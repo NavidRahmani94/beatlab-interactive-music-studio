@@ -46,7 +46,8 @@ export class BeatLabEngine {
     this.master = new Tone.Limiter(-3).toDestination();
     this.kick = new Tone.MembraneSynth({pitchDecay: 0.05, octaves: 8, envelope: {attack: 0.001, decay: 0.35, sustain: 0, release: 0.08}}).connect(this.master);
     this.snare = new Tone.NoiseSynth({noise: {type: 'white'}, envelope: {attack: 0.001, decay: 0.16, sustain: 0}}).connect(this.master);
-    this.hat = new Tone.MetalSynth({frequency: 260, envelope: {attack: 0.001, decay: 0.055, release: 0.02}, harmonicity: 5.1, modulationIndex: 24, resonance: 3000, octaves: 1}).connect(this.master);
+    this.hat = new Tone.MetalSynth({envelope: {attack: 0.001, decay: 0.055, release: 0.02}, harmonicity: 5.1, modulationIndex: 24, resonance: 3000, octaves: 1}).connect(this.master);
+    this.hat.frequency.value = 260;
     this.clap = new Tone.NoiseSynth({noise: {type: 'pink'}, envelope: {attack: 0.001, decay: 0.23, sustain: 0}}).connect(this.master);
     this.snare.volume.value = -13;
     this.hat.volume.value = -20;

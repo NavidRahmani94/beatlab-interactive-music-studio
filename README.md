@@ -1,4 +1,4 @@
-# BeatLab — Phase 0 + Phase 1
+# BeatLab — Phase 0 + Phase 1 (v0.1.1)
 
 A working browser drum-engine prototype using React, TypeScript, Vite and Tone.js.
 
@@ -9,7 +9,8 @@ A working browser drum-engine prototype using React, TypeScript, Vite and Tone.j
 ## Start
 ```bash
 npm install
-npm run dev
+npm run dev          # localhost only
+npm run dev:lan      # exposed on the local network
 ```
 Open the URL printed by Vite (typically http://localhost:5173).
 
@@ -44,7 +45,20 @@ Piano Roll, channel mixer/effects, JSON save/load, WAV export, UI automation and
 7. Open browser developer console; check no critical errors.
 
 ## Architecture
-`App.tsx` owns UI state, `pattern.ts` contains pure pattern logic, and `engine.ts` owns Tone.js instruments, clock and scheduling. The engine reads the current pattern without recreating transport events after each edit.
+All source lives in `src/`. `App.tsx` owns UI state, `pattern.ts` contains pure pattern logic, and `engine.ts` owns Tone.js instruments, clock and scheduling. The engine reads the current pattern without recreating transport events after each edit.
 
 ## Known limitations
 Drum sounds are synthesized rather than loaded samples; exact sound character may vary by browser. Phase 1 has no audio export. The phase 2 grid is an early preview, not a fully accepted phase.
+
+## Changelog v0.1.1
+- Fixed `npm run build` (TS2353): `MetalSynth.frequency` is now set after construction.
+- Moved sources to `src/`; `tsconfig` includes `src`.
+- Added `package-lock.json`, `.gitignore`, `engines`; moved vite/plugin-react to devDependencies.
+- `dev` no longer binds to 0.0.0.0 (use `dev:lan`).
+- UI phase labels corrected; 4 extra unit tests (8 total).
+
+## Verification status
+- `npm test` (8 pass) and `npm run build`: verified.
+- Headless Chromium smoke test: Play starts, playhead moves, BPM change applies, 10x Stop/Play leaves no stuck state, no app errors.
+- **Not verified:** actual audio character/timing by ear, Firefox. Do the manual checklist above.
+- Fonts load from Google Fonts (needs internet; falls back to system fonts offline).
