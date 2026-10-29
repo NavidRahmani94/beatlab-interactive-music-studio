@@ -58,3 +58,6 @@ vizMath.test.ts (263 unit tests in total), e2e-v16.cjs (all styles draw, choice 
 
 ## v0.16.1
 Benchmark (bench.cjs, dev only): hat-only render 19.7 s -> 4.4 s for 25.9 s of audio. 263 unit tests, e2e v14 and v16 pass.
+
+## v0.17 tests
+keyboardPiano.test.ts (268 unit tests in total), e2e-v17.cjs (note-name click makes sound, step entry in easy and advanced, octave, typing safe, drums pads, toggle). e2e-v14 updated: REC can be armed while stopped.

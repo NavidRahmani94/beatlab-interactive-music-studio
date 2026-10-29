@@ -15,6 +15,12 @@ type Props = {
   onConnect: () => void;
   onDevice: (id: string) => void;
   onRec: (on: boolean) => void;
+  keysOn: boolean;
+  onKeys: (on: boolean) => void;
+  octave: number;
+  onOctave: (o: number) => void;
+  cursor: number;           // step-entry position (0-based) when REC is armed while stopped, else -1
+  view: 'drums' | 'notes';
   onExport: () => void;
   /** Puts the chosen part of the file into the project; returns a message for the status line. */
   onImport: (data: MidiData, source: number | 'drums', bar: number | 'all', useTempo: boolean) => string;
@@ -50,6 +56,12 @@ export default function MidiPanel(p: Props) {
       <button className="auto-btn" aria-expanded={open} onClick={() => setOpen(o => !o)}>{open ? '▾' : '▸'} 🎹 MIDI</button>
       <span>PLAY AND RECORD WITH A KEYBOARD · IMPORT / EXPORT .MID FILES</span>
     </div>
+    <div className="keys-bar" role="group" aria-label="Keyboard piano and recording">
+      <button className={'auto-btn' + (p.keysOn ? ' on' : '')} aria-pressed={p.keysOn} title="Play the open tab with the computer keyboard" onClick={() => p.onKeys(!p.keysOn)}>⌨ KEYBOARD PIANO {p.keysOn ? 'ON' : 'OFF'}</button>
+      {p.keysOn && p.view === 'notes' && <span className="octave">OCTAVE <button className="auto-btn" aria-label="Octave down" onClick={() => p.onOctave(p.octave - 1)}>−</button><b>C{p.octave}</b><button className="auto-btn" aria-label="Octave up" onClick={() => p.onOctave(p.octave + 1)}>＋</button></span>}
+      <button className={'auto-btn rec' + (p.rec ? ' on' : '')} aria-pressed={p.rec} title={p.playing ? 'Notes you play are written where the song is playing' : 'Step entry: each note goes to the highlighted step, then it moves on (← → move it)'} onClick={() => p.onRec(!p.rec)}>{p.rec ? '● RECORDING' : '○ REC'}</button>
+      <span className="hint" role="status">{p.keysOn ? (p.view === 'drums' ? 'Keys A S D F = kick, snare, hat, clap.' : 'Keys A W S E D F T G Y H U J K = C to C, Z / X change octave.') : ''}{p.rec ? (p.playing ? ' Recording into the playing pattern.' : p.cursor >= 0 ? ` Step entry at step ${p.cursor + 1}.` : '') : ''}</span>
+    </div>
     {open && <div className="midi-body">
       <div className="melody-controls">
         {p.supported
@@ -60,8 +72,6 @@ export default function MidiPanel(p: Props) {
             <option value="all">All keyboards</option>{p.devices.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
         </label>}
-        {p.connected && <button className={'auto-btn rec' + (p.rec ? ' on' : '')} aria-pressed={p.rec} disabled={!p.playing && !p.rec}
-          title={p.playing ? 'While the song plays, notes you play are written into the open track' : 'Press PLAY first, then REC'} onClick={() => p.onRec(!p.rec)}>{p.rec ? '● RECORDING' : '○ REC'}</button>}
         <span className="hint" role="status">{p.message}{p.connected ? ` Keyboard plays: ${p.target}.` : ''}</span>
       </div>
       <div className="melody-controls second">

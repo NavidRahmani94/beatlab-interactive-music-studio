@@ -58,3 +58,5 @@ Dynamic tracks: synth note track, rename / add / delete tracks, schema 5 with au
 - v0.15.0: Arrangement (drag & drop, sections, structure builder) done.
 
 - v0.16.0: Interactive Visuals done. All planned upgrades finished (Sample Library cancelled by the user).
+
+- v0.17.0: playable note names, keyboard piano, step entry, audio stability changes.

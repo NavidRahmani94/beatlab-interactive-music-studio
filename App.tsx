@@ -15,6 +15,7 @@ import { MidiConnection, MidiDevice, midiSupported, openMidi } from './midiInput
 import { MidiMsg, drumForNote, heldSteps, quantizePosition } from './midiLive';
 import { MidiData, drumsToGrid, encodeMidi, foldToRange, barsOf, notesToGrid, sourceNotes } from './midiFile';
 import { mergeNotes } from './chords';
+import { DEFAULT_OCTAVE, clampOctave, keyToMidi, keyToPad, nextStep, octaveShift } from './keyboardPiano';
 import { Section, clampSections, clearSlot, copySlot, insertSlot, moveSlot, removeSlot } from './arrangement';
 import { MelodyNote, ScaleName, easyRoot, midiToNote, remapToScale, transposeNotes } from './melody';
 import { ChannelName, Channels, ChannelSettings, MasterSettings, patchChannel, patchMaster, syncChannels } from './mixer';
@@ -257,11 +258,16 @@ export default function App() {
   // ---- MIDI keyboard: play the open tab, and (while the song plays) record into it
   const [midi, setMidi] = useState<{ connected: boolean; devices: MidiDevice[]; deviceId: string; message: string }>({ connected: false, devices: [], deviceId: 'all', message: midiSupported() ? 'Not connected.' : '' });
   const [rec, setRec] = useState(false);
+  const [keysOn, setKeysOn] = useState(true);
+  const [octave, setOctave] = useState(DEFAULT_OCTAVE);
+  const [stepCursor, setStepCursor] = useState(0);
+  const cursorRef = useRef(0); cursorRef.current = stepCursor;
+  const drumTimer = useRef<number | undefined>(undefined);
   const conn = useRef<MidiConnection | null>(null);
   type How = { kind: 'drums' } | { kind: 'track'; id: string } | { kind: 'audition'; patch: SynthPatch };
   const live = useRef({ view, tracks, synths, synthId, rec, playing, bpm, playlist, mode, cur });
   live.current = { view, tracks, synths, synthId, rec, playing, bpm, playlist, mode, cur };
-  const held = useRef(new Map<number, { t0: number; how: How; vel: number; at: { pattern: number; step: number } | null }>());
+  const held = useRef(new Map<number, { t0: number; how: How; vel: number; at: { pattern: number; step: number } | null; entry?: boolean }>());
   const howNow = (): How | null => {
     const L = live.current;
     if (L.view === DRUMS_TAB) return { kind: 'drums' };
@@ -285,7 +291,8 @@ export default function App() {
         eng.liveUp(h.how.id, name);
         if (h.at) {
           const midiNote = foldToRange(m.note); const at = h.at; const id = h.how.id;
-          const n: MelodyNote = { id: `n${midiNote}_${at.step}`, pitch: midiToNote(midiNote), step: at.step, lengthSteps: heldSteps(performance.now() - h.t0, L.bpm), velocity: h.vel };
+          const n: MelodyNote = { id: `n${midiNote}_${at.step}`, pitch: midiToNote(midiNote), step: at.step, lengthSteps: h.entry ? 1 : Math.min(heldSteps(performance.now() - h.t0, L.bpm), 32 - at.step), velocity: h.vel };
+          if (h.entry && ![...held.current.values()].some(x => x.entry)) setStepCursor(c => nextStep(c));
           setPatterns(ps => ps.map((p, i) => (i === at.pattern ? withNotes(p, id, mergeNotes(notesFor(p, id), [n])) : p)));
         }
       }
@@ -295,7 +302,8 @@ export default function App() {
     if (!how) return;
     const fr = frameRef.current;
     const where = (): { pattern: number; step: number } | null => {
-      if (!L.rec || !L.playing || !fr) return null;
+      if (L.rec && !L.playing) return { pattern: L.cur, step: cursorRef.current };   // step entry: notes go to the highlighted step
+      if (!L.rec || !fr) return null;
       const q = quantizePosition(fr.frame, (performance.now() - fr.at) / (60000 / L.bpm / 4), L.playlist, L.mode, L.cur);
       return q.pattern === null ? null : { pattern: q.pattern, step: q.step };
     };
@@ -305,10 +313,11 @@ export default function App() {
       eng.liveDrum(inst, m.velocity);
       const at = where();
       if (at) setPatterns(ps => ps.map((p, i) => (i === at.pattern ? { ...p, drums: { ...p.drums, [inst]: p.drums[inst].map((v, s) => (s === at.step ? true : v)) } } : p)));
+      if (at && !L.playing) { window.clearTimeout(drumTimer.current); drumTimer.current = window.setTimeout(() => setStepCursor(c => nextStep(c)), 220); }  // pads hit together share one step
       return;
     }
     if (how.kind === 'audition') void eng.auditionDown(how.patch, name); else eng.liveDown(how.id, name, m.velocity);
-    held.current.set(m.note, { t0: performance.now(), how, vel: Math.max(0.05, m.velocity), at: how.kind === 'track' ? where() : null });
+    held.current.set(m.note, { t0: performance.now(), how, vel: Math.max(0.05, m.velocity), at: how.kind === 'track' ? where() : null, entry: how.kind === 'track' && L.rec && !L.playing });
   }, []);
   async function connectMidi() {
     try {
@@ -319,6 +328,47 @@ export default function App() {
     } catch (e) { setMidi(s => ({ ...s, message: e instanceof Error ? e.message : 'MIDI could not start.' })); }
   }
   useEffect(() => () => { conn.current?.dispose(); }, []);
+  // ---- computer keyboard as a piano (and ← → to move the step-entry cursor)
+  const keyHeld = useRef(new Map<string, number>());
+  const octaveRef = useRef(octave); octaveRef.current = octave;
+  useEffect(() => {
+    if (!keysOn) return;
+    const typing = (el: EventTarget | null) => { const t = el as HTMLElement | null; return !!t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable); };
+    const down = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || typing(e.target)) return;
+      const L = live.current;
+      if (L.rec && !L.playing && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { e.preventDefault(); setStepCursor(c => nextStep(c, e.key === 'ArrowRight' ? 1 : -1)); return; }
+      if (e.repeat) return;
+      const shift = L.view === DRUMS_TAB ? 0 : octaveShift(e.key);
+      if (shift) { setOctave(o => clampOctave(o + shift)); return; }
+      const note = L.view === DRUMS_TAB ? keyToPad(e.key) : keyToMidi(e.key, octaveRef.current);
+      if (note === null || keyHeld.current.has(e.key.toLowerCase())) return;
+      keyHeld.current.set(e.key.toLowerCase(), note);
+      void engine.current?.prepare().then(() => onMidi({ kind: 'on', note, velocity: 0.8 } as MidiMsg));
+    };
+    const up = (e: KeyboardEvent) => {
+      const k = e.key.toLowerCase(); const note = keyHeld.current.get(k);
+      if (note === undefined) return;
+      keyHeld.current.delete(k);
+      onMidi({ kind: 'off', note, velocity: 0 } as MidiMsg);
+    };
+    window.addEventListener('keydown', down); window.addEventListener('keyup', up);
+    return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); keyHeld.current.forEach(n => onMidi({ kind: 'off', note: n, velocity: 0 } as MidiMsg)); keyHeld.current.clear(); };
+  }, [keysOn, onMidi]);
+  // clicking a note name in the piano roll plays it with that track's sound
+  const previewHeld = useRef(new Set<string>());
+  const previewNote = useCallback((trackId: string, midi: number, down: boolean) => {
+    const eng = engine.current; if (!eng) return;
+    const name = midiToNote(midi); const key = `${trackId}:${midi}`;
+    if (down) {
+      previewHeld.current.add(key);
+      void eng.prepare().then(() => {
+        eng.liveDown(trackId, name, 0.8);
+        // released before the audio engine was ready (first click): let the note ring briefly instead of hanging
+        if (!previewHeld.current.has(key)) window.setTimeout(() => eng.liveUp(trackId, name), 250);
+      });
+    } else if (previewHeld.current.delete(key)) eng.liveUp(trackId, name);
+  }, []);
   const midiTarget = view === DRUMS_TAB ? 'DRUMS (pads: GM notes 36 kick, 38 snare, 42 hat, 39 clap)' : view === 'lab' ? (synths.find(x => x.id === synthId)?.name ?? 'no synth selected') : (trackById(tracks, view)?.name ?? '—');
   function exportMidi() {
     const bytes = encodeMidi({ bpm, patterns, playlist, tracks, mode, pattern: cur, name });
@@ -393,7 +443,7 @@ export default function App() {
   const renderTrack = (t: TrackDef) => <TrackPanel key={t.id} track={t} accent={trackAccent(tracks.indexOf(t))} onRename={n => renameTrack(t.id, n)} onDelete={() => deleteTrack(t.id)}
     synths={synths} notes={notesFor(pattern, t.id)} onNotes={setTrackNotes(t.id)} enabled={!(channels[t.id]?.muted)}
     onEnabled={on => changeChannel(t.id, { muted: !on })} solo={!!channels[t.id]?.solo} onSolo={solo => changeChannel(t.id, { solo })} keyPc={keyPc} scale={scale} onKeyChange={changeKey} onScaleChange={changeScale}
-    onInstrument={(id: MelodyInstrumentId) => setInstrument(t.id, id)} onArp={patch => setTrackArp(t.id, patch)} playingStep={stepHere} />;
+    onInstrument={(id: MelodyInstrumentId) => setInstrument(t.id, id)} onArp={patch => setTrackArp(t.id, patch)} playingStep={stepHere} onPreview={(m, d) => previewNote(t.id, m, d)} cursor={rec && !playing && view === t.id ? stepCursor : -1} />;
 
   // key and scale are shared by all tracks and all patterns, so changing them moves the whole song together
   const changeKey = (next: number) => { setPatterns(ps => mapNotes(ps, n => transposeNotes(n, easyRoot(next) - easyRoot(keyPc)))); setKeyPc(next); };
@@ -449,7 +499,7 @@ export default function App() {
   const bars = mode === 'song' ? playlist.length : 1;
 
   return <main className="shell" style={{ ['--bar-s' as string]: `${(STEPS * 15) / bpm}s` }}>
-    <header><div><div className="eyebrow">INTERACTIVE MUSIC STUDIO</div><h1><span>BEAT</span>LAB<span className="dot">.</span></h1></div><div className="head-right"><button className="theme-btn" aria-label="Colour theme" title="Switch between automatic, dark and light" onClick={() => setTheme(nextTheme(theme))}>{THEME_LABEL[theme]}</button><div className="phase">PHASE 01–10 <span>• V0.16.1 TEST BUILD</span></div></div></header>
+    <header><div><div className="eyebrow">INTERACTIVE MUSIC STUDIO</div><h1><span>BEAT</span>LAB<span className="dot">.</span></h1></div><div className="head-right"><button className="theme-btn" aria-label="Colour theme" title="Switch between automatic, dark and light" onClick={() => setTheme(nextTheme(theme))}>{THEME_LABEL[theme]}</button><div className="phase">PHASE 01–10 <span>• V0.17 TEST BUILD</span></div></div></header>
     <section className="intro hero"><div className="hero-text"><div className="eyebrow">YOUR FIRST SONG</div><h2>Make some noise.</h2><p>Ambient. Drums. Melody. Arpeggio. Mix. Master. Arrange. Export WAV / MP3.</p></div><HeroArt playing={playing} bpm={bpm} /></section>
     {pendingRestore && <div className="restore-banner" role="alert">
       <span>Unsaved work from {new Date(pendingRestore.savedAt).toLocaleString()} was found on this device.</span>
@@ -462,7 +512,8 @@ export default function App() {
 
     <MidiPanel supported={midiSupported()} connected={midi.connected} devices={midi.devices} deviceId={midi.deviceId} message={midi.message} rec={rec} playing={playing} target={midiTarget}
       exportUnit={mode === 'pattern' ? pattern.name : 'song'} onConnect={connectMidi} onDevice={id => { conn.current?.select(id); setMidi(s => ({ ...s, deviceId: id })); }}
-      onRec={setRec} onExport={exportMidi} onImport={importMidi} />
+      onRec={setRec} onExport={exportMidi} onImport={importMidi} keysOn={keysOn} onKeys={setKeysOn} octave={octave} onOctave={o => setOctave(clampOctave(o))}
+      cursor={rec && !playing ? stepCursor : -1} view={view === DRUMS_TAB ? 'drums' : 'notes'} />
 
     <div className="tabs" role="tablist" aria-label="Tracks">
       <button className={'mini-play' + (playing ? ' on' : '')} aria-label={playing ? 'Stop (quick)' : 'Play (quick)'} title="Play / stop from here (Space also works)" onClick={playing ? stop : play}>{playing ? '■' : '▶'}</button>
@@ -504,6 +555,6 @@ export default function App() {
       onInsertSlot={i => { setPlaylist(pl => insertSlot(pl, i)); }} onRemoveSlot={i => { setPlaylist(pl => removeSlot(pl, i)); setSections(s => clampSections(s, Math.max(1, playlist.length - 1))); }} onClearBars={() => setPlaylist(pl => pl.map(() => null))} onMode={setMode} />
     <MixerPanel tracks={tracks} channels={channels} master={master} onChannel={changeChannel} onMaster={changeMaster} getLevelDb={getLevelDb} playing={playing} />
     <div role={status.kind === 'error' ? 'alert' : 'status'} className={'status ' + status.kind}>{status.text}</div>
-    <footer><span>BEATLAB / V0.16.1 TEST BUILD</span><span>BUILT WITH REACT + TONE.JS</span><span>AUDIO UNVERIFIED BY EAR</span></footer>
+    <footer><span>BEATLAB / V0.17 TEST BUILD</span><span>BUILT WITH REACT + TONE.JS</span><span>AUDIO UNVERIFIED BY EAR</span></footer>
   </main>;
 }

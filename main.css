@@ -286,3 +286,13 @@ body,.panel,button,select,input{transition:background-color .15s,color .15s,bord
 /* v0.16 visual styles */
 .viz-modes{margin-left:auto;display:inline-flex;gap:4px}
 .viz-modes button{font-size:10px;padding:4px 8px}
+
+/* v0.17 playable note names, keyboard piano, step entry */
+.mlabel.key{cursor:pointer;border-radius:4px;user-select:none;-webkit-user-select:none;touch-action:none}
+.mlabel.key:hover{color:var(--text);background:var(--raised)}
+.mlabel.key:active{background:var(--accent);color:var(--onaccent)}
+.mhead .stepcur{color:var(--accent-text);font-weight:700}
+.mcell.stepcur:not(.on){background:color-mix(in srgb,var(--accent) 22%,var(--raised));border-color:var(--accent)}
+.keys-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:12px 24px}
+.keys-bar .octave{display:inline-flex;align-items:center;gap:6px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;color:var(--muted)}
+.auto-btn.on{background:var(--accent);color:var(--onaccent)}

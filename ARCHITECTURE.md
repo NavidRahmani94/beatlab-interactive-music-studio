@@ -64,3 +64,6 @@ project.ts ── one BeatLabProject (schemaVersion 2). validateProject on Open 
 
 ## v0.16.1
 `Rig.buildHat` renders one hat hit per kit in a private OfflineContext (synchronously switching the global Tone context, like patchSynth). Falls back to the MetalSynth until the buffer exists.
+
+## v0.17 additions
+`keyboardPiano.ts` (pure key mapping, octave, step cursor). App: keyboard listeners feed the same `onMidi` path as a real MIDI keyboard; `previewNote` for the note names; `stepCursor` for step entry. `toneFix.ts`: Tone context with latencyHint playback + lookAhead 0.15, and a timer-based dispose of finished one-shot sources.

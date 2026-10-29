@@ -18,7 +18,7 @@ const ok = (n, c, d = '') => { results.push(c); console.log((c ? 'PASS ' : 'FAIL
   await p.click('button:has-text("MIDI") >> nth=0');
   await p.click('text=CONNECT KEYBOARD'); await p.waitForTimeout(800);
   ok('keyboard found', /1 keyboard found/.test(await p.textContent('.midi')), (await p.textContent('.midi-body .hint')));
-  ok('REC needs the song to play', await p.isDisabled('button.rec'));
+  ok('REC can be armed while stopped (step entry)', !(await p.isDisabled('button.rec')));
   // record a note on the SYNTH track
   await p.click('button[role="tab"]:text-is("SYNTH")');
   const cells = sel => p.$$eval(`${sel} button[aria-pressed="true"][data-step]`, e => e.length);

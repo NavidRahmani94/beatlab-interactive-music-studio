@@ -109,3 +109,9 @@ Open **🎹 CHORD BUILDER** on any note track. The seven chords of your key are 
 
 ## v0.16.1 — performance fix
 The hi-hat (Tone.MetalSynth, 12 FM oscillators per hit) used about 60% of the audio load in our benchmark. It is now rendered once per drum kit into a buffer (same sound, correlation 0.99) and only played back. Render time of the demo dropped from 1.45x to about 0.4x of real time on the test machine.
+
+## New in v0.17 — playable notes, keyboard piano, step entry (+ smoother audio)
+- Click (or hold) a note name at the left of any piano roll (EASY and ADVANCED) to hear it with that track's sound.
+- KEYBOARD PIANO (always visible above the tabs): the computer keyboard plays the open tab — A W S E D F T G Y H U J K = C to C, Z / X change octave. On DRUMS, A S D F are kick, snare, hat, clap. Typing in text boxes never plays.
+- REC works with the computer keyboard and with a MIDI keyboard: while the song plays notes go where the playhead is; while stopped it is step entry (notes go to the highlighted step, then the cursor moves; ← → move it).
+- Audio: the context now uses a larger buffer and look-ahead (latencyHint playback) so short main-thread hiccups no longer crackle; finished oscillators are freed with a timer instead of requestIdleCallback.

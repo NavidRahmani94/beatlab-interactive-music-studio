@@ -16,6 +16,8 @@ type Props = {
   enabled: boolean;
   playingStep: number;      // -1 when this pattern is not being played right now
   accent: string;           // CSS colour of this track
+  onPreview?: (midi: number, down: boolean) => void; // press / release a note name to hear it
+  cursor?: number;          // step-entry position (highlighted column), -1 = none
   touchDraw: boolean;       // touch screens: true = dragging draws/stretches notes, false = dragging scrolls (a tap still adds/removes)
 };
 
@@ -30,7 +32,7 @@ type Drag =
  * Piano roll. CLICK an empty cell = new note (default length). DRAG sideways from an empty cell = a note of any length.
  * DRAG sideways from a cell of an existing note = stretch / shrink it. CLICK an existing note = remove it.
  */
-export default function PianoRoll({ notes, onNotes, advanced, keyPc, scale, defaultLength, velocity, enabled, playingStep, accent, touchDraw }: Props) {
+export default function PianoRoll({ notes, onNotes, advanced, keyPc, scale, defaultLength, velocity, enabled, playingStep, accent, touchDraw, onPreview, cursor = -1 }: Props) {
   const rollRef = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);
   const laneDragging = useRef(false);
@@ -140,17 +142,19 @@ export default function PianoRoll({ notes, onNotes, advanced, keyPc, scale, defa
   return <>
     <div className={'roll-wrap ' + (advanced ? 'advanced' : 'easy') + (enabled ? '' : ' is-muted')} ref={rollRef} style={{ ['--accent' as string]: accent }}>
       <div className={'roll' + (touchDraw ? ' draw' : '')} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={() => { drag.current = null; }}>
-        <div className="mrow mhead"><span />{Array.from({ length: STEPS }, (_, i) => <span key={i} className={i === 16 ? 'bar2' : undefined}>{i + 1}</span>)}</div>
+        <div className="mrow mhead"><span />{Array.from({ length: STEPS }, (_, i) => <span key={i} className={(i === 16 ? 'bar2' : '') + (i === cursor ? ' stepcur' : '')}>{i + 1}</span>)}</div>
         {rows.map(midi => {
           const name = midiToNote(midi);
           const inKey = inScale(midi, keyPc, scale);
           const isRoot = ((midi - keyPc) % 12 + 12) % 12 === 0;
           return <div key={midi} className={'mrow' + (name.includes('#') ? ' black' : '') + (inKey ? ' inkey' : '') + (isRoot ? ' root' : '')}>
-            <span className="mlabel">{name}</span>
+            <span className={'mlabel' + (onPreview ? ' key' : '')} role={onPreview ? 'button' : undefined} aria-label={onPreview ? `Hear ${name}` : undefined} title={onPreview ? `Click to hear ${name}` : undefined}
+              onPointerDown={onPreview ? e => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); onPreview(midi, true); } : undefined}
+              onPointerUp={onPreview ? () => onPreview(midi, false) : undefined} onPointerCancel={onPreview ? () => onPreview(midi, false) : undefined}>{name}</span>
             {Array.from({ length: STEPS }, (_, s) => {
               const cell = cells.get(`${midi}:${s}`);
               const cls = 'mcell' + (cell ? ' on' + (cell.start ? ' start' : '') + (cell.end ? ' end' : '') : '') + (s % 4 === 0 ? ' beat' : '') + (s === 16 ? ' bar2' : '') +
-                (playingStep === s ? ' current' : '') + (advanced && !inKey ? ' out' : '');
+                (playingStep === s ? ' current' : '') + (s === cursor ? ' stepcur' : '') + (advanced && !inKey ? ' out' : '');
               return <button key={s} data-midi={midi} data-step={s} className={cls} style={cell ? { ['--v' as string]: cell.v } : undefined}
                 aria-label={`${name} step ${s + 1}`} aria-pressed={!!cell} onClick={e => keyClick(midi, s, e.detail)} />;
             })}

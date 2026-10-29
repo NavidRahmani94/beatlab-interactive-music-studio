@@ -1,3 +1,4 @@
+import { applyToneFix } from './toneFix';
 import * as Tone from 'tone';
 import { Instrument } from './pattern';
 import { MelodyNote } from './melody';
@@ -171,6 +172,8 @@ export function notesStartingAt(notes: MelodyNote[], step: number): MelodyNote[]
  * The SAME class is used for live playback and for the offline WAV render, so both sound identical.
  * Create it while the Tone context you want (live or offline) is the active one.
  */
+applyToneFix();
+
 export class Rig {
   private masterIn: Tone.Gain;
   private eq: Tone.EQ3;
