@@ -307,6 +307,26 @@ describe('groove in project files', () => {
   });
 });
 
+describe('sections in project files', () => {
+  it('are saved and opened unchanged', () => {
+    const p = defaultProject(); p.playlist = [0, 0, 0, null]; p.sections = [{ name: 'Intro', start: 0, length: 2 }, { name: 'Verse', start: 2, length: 2 }];
+    const r = parseProject(serializeProject(p));
+    expect(r.ok && r.project.sections).toEqual(p.sections);
+  });
+  it('older files open with no sections', () => {
+    const p: any = clone(defaultProject()); delete p.sections;
+    const r = validateProject(p);
+    expect(r.ok && r.project.sections).toEqual([]);
+  });
+  it('rejects broken sections', () => {
+    bad(p => { p.sections = 'x'; }, /sections/);
+    bad(p => { p.sections = [{ name: '', start: 0, length: 1 }]; }, /sections/);
+  });
+  it('the demos come with named sections', () => {
+    expect(SAMPLE_PROJECTS['Hip Hop Demo']().sections.length).toBeGreaterThan(0);
+  });
+});
+
 describe('startup song', () => {
   it('is valid, has drums in every pattern group, several patterns and a multi-bar playlist', () => {
     const p = startupProject();

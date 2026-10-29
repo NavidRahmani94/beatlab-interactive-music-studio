@@ -29,14 +29,17 @@ Attach this zip and say: "Continue BeatLab from PROJECT_STATUS.md". Keep the fla
 - Touch mode toggle for drawing notes on phones.
 - Verified: 127 unit tests; WAV (89.9 s, peak -4 dB, intro/break quieter than verse/hook) and MP3 192 header/duration of the demo export in headless Chromium. NOT verified: human listening, real phone, WAV24/MP3 320 in browser, e2e-full.cjs (still the v0.6 script; needs updating for 32 steps).
 
-## v0.13.0 (latest)
+## v0.14.0 (latest)
+MIDI: live keyboard, record, .mid import/export. Tested with a simulated keyboard, not real hardware. Next planned: Arrangement drag & drop, Interactive Visuals.
+
+## v0.13.0
 Drum Groove Engine + hi-hat bug fix. Known: exporting a long song (about 85 s of audio) took more than 4 minutes on a 2-core test machine.
 
 ## v0.12.0
 Smart Chord Builder. Before it: v0.11 Undo/Redo + Autosave.
 
 ## v0.11.0
-Undo / Redo and Autosave. Next planned, in this order: MIDI, Arrangement drag & drop, Visuals, Sample Library.
+Undo / Redo and Autosave. Next planned, in this order: Arrangement drag & drop, Visuals, Sample Library.
 
 ## v0.10.0
 Dynamic tracks: synth note track, rename / add / delete tracks, schema 5 with automatic upgrade. Verified by unit tests, 19 browser checks and a WAV export; not heard by ear, not tried on a real phone. Live recording from the Synth Lab keyboard is not done.
@@ -51,3 +54,7 @@ Dynamic tracks: synth note track, rename / add / delete tracks, schema 5 with au
 - Level calibration of the library: each sound was rendered offline and its volume set so the loudness is about the same (target -21 dB RMS).
 - NOT verified: listening by ear (sounds are synthesized imitations, e.g. santur/ney are not recordings), real phone, MP3 320 / WAV24 in the browser, `e2e-full.cjs` (old v0.6 script, not updated).
 - Ideas not done: more drum rows (open hat, toms, rim, crash), per-sound effects sends, sample import.
+
+- v0.15.0: Arrangement (drag & drop, sections, structure builder) done.
+
+- v0.16.0: Interactive Visuals done. All planned upgrades finished (Sample Library cancelled by the user).

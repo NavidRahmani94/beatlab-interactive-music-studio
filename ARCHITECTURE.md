@@ -28,6 +28,9 @@ project.ts ── one BeatLabProject (schemaVersion 2). validateProject on Open 
 * **Visualiser.** Two `Tone.Analyser` nodes after the limiter (FFT + waveform) feed a canvas drawn with `requestAnimationFrame` (no React re-renders); the playlist highlights the playing bar.
 
 
+## v0.14 additions
+`midiFile.ts` (pure): .mid writer and strict reader (running status, velocity-0 note-offs, SMPTE rejected, size and note limits), notes → grid and GM drums → pattern. `midiLive.ts` (pure): message parsing, drum pad map, `quantizePosition`, `heldSteps`. `midiInput.ts`: Web MIDI wrapper (browser only). The Rig has `liveDown/liveUp/liveDrum`, which use the same voices as the song and start slightly later while the transport runs (Tone refuses events in the past). `MidiPanel.tsx` is the UI; App owns the recording logic.
+
 ## v0.13 additions
 `groove.ts` (pure): `drumHits(drums, step, tick, groove)` returns the hits of a step (own hits + ghost notes + fills, with delay and velocity), `swingDelay`, `stepDrift`, and a hash-based `rand(tick, salt)`. The Rig calls them in `triggerStep`, so live play and export are identical. `groove` is a field of the project (optional in the file, default straight).
 
@@ -52,3 +55,9 @@ project.ts ── one BeatLabProject (schemaVersion 2). validateProject on Open 
 - `rig.ts`: `setSynths()`, instrument resolution (built-in PolySynth sounds, library patch, or the user's patch), a signature per voice so a track is rebuilt when its patch changes, and an extra audition voice for the Synth Lab keyboard. `engine.ts` forwards `setSynths` and `auditionDown/Up/Stop`; `exporter.ts` calls `rig.setSynths(project.synths)` before building the tracks.
 - `project.ts`: schema 4 (`synths`), tracks may reference `synth:<id>`, version-3 files still open; seven demo songs.
 - `theme.ts` + CSS variables in `main.css` (dark default, `[data-theme=light]` overrides); a tiny script in `index.html` sets the theme before the first paint.
+
+## v0.15 additions
+`arrangement.ts` is pure: slot operations (move/copy/clear/insert/remove), section helpers, `autoSections`, `STRUCTURES`, `guessRoles`, `buildStructure`. Sections are labels only and never affect audio. `PlaylistPanel` uses HTML5 drag & drop.
+
+## v0.16 additions
+`vizMath.ts` is pure (band energies from the FFT, loudness, `BeatPulse` onset detector). `Visualizer.tsx` draws all styles on one canvas with requestAnimationFrame; no React re-renders per frame.

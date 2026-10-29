@@ -260,3 +260,29 @@ body,.panel,button,select,input{transition:background-color .15s,color .15s,bord
 @keyframes noteRise{0%{transform:translateY(0) rotate(-8deg);opacity:0}12%{opacity:.8}85%{opacity:.5}100%{transform:translateY(-230px) rotate(10deg);opacity:0}}
 @media (max-width:700px){.hero-art{flex-basis:100%;height:120px;max-width:none}.hero-art .eq{gap:3px;padding:0 12px}.hero-art .note{font-size:16px}}
 @media (prefers-reduced-motion:reduce){.hero-art *{animation:none!important}.hero-art .note{display:none}}
+
+/* v0.14 MIDI */
+.midi .panel-label{align-items:center}
+.midi-body .hint{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:.4px}
+.midi-body .hint.err{color:var(--pink)}
+.auto-btn.rec.on{background:var(--red);border-color:var(--red);color:var(--onaccent)}
+.auto-btn:disabled{opacity:.45}
+
+/* v0.15 arrangement */
+.slot{position:relative}
+.slot.over{outline:2px dashed var(--accent);outline-offset:1px}
+.slot.cursor:not(.playing){box-shadow:0 0 0 1px var(--text3) inset}
+.slot.in-section{border-top:3px solid var(--sec)}
+.slot .sec-tag{position:absolute;top:-1px;right:4px;font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.6px;text-transform:uppercase;color:var(--sec);max-width:70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.slot[draggable="true"]{cursor:grab}
+.bin{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.8px;color:var(--muted);border:1px dashed var(--line);border-radius:6px;padding:7px 10px;opacity:.5}
+.bin.show{opacity:1;border-color:var(--red);color:var(--pink)}
+.structure{padding:0 24px 16px}
+.structure-body{margin-top:10px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.section-edit{display:inline-flex;gap:6px;align-items:center}
+.section-edit .name-input{width:110px}
+.section-edit select{background:var(--raised);color:var(--text);border:1px solid var(--line);border-radius:5px;height:30px;padding:0 6px;font-size:12px}
+
+/* v0.16 visual styles */
+.viz-modes{margin-left:auto;display:inline-flex;gap:4px}
+.viz-modes button{font-size:10px;padding:4px 8px}

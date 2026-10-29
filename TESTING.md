@@ -24,6 +24,9 @@ Tip: run the browser test with a normal-sized window (the script uses 1280×1000
 10. Stop/Play 10 times: no doubled notes, always starts at bar 1 step 1. Browser console: no red errors.
 
 
+## v0.14 tests
+`midi.test.ts`: file round trips, drums on channel 10, damaged / truncated / random input never throws, grid snapping, live message parsing, quantizing. `e2e-v14.cjs <url>` uses a fake Web MIDI keyboard (a script that injects `navigator.requestMIDIAccess`): connect, record notes and drum hits, export, import, undo, broken file. A real keyboard was NOT tested.
+
 ## v0.13 tests
 `groove.test.ts` (off = unchanged, repeatable, ghost/fill positions, validation), groove cases in `project.test.ts`, `e2e-v13.cjs` (sliders, preset→custom, two exports differ, save). Two exports of the same groove were compared offline: correlation 0.994 (only the reverb's own noise differs).
 
@@ -46,3 +49,9 @@ Tip: run the browser test with a normal-sized window (the script uses 1280×1000
 - `theme.test.ts`: theme cycling and resolution.
 - Browser: `node e2e-v09.cjs http://localhost:4173/` (34 checks) and `node e2e-demos.cjs http://localhost:4173/` (exports six demos). Start the preview server in the same shell command (`npx vite preview --port 4173`).
 - Level calibration was done by rendering every library sound offline in Chromium (`Tone.Offline`) and measuring RMS/peak.
+
+## v0.15 tests
+arrangement.test.ts, sections in project.test.ts (256 unit tests), e2e-v15.cjs (real drag & drop, bin, insert/remove, structure builder, section rename).
+
+## v0.16 tests
+vizMath.test.ts (263 unit tests in total), e2e-v16.cjs (all styles draw, choice remembered, ~59 fps headless).

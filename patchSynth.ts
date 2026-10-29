@@ -8,6 +8,9 @@ export interface NoteSynth {
   releaseAll(): unknown;
   dispose(): unknown;
   connect(destination: any): unknown;
+  /** Key down / key up (used by live playing from a MIDI keyboard). */
+  triggerAttack?(note: string, time?: number, velocity?: number): unknown;
+  triggerRelease?(note: string, time?: number): unknown;
   volume: { value: number };
 }
 

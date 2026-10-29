@@ -1,5 +1,5 @@
 import * as Tone from 'tone';
-import { clampBpm } from './pattern';
+import { Instrument, clampBpm } from './pattern';
 import { Channels, MasterSettings, defaultMaster } from './mixer';
 import { DrumKitId } from './instruments';
 import { TrackDef } from './tracks';
@@ -72,6 +72,11 @@ export class BeatLabEngine {
   }
   auditionUp(patch: SynthPatch, note: string): void { this.rig?.auditionUp(patch, note); }
   auditionStop(): void { this.rig?.auditionStop(); }
+  /** Starts the audio engine (call from a click) so that a MIDI keyboard can be heard right away. */
+  async prepare(): Promise<void> { await Tone.start(); await this.ensureRig(this.generation); }
+  liveDown(trackId: string, note: string, velocity: number): void { this.rig?.liveDown(trackId, note, velocity); }
+  liveUp(trackId: string, note: string): void { this.rig?.liveUp(trackId, note); }
+  liveDrum(inst: Instrument, velocity: number): void { this.rig?.liveDrum(inst, velocity); }
   async start(bpm: number): Promise<void> {
     if (this.active) return;
     const generation = ++this.generation;

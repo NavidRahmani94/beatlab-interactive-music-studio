@@ -4,6 +4,7 @@ import { DRUM_CHANNELS, ChannelSettings, Channels, MAX_FEEDBACK, MasterSettings,
 import { DrumKitId, isDrumKit, isMelodyInstrument } from './instruments';
 import { KIND_DEFAULT_INSTRUMENT, MAX_TRACKS, MAX_TRACK_NAME, TrackDef, defaultTrackDefs, isTrackKind, isValidTrackId, makeTrack } from './tracks';
 import { ArpSettings, defaultArp, isArpMode, isArpOctaves, isArpRate } from './arp';
+import { MAX_SECTIONS, MAX_SECTION_NAME, Section, autoSections, clampSections } from './arrangement';
 import { Groove, GROOVE_PRESETS, defaultGroove, validateGroove } from './groove';
 import { MAX_BARS, MAX_PATTERNS, PatternData, Playlist, compactNotes, defaultPatternData, emptyDrumPattern } from './song';
 import { toggleNote } from './melody';
@@ -22,6 +23,7 @@ export type BeatLabProject = {
   tracks: TrackDef[];    // the user's tracks (drums are fixed and not listed). Each has a name, kind, instrument and (for arpeggio) its settings
   synths: SynthSlot[];   // the user's own Synth Lab sounds; a track uses one as "synth:<id>"
   drumKit: DrumKitId;
+  sections: Section[];  // named stretches of the playlist (Intro, Verse, Chorus …); only labels, they never change the sound
   groove: Groove;       // swing / humanize / ghost notes / variation of the drums
   melodyView: { key: number; scale: ScaleName };
   channels: Channels;
@@ -36,7 +38,7 @@ export function defaultProject(): BeatLabProject {
   return {
     schemaVersion: 5, name: 'Untitled', bpm: 120,
     patterns: [defaultPatternData('Pattern 1', makePreset('happy', 0).notes)], playlist: [0],
-    tracks: defaultTrackDefs(), synths: [], drumKit: 'classic', groove: defaultGroove(), melodyView: { key: 0, scale: 'majorPent' },
+    tracks: defaultTrackDefs(), synths: [], drumKit: 'classic', sections: [], groove: defaultGroove(), melodyView: { key: 0, scale: 'majorPent' },
     channels: defaultChannels(defaultTrackDefs()), master: defaultMaster()
   };
 }
@@ -284,7 +286,7 @@ const DEMO_GROOVE: Record<string, Groove> = {
   'Hip Hop Demo': { swing: 0.35, humanize: 0.4, ghost: 0.4, fill: 0.3 }, 'Lo-Fi Chill': GROOVE_PRESETS['Lo-Fi loose'], 'House 124': { swing: 0.12, humanize: 0.15, ghost: 0, fill: 0.2 },
   'Trap 140': { swing: 0, humanize: 0.15, ghost: 0, fill: 0.3 }, 'Persian Mood': { swing: 0.15, humanize: 0.3, ghost: 0.15, fill: 0.2 }, 'Synthwave 108': { swing: 0.05, humanize: 0.1, ghost: 0, fill: 0.3 }, 'Chiptune 150': defaultGroove()
 };
-Object.entries(DEMO_GROOVE).forEach(([name, groove]) => { const make = SAMPLE_PROJECTS[name]; SAMPLE_PROJECTS[name] = () => ({ ...make(), groove }); });
+Object.entries(DEMO_GROOVE).forEach(([name, groove]) => { const make = SAMPLE_PROJECTS[name]; SAMPLE_PROJECTS[name] = () => { const p = make(); return { ...p, groove, sections: autoSections(p.patterns, p.playlist) }; }; });
 
 export function serializeProject(project: BeatLabProject): string {
   return JSON.stringify(project, null, 2);
@@ -478,6 +480,19 @@ export function validateProject(input: unknown): ParseResult {
     drumKit = data.drumKit;
   }
 
+  let sections: Section[] = [];
+  if (data.sections !== undefined) {
+    if (!Array.isArray(data.sections)) return fail('"sections" must be a list.');
+    if (data.sections.length > MAX_SECTIONS) return fail(`Too many sections (max ${MAX_SECTIONS}).`);
+    for (let i = 0; i < data.sections.length; i++) {
+      const s: unknown = data.sections[i];
+      if (!isObj(s) || typeof s.name !== 'string' || s.name.trim().length < 1 || s.name.length > MAX_SECTION_NAME) return fail(`sections[${i}].name must be text of 1–${MAX_SECTION_NAME} characters.`);
+      if (!isNum(s.start) || !Number.isInteger(s.start) || s.start < 0 || s.start >= MAX_BARS) return fail(`sections[${i}].start must be a slot number.`);
+      if (!isNum(s.length) || !Number.isInteger(s.length) || s.length < 1 || s.length > MAX_BARS) return fail(`sections[${i}].length must be 1 or more slots.`);
+      sections.push({ name: s.name.trim(), start: s.start, length: s.length });
+    }
+    sections = clampSections(sections, playlist.length);
+  }
   let groove = defaultGroove();
   if (data.groove !== undefined) {
     const gr = validateGroove(data.groove);
@@ -533,7 +548,7 @@ export function validateProject(input: unknown): ParseResult {
     };
   }
 
-  return { ok: true, project: { schemaVersion: 5, name: data.name, bpm: Math.round(data.bpm), patterns, playlist, tracks, synths, drumKit, groove, melodyView, channels, master } };
+  return { ok: true, project: { schemaVersion: 5, name: data.name, bpm: Math.round(data.bpm), patterns, playlist, tracks, synths, drumKit, sections, groove, melodyView, channels, master } };
 }
 
 export function parseProject(text: string): ParseResult {

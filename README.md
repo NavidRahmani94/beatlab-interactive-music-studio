@@ -53,6 +53,14 @@ More: `ARCHITECTURE.md`, `TESTING.md`, `DEMO_SCRIPT.md`, `BeatLab_Project_Master
 Push to a repository's `main` branch, then in the repo go to **Settings → Pages → Source: GitHub Actions**. The workflow in `.github/workflows/pages.yml` runs the tests, builds, and publishes the site at `https://<user>.github.io/<repo>/`. (If your tooling cannot keep the `.github` folder, delete it; the app itself stays flat.)
 
 
+## New in v0.14 – MIDI
+Open the **🎹 MIDI** panel (under the visualizer).
+- **MIDI keyboard** (Chrome / Edge on a computer): CONNECT KEYBOARD, choose the input, and play. The keys play the open tab with its own instrument (DRUMS: pads on General MIDI notes 36 kick, 38 snare, 42 hi-hat, 39 clap; SYNTH LAB: the selected synth).
+- **Record:** press PLAY, then ○ REC. Notes you play are written into the open track at the nearest step (note length = how long you hold the key); pad hits are written into the drums. Recording stops when playback stops. Best in PATTERN mode so it loops the pattern you are editing.
+- **Export .MID:** the song or the selected pattern as a format-1 MIDI file (drums on channel 10, one MIDI track per BeatLab track).
+- **Import .MID:** choose the file, then which track (or the drums) and which 32-step bar to take, or “All bars → new patterns”. Notes are snapped to 16ths and folded into the piano roll range (C3–C6). Optionally use the file's tempo.
+Not included: sending notes OUT to a hardware synth, MIDI clock sync, pitch bend / modulation, tempo changes inside a file.
+
 ## New in v0.13.1 – animated header
 The top of the page has a light animation (`HeroArt.tsx`): mirrored equalizer bars, two drifting waves and rising notes in the theme colours. It follows the tempo, wakes up while the song plays, and stops for people who prefer reduced motion. Only transform/opacity are animated, so it is cheap.
 
@@ -87,3 +95,14 @@ Open **🎹 CHORD BUILDER** on any note track. The seven chords of your key are 
 - **Instruments:** the instrument menu of every track now has 12 families (Keys, Organs, Mallets & bells, Plucked strings, Synth leads, Bass, Pads & atmosphere, Strings & winds, Brass, World & Persian, Chip & retro, Textures & FX) and 11 drum kits (Classic, 808, Tight, 909 House/Techno, Trap, Lo-fi, Rock, Electro, Drum & Bass, Industrial, Chip). They are synthesized imitations, not recordings.
 - **Synth Lab:** open the SYNTH LAB tab, press NEW SYNTH (or start from any library sound / a random one), shape the sound with the knobs, play it on the on-screen keys or your computer keyboard (A S D F G H J K, black keys W E T Y U), then press MELODY / AMBIENT / ARPEGGIO under "Use this synth on". Your synths are saved inside the project file and are included in WAV / MP3 exports.
 - **Demo songs:** the SAMPLE menu has Lo-Fi Chill, House 124, Trap 140, Persian Mood, Synthwave 108 and Chiptune 150 next to the Hip Hop Demo.
+
+## New in v0.15 — Arrangement
+- Drag a pattern chip onto a playlist slot; drag a filled slot to move it (Alt/Ctrl = copy); drop it on the bin to clear it. Click-to-paint still works (touch screens do not support drag & drop).
+- Insert or remove a slot (the rest shifts).
+- Sections (Intro, Verse, Chorus …) are labels with a colour band on the slots; edit names/start/length, or use NAME FROM PATTERNS.
+- SONG STRUCTURE: pick Pop / Hip hop / EDM / Short, choose a pattern per role, BUILD ARRANGEMENT. Undo brings the old playlist back.
+- Project files keep `sections` (older files open with none).
+
+## New in v0.16 — Interactive Visuals
+- Four styles in the VISUALISER panel: BARS, RINGS, PARTICLES, AURORA (the choice is remembered).
+- They react to bass, mid and treble energy, overall loudness and a beat pulse detected from the bass. Reduced-motion users get no particle bursts.

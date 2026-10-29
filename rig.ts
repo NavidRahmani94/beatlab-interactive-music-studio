@@ -400,17 +400,10 @@ export class Rig {
    */
   triggerStep(step: number, time: number, pattern: PatternData | null, tick: number, stepSeconds: number): void {
     if (!pattern) return;
-    const d = this.kitDur;
     const g = this.groove;
     const base = time + swingDelay(step, stepSeconds, g.swing);        // swing moves the whole odd step, drums and notes together
     drumHits(pattern.drums, step, tick, g).forEach(({ inst, delay, velocity }) => {
-      if (this.muted[inst]) return;
-      const t = base + delay;
-      if (inst === 'kick') this.kick.triggerAttackRelease(this.kickNote, d.kick, t, velocity);
-      else if (inst === 'snare') this.snare.triggerAttackRelease(d.snare, t, velocity);
-      // the first argument of a Tone.MetalSynth is its pitch (260 Hz, as set in the constructor); the old call put the duration there, which made the hats nearly silent
-      else if (inst === 'hat') this.hat.triggerAttackRelease(HAT_HZ, d.hat, t, velocity);
-      else this.clap.triggerAttackRelease(d.clap, t, velocity);
+      if (!this.muted[inst]) this.playDrum(inst, base + delay, velocity);
     });
     const drift = stepDrift(tick, g);
     time = base + drift.delay;
@@ -431,6 +424,32 @@ export class Rig {
       });
     });
   }
+
+  /** One drum hit at an explicit time. */
+  private playDrum(inst: Instrument, t: number, velocity: number): void {
+    const d = this.kitDur;
+    if (inst === 'kick') this.kick.triggerAttackRelease(this.kickNote, d.kick, t, velocity);
+    else if (inst === 'snare') this.snare.triggerAttackRelease(d.snare, t, velocity);
+    // the first argument of a Tone.MetalSynth is its pitch (260 Hz, as set in the constructor); the old call put the duration there, which made the hats nearly silent
+    else if (inst === 'hat') this.hat.triggerAttackRelease(HAT_HZ, d.hat, t, velocity);
+    else this.clap.triggerAttackRelease(d.clap, t, velocity);
+  }
+
+  // ---- live playing from a MIDI keyboard: the same voices the song uses
+  private liveSynth(id: string, note: string): { synth: NoteSynth; pitch: string } | null {
+    const rt = this.tracks.get(id);
+    if (!rt) return null;
+    return { synth: rt.voice.synth, pitch: rt.voice.shift ? Tone.Frequency(note).transpose(rt.voice.shift).toNote() : note };
+  }
+  /**
+   * While the song plays, the transport has already handed some notes to the same voices a few ms ahead, and Tone refuses events that go back in time,
+   * so live notes start a little later then. When stopped they start almost at once.
+   */
+  private liveTime(): number { return Tone.now() + (Tone.getTransport().state === 'started' ? 0.06 : 0.005); }
+  private safe(fn: () => void): void { try { fn(); } catch { /* a key press must never break playback */ } }
+  liveDown(id: string, note: string, velocity: number): void { const v = this.liveSynth(id, note); this.safe(() => v?.synth.triggerAttack?.(v.pitch, this.liveTime(), Math.max(0.05, velocity))); }
+  liveUp(id: string, note: string): void { const v = this.liveSynth(id, note); this.safe(() => v?.synth.triggerRelease?.(v.pitch, this.liveTime() + 0.01)); }
+  liveDrum(inst: Instrument, velocity: number): void { this.safe(() => this.playDrum(inst, this.liveTime(), Math.max(0.05, velocity))); }
 
   releaseAll(): void {
     this.kick.triggerRelease();
