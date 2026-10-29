@@ -1,79 +1,48 @@
-# BeatLab — Phases 0–3 (v0.2.0, audio unverified)
+# BeatLab — Interactive Music Studio (v0.5, test build)
 
-A working browser drum-engine prototype using React, TypeScript, Vite and Tone.js.
-
-## Requirements
-- Node.js 20.19+ or 22.12+
-- npm and a modern desktop browser
+A browser music studio: build a drum beat, write a melody (Easy or Advanced), mix it, save the project and export a real WAV file.
+React + TypeScript + Vite + Tone.js. No backend.
 
 ## Start
 ```bash
 npm install
-npm run dev          # localhost only
-npm run dev:lan      # exposed on the local network
+npm run dev          # http://localhost:5173  (localhost only; use `npm run dev:lan` to expose on the network)
+npm test             # unit tests (Vitest)
+npm run build        # type-check + production build
 ```
-Open the URL printed by Vite (typically http://localhost:5173).
+Needs Node.js 20.19+ (or 22.12+) and a modern desktop browser. **All files are in one flat folder (no sub-folders).**
 
-## Verify
-```bash
-npm test
-npm run build
-```
+## What you can do
+| Area | Features |
+|---|---|
+| **Transport** | Play / Stop (also **Space**), BPM 60–200 changeable while playing |
+| **Drums** | 4 voices × 16 steps, 3 drum kits (Classic, 808, Tight), ON/OFF per instrument |
+| **Melody – Easy** | Rows contain only notes of the chosen **Key + Scale**, so nothing can sound wrong. **One click = one cell** (note length defaults to 1 step) |
+| **Melody – Advanced** | Full piano roll C3–C6 (scrollable), out-of-key rows dimmed, note lengths 1/2/4/8, chords |
+| **Instruments** | Soft Synth, Electric Piano, Pluck, Warm Pad, Bell, Lead, Bass (level-matched) |
+| **Moods** | Happy, Chill, Dark, Dreamy, Epic, Playful, Sad, Mystery, Groovy — each loads a melody **and** sets scale + instrument |
+| **Auto Melody** | ✦ button: new random-but-musical tune for the current key / scale / mood (single-step cells, starts on beat 1, ends on the root) |
+| **Key / Scale** | Changing **Key** transposes the tune. Changing **Scale** (Major Pent, Minor Pent, Major, Natural Minor) keeps every note's scale *degree*, so the music really changes (e.g. major → minor) |
+| **Velocity** | Velocity lane under the piano roll: drag up/down (or ↑/↓ keys) to set loudness of the notes on each step; "New note velocity" slider; cell brightness shows velocity |
+| **Mixer** | Per channel: Mute, Solo, Pan, Volume (−40…+6 dB), Reverb send, Delay send |
+| **Master** | Master Volume, **Master Reverb** (amount + size Room/Hall/Cathedral), Delay time (1/16, 1/8, dotted 1/8, 1/4) + feedback, live level meter, limiter |
+| **Project** | New / Open / Save (`.beatlab.json`), unsaved-changes warning, 4 sample projects |
+| **Export** | WAV: 44.1 kHz, stereo, 16-bit PCM, 1/2/4/8 loops, reverb/delay tail included (offline render, faster than real time) |
 
-## How to use
-- Click **PLAY** to unlock browser audio and start the synchronized 16-step loop.
-- Adjust BPM between 60 and 200 while playing.
-- Click individual drum steps to enable/disable sounds in real time.
-- Click **STOP** to reset the playhead; **CLEAR ALL** to silence the pattern.
+## Files
+`App.tsx` UI state · `pattern.ts` drum logic · `melody.ts` melody logic (scales, moods, auto-melody, velocity) · `mixer.ts` mixer/master model ·
+`instruments.ts` instrument + kit catalogue · `rig.ts` the audio graph (shared by live playback and export) · `engine.ts` live Transport ·
+`exporter.ts` + `wav.ts` offline render + WAV encoder · `project.ts` project model + strict validation · `MelodyPanel.tsx`, `MixerPanel.tsx`, `ProjectBar.tsx` UI.
+More: `ARCHITECTURE.md`, `TESTING.md`, `DEMO_SCRIPT.md`, `BeatLab_Project_Master_Plan.md`.
 
-## Included
-- Phase 0 scaffold, React/TS/Vite configuration
-- Phase 1: four synthesized drum voices (kick, snare, closed hi-hat, clap), one Tone.Transport clock, BPM, Play/Stop, resource cleanup
-- Early preview of Phase 2: interactive 4×16 drum grid
-- Unit tests for pure pattern logic
+## Verified (automatically)
+- 78 unit tests pass; `npm run build` succeeds.
+- Browser test (`e2e-full.cjs`, 37 checks) in real Chromium: live playback, playhead, all 9 moods, scale/key change, auto melody, velocity lane, chords, mixer, save/open/invalid file, samples, export.
+- Exported WAV files analysed: valid 16-bit stereo 44.1 kHz; velocity 100 vs 20 = 5.0× amplitude; 7 instruments all sound different; hard pan puts 100 % of the signal on one side; master reverb adds a tail (Cathedral longer than Room, file length grows); master volume −30 dB measured −29.7 dB.
+- Instrument levels balanced to about −15.7 dBFS peak for a single note at velocity 0.8.
 
-## Not implemented yet
-Chord progressions, channel mixer/effects, JSON save/load, WAV export, UI automation and audio-render verification. The phase is **not formally accepted** until browser listening, repeat Play/Stop and BPM tests pass on the user's machine.
-
-## Manual acceptance checklist
-1. Run `npm install`, `npm test`, `npm run build`, `npm run dev`.
-2. Click PLAY: kick plays on beats 1–4; snare on beats 2 and 4; hi-hat on eighth notes.
-3. Change BPM from 100 to 140 during playback; confirm tempo changes without duplicate hits.
-4. Toggle steps while playing; changes should be audible.
-5. Stop and start 10 times; check no doubled notes and playback restarts at step 1.
-6. Enable clap steps and verify clap sound.
-7. Open browser developer console; check no critical errors.
-
-## Architecture
-`App.tsx` owns UI state, `pattern.ts` contains pure pattern logic, and `engine.ts` owns Tone.js instruments, clock and scheduling. The engine reads the current pattern without recreating transport events after each edit.
-
-## Known limitations
-Drum sounds are synthesized rather than loaded samples; exact sound character may vary by browser. Phase 1 has no audio export. The phase 2 grid is an early preview, not a fully accepted phase.
-
-## Changelog v0.1.1
-- Fixed `npm run build` (TS2353): `MetalSynth.frequency` is now set after construction.
-- Flat layout kept (all files in project root, no subfolders).
-- Added `package-lock.json`, `.gitignore`, `engines`; moved vite/plugin-react to devDependencies.
-- `dev` no longer binds to 0.0.0.0 (use `dev:lan`).
-- UI phase labels corrected; 4 extra unit tests (8 total).
-
-## Changelog v0.2.0 — Phase 3: Melody (Easy + Advanced)
-- New `melody.ts` (pure logic), `MelodyPanel.tsx` (UI), `melody.test.ts` (16 tests; 24 total).
-- **One data model, two views.** Both modes edit the same note list `{id, pitch, step, lengthSteps, velocity}`.
-- **Easy mode:** rows are only the notes of the chosen Key + Scale (so no wrong notes); note length SHORT/MEDIUM/LONG (1/2/4 steps); presets HAPPY / CHILL / DARK.
-- **Advanced mode:** full chromatic piano roll C3–C6 (scrollable), out-of-key rows dimmed, lengths 1/2/4/8, chords allowed.
-- Changing **Key** transposes the melody; changing **Scale** snaps notes to the nearest note of the new scale.
-- Click an empty cell to add a note, click an existing note to remove it. Melody has its own ON/OFF.
-- Melody (PolySynth, triangle) runs on the same Transport as the drums; stop releases all notes.
-- Deviation from the master plan: range is C3–C6 instead of C3–C5 so every key fits the Easy view.
-
-## Changelog v0.1.3
-- Per-instrument ON/OFF button in the drum grid (pattern is kept; the voice is silenced).
-- Fixed timbre changing with tempo: drum notes now use fixed durations in seconds instead of musical values (e.g. '32n'), which cut the envelope differently at each BPM. Measured hi-hat spectral centroid: 4433/5040/5274 Hz at 60/120/200 BPM before, constant 6030 Hz after. Hi-hat volume raised to compensate.
-
-## Verification status
-- `npm test` (8 pass) and `npm run build`: verified.
-- Headless Chromium smoke test: Play starts, playhead moves, BPM change applies, 10x Stop/Play leaves no stuck state, no app errors.
-- **Not verified:** actual audio character/timing by ear, Firefox. Do the manual checklist above.
-- Phase 3 checks done: melody synth pitches measured offline (C4/E4/A4/C5 = 262/330/440/523 Hz), headless-browser test of Easy/Advanced editing, ON/OFF, key/preset change, no page errors.
-- Fonts load from Google Fonts (needs internet; falls back to system fonts offline).
+## Not verified / known limits
+- **Nobody has listened to it yet.** Taste (how good the sounds are) needs your ears: run the manual checklist in `TESTING.md`.
+- Only Chromium was tested (not Firefox/Safari).
+- One bar (16 steps) per project; fonts load from Google Fonts (system fonts are used offline).
+- Instruments are synthesised (no sample files), so they are light-weight but not realistic.

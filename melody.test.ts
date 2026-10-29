@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
-  MAX_MIDI, MIN_MIDI, PRESETS, PresetName, SCALES, ScaleName, easyRoot, inScale, makePreset,
-  midiToNote, noteAt, noteToMidi, normalizeNotes, scaleRows, snapNotesToScale, toggleNote, transposeNotes
+  MAX_MIDI, MIN_MIDI, PRESETS, PRESET_NAMES, SCALES, ScaleName, easyRoot, inScale, makePreset, generateMelody, setStepVelocity, stepVelocity, clampVelocity,
+  midiToNote, noteAt, noteToMidi, normalizeNotes, scaleRows, snapNotesToScale, toggleNote, transposeNotes, remapToScale
 } from './melody';
+import { isMelodyInstrument } from './instruments';
 
 describe('note names', () => {
   it('converts midi <-> note names', () => {
@@ -91,19 +92,103 @@ describe('transpose and snap', () => {
   });
 });
 
-describe('presets', () => {
-  (['happy', 'chill', 'dark'] as PresetName[]).forEach(name => {
-    it(`${name} is valid in every key`, () => {
+describe('moods (presets)', () => {
+  it('there are nine moods', () => { expect(PRESET_NAMES).toHaveLength(9); });
+  it('moods use several different instruments and scales', () => {
+    expect(new Set(PRESET_NAMES.map(n => PRESETS[n].instrument)).size).toBeGreaterThanOrEqual(6);
+    expect(new Set(PRESET_NAMES.map(n => PRESETS[n].scale)).size).toBeGreaterThanOrEqual(3);
+  });
+  it('every cell is a single step (no 2-by-2 blocks)', () => {
+    PRESET_NAMES.forEach(n => makePreset(n, 0).notes.forEach(x => expect(x.lengthSteps).toBe(1)));
+  });
+  PRESET_NAMES.forEach(name => {
+    it(`${name} is valid in every key and has a real instrument`, () => {
+      expect(isMelodyInstrument(PRESETS[name].instrument)).toBe(true);
       for (let pc = 0; pc < 12; pc++) {
-        const { scale, notes } = makePreset(name, pc);
+        const { scale, notes, instrument } = makePreset(name, pc);
+        expect(instrument).toBe(PRESETS[name].instrument);
         expect(notes).toHaveLength(PRESETS[name].notes.length);
         expect(normalizeNotes(notes)).toEqual(notes);
         const rows = scaleRows(pc, scale);
         notes.forEach(n => {
           expect(rows).toContain(noteToMidi(n.pitch));
           expect(n.step + n.lengthSteps).toBeLessThanOrEqual(16);
+          expect(n.velocity).toBeGreaterThan(0);
         });
       }
     });
+  });
+});
+
+describe('velocity', () => {
+  it('new notes carry the given velocity', () => { expect(toggleNote([], 60, 0, 1, 0.3)[0].velocity).toBe(0.3); });
+  it('clamps velocity into 0.05..1', () => { expect(clampVelocity(5)).toBe(1); expect(clampVelocity(-1)).toBe(0.05); expect(clampVelocity(NaN)).toBe(0.8); });
+  it('setStepVelocity changes only notes that start on that step', () => {
+    let n = toggleNote([], 60, 0, 4, 0.8);          // C4 starts at 0, covers 0..3
+    n = toggleNote(n, 64, 0, 1, 0.8);               // E4 starts at 0
+    n = toggleNote(n, 67, 2, 1, 0.8);               // G4 starts at 2
+    const m = setStepVelocity(n, 0, 0.4);
+    expect(m.filter(x => x.step === 0).every(x => x.velocity === 0.4)).toBe(true);
+    expect(m.find(x => x.step === 2)?.velocity).toBe(0.8);
+    expect(stepVelocity(m, 0)).toBe(0.4);
+    expect(stepVelocity(m, 1)).toBeUndefined();     // no note STARTS on step 1
+    expect(setStepVelocity(n, 5, 0.1)).toBe(n);     // nothing starts there -> same reference
+  });
+  it('velocity survives transpose and snap', () => {
+    const n = toggleNote([], 61, 0, 1, 0.33);
+    expect(transposeNotes(n, 2)[0].velocity).toBe(0.33);
+    expect(snapNotesToScale(n, 0, 'majorPent')[0].velocity).toBe(0.33);
+  });
+});
+
+describe('auto melody', () => {
+  it('is deterministic for a seed and differs between seeds', () => {
+    expect(generateMelody(0, 'majorPent', 'happy', 42)).toEqual(generateMelody(0, 'majorPent', 'happy', 42));
+    expect(generateMelody(0, 'majorPent', 'happy', 1)).not.toEqual(generateMelody(0, 'majorPent', 'happy', 2));
+  });
+  it('is always in key, inside the bar, non-overlapping, and never nearly empty', () => {
+    (Object.keys(SCALES) as ScaleName[]).forEach(scale => PRESET_NAMES.forEach(mood => {
+      for (const seed of [1, 7, 99, 12345, 987654321]) {
+        for (const pc of [0, 5, 11]) {
+          const notes = generateMelody(pc, scale, mood, seed);
+          const rows = scaleRows(pc, scale);
+          expect(notes.length).toBeGreaterThanOrEqual(3);
+          expect(normalizeNotes(notes)).toEqual(notes);
+          notes.forEach(n => { expect(rows).toContain(noteToMidi(n.pitch)); expect(n.step + n.lengthSteps).toBeLessThanOrEqual(16); });
+          expect(noteToMidi(notes[notes.length - 1].pitch)).toBe(rows[0]); // resolves on the root
+          expect(notes[0].step).toBe(0);
+        }
+      }
+    }));
+  });
+});
+
+describe('changing the scale changes the music', () => {
+  it('Major -> Minor keeps each note\'s degree, so the notes really change', () => {
+    const major = makePreset('dreamy', 0).notes;                 // C major
+    const minor = remapToScale(major, 0, 'major', 'minor');
+    expect(minor.map(n => n.step)).toEqual(major.map(n => n.step));
+    expect(minor.map(n => n.pitch)).not.toEqual(major.map(n => n.pitch));
+    minor.forEach(n => expect(inScale(noteToMidi(n.pitch)!, 0, 'minor')).toBe(true));
+    // the 3rd of C major (E) becomes the 3rd of C minor (Eb)
+    const third = remapToScale([...toggleNote([], 64, 0, 1)], 0, 'major', 'minor')[0];
+    expect(third.pitch).toBe('D#4');
+  });
+  it('same scale is a no-op and velocity is kept', () => {
+    const n = toggleNote([], 64, 3, 1, 0.37);
+    expect(remapToScale(n, 0, 'major', 'major')).toEqual(n);
+    expect(remapToScale(n, 0, 'major', 'minor')[0].velocity).toBe(0.37);
+  });
+  it('moods differ in feel: epic is louder and busier than chill', () => {
+    const avg = (mood: 'epic' | 'chill') => {
+      let notes = 0, vel = 0;
+      for (let seed = 1; seed <= 40; seed++) { const m = generateMelody(0, 'minor', mood, seed); notes += m.length; vel += m.reduce((a, x) => a + x.velocity, 0) / m.length; }
+      return { notes: notes / 40, vel: vel / 40 };
+    };
+    expect(avg('epic').notes).toBeGreaterThan(avg('chill').notes);
+    expect(avg('epic').vel).toBeGreaterThan(avg('chill').vel);
+  });
+  it('auto melody uses single-step cells only', () => {
+    generateMelody(3, 'major', 'playful', 5).forEach(n => expect(n.lengthSteps).toBe(1));
   });
 });
