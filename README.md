@@ -53,6 +53,14 @@ More: `ARCHITECTURE.md`, `TESTING.md`, `DEMO_SCRIPT.md`, `BeatLab_Project_Master
 Push to a repository's `main` branch, then in the repo go to **Settings → Pages → Source: GitHub Actions**. The workflow in `.github/workflows/pages.yml` runs the tests, builds, and publishes the site at `https://<user>.github.io/<repo>/`. (If your tooling cannot keep the `.github` folder, delete it; the app itself stays flat.)
 
 
+## New in v0.10 – your own tracks
+- **Synth has its own notes.** The SYNTH tab (and the Synth Lab, via ＋ NOTES TRACK) has a piano roll like the other tracks. Every pattern keeps its own synth notes.
+- **Rename any track** (Melody, Ambient, Arpeggio, Synth): type in TRACK NAME at the top of its tab. The mixer follows.
+- **Add / delete tracks:** DRUMS stays fixed. ＋ TRACK adds a Melody, Ambient, Arpeggio or Synth track (up to 8). 🗑 DELETE TRACK removes it and its notes from every pattern.
+- Each track has its own instrument, notes in every pattern, and mixer channel; arpeggio settings belong to each arpeggio track.
+- Older project files (version 1–4) open and are converted automatically.
+- Not included yet: recording notes live from the Synth Lab keyboard into the piano roll (notes are placed on the piano roll).
+
 ## New in v0.9
 
 - **Theme:** the button at the top right cycles AUTO / DARK / LIGHT (AUTO follows your system). The choice is remembered.

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { TAB_ORDER, TAB_LABELS, MELODIC_TRACKS, TRACK_DEFAULT_INSTRUMENT, TRACK_DEFAULT_LENGTH, isMelodicTrack, DRUM_KIT_IDS, MELODY_INSTRUMENT_IDS, isDrumKit, isMelodyInstrument } from './instruments';
+import { DRUM_KIT_IDS, MELODY_INSTRUMENT_IDS, isDrumKit, isMelodyInstrument } from './instruments';
+import { KIND_DEFAULT_INSTRUMENT, KIND_DEFAULT_LENGTH, TRACK_KIND_IDS } from './tracks';
 
 describe('instrument catalogue', () => {
   it('offers several melody instruments and drum kits', () => {
@@ -15,15 +16,9 @@ describe('instrument catalogue', () => {
   });
 });
 
-describe('the four modes', () => {
-  it('there are four tabs: ambient, drums, melody, arp', () => {
-    expect([...TAB_ORDER].sort()).toEqual(['ambient', 'arp', 'drums', 'melody']);
-    TAB_ORDER.forEach(t => expect(TAB_LABELS[t]).toBeTruthy());
-  });
-  it('each melodic track has a real default instrument and note length', () => {
-    MELODIC_TRACKS.forEach(t => { expect(isMelodyInstrument(TRACK_DEFAULT_INSTRUMENT[t])).toBe(true); expect(TRACK_DEFAULT_LENGTH[t]).toBeGreaterThanOrEqual(1); });
-    expect(isMelodicTrack('arp')).toBe(true);
-    expect(isMelodicTrack('drums')).toBe(false);
+describe('track kinds', () => {
+  it('each kind has a real default instrument and note length', () => {
+    TRACK_KIND_IDS.forEach(k => { expect(isMelodyInstrument(KIND_DEFAULT_INSTRUMENT[k])).toBe(true); expect(KIND_DEFAULT_LENGTH[k]).toBeGreaterThanOrEqual(1); });
     expect(isMelodyInstrument('strings') && isMelodyInstrument('drone') && isMelodyInstrument('airPad') && isMelodyInstrument('glassPad')).toBe(true);
   });
 });

@@ -3,23 +3,26 @@ import {
   Envelope, FACTORY_IDS, FACTORY_SOUNDS, FILTER_TYPES, FilterType, LFO_TARGETS, LFO_WAVES, LfoTarget, LfoWave, LIMITS, MAX_SYNTHS, NOISE_COLORS, NoiseColor,
   OscSettings, SOUND_GROUPS, SynthPatch, SynthSlot, WAVES, Wave, addSynth, clampPatch, customRef, defaultPatch, makePatch, randomPatch, removeSynth, updateSynth
 } from './synth';
-import { MELODIC_TRACKS, MelodicTrack } from './instruments';
-import { TrackInstruments } from './project';
+import { ReactNode } from 'react';
+import { MAX_TRACKS, TrackDef } from './tracks';
 
 type Props = {
   synths: SynthSlot[];
   onSynths: (fn: (prev: SynthSlot[]) => SynthSlot[]) => void;
   selectedId: string | null;
   onSelect: (id: string | null) => void;
-  tracks: TrackInstruments;
-  onUse: (track: MelodicTrack, ref: string) => void;
+  tracks: TrackDef[];
+  onUse: (trackId: string, ref: string) => void;
+  /** Makes a new Synth track (with its own piano roll) that plays the given synth. */
+  onCreateTrack: (synthId: string) => void;
+  /** Draws the note editor (piano roll) of a track. */
+  renderTrack: (track: TrackDef) => ReactNode;
   onKeyDown: (patch: SynthPatch, note: string) => void;
   onKeyUp: (patch: SynthPatch, note: string) => void;
   onKeysStop: () => void;
   getWaveform: () => Float32Array | null;
 };
 
-const TRACK_NAMES: Record<MelodicTrack, string> = { melody: 'Melody', ambient: 'Ambient', arp: 'Arpeggio' };
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const noteName = (midi: number): string => `${NOTE_NAMES[midi % 12]}${Math.floor(midi / 12) - 1}`;
 const isBlack = (midi: number): boolean => [1, 3, 6, 8, 10].includes(midi % 12);
@@ -186,7 +189,8 @@ export default function SynthPanel(p: Props) {
     p.onSynths(() => rest);
     p.onSelect(rest.length ? rest[0].id : null);
   };
-  const usedBy = (id: string) => MELODIC_TRACKS.filter(t => p.tracks[t] === customRef(id));
+  const usedBy = (id: string) => p.tracks.filter(t => t.instrument === customRef(id));
+  const noteTrack = slot ? p.tracks.find(t => t.kind === 'synth' && t.instrument === customRef(slot.id)) : undefined;
   const full = synths.length >= MAX_SYNTHS;
 
   return <section className="panel lab" aria-label="Synth Lab">
@@ -195,7 +199,7 @@ export default function SynthPanel(p: Props) {
     <div className="lab-top">
       <div className="chips" role="group" aria-label="Your synths">
         {synths.map(s => <button key={s.id} className={'chip' + (s.id === selectedId ? ' sel' : '')} style={{ ['--c' as string]: 'var(--accent-text)' }} aria-pressed={s.id === selectedId} onClick={() => { p.onKeysStop(); p.onSelect(s.id); }}>
-          <i />{s.name}{usedBy(s.id).length > 0 && <small> · {usedBy(s.id).map(t => TRACK_NAMES[t]).join('+')}</small>}
+          <i />{s.name}{usedBy(s.id).length > 0 && <small> · {usedBy(s.id).map(t => t.name).join('+')}</small>}
         </button>)}
         {synths.length === 0 && <span className="hint">No synth yet. Make one from scratch or start from a library sound →</span>}
       </div>
@@ -216,9 +220,10 @@ export default function SynthPanel(p: Props) {
         <label className="ctl">NAME <input className="name-input short" aria-label="Synth name" value={slot.name} maxLength={40} onChange={e => p.onSynths(ss => updateSynth(ss, slot.id, s => ({ ...s, name: e.target.value })))} /></label>
         <div className="ctl">USE THIS SYNTH ON
           <div className="seg" role="group" aria-label="Use this synth on">
-            {MELODIC_TRACKS.map(t => { const on = p.tracks[t] === customRef(slot.id); return <button key={t} aria-pressed={on} className={on ? 'sel' : ''} onClick={() => p.onUse(t, customRef(slot.id))}>{on ? '✓ ' : ''}{TRACK_NAMES[t].toUpperCase()}</button>; })}
+            {p.tracks.map(t => { const on = t.instrument === customRef(slot.id); return <button key={t.id} aria-pressed={on} className={on ? 'sel' : ''} onClick={() => p.onUse(t.id, customRef(slot.id))}>{on ? '✓ ' : ''}{t.name.toUpperCase()}</button>; })}
           </div>
         </div>
+        <button className="auto-btn" disabled={p.tracks.length >= MAX_TRACKS || !!noteTrack} title="Make a Synth track with a piano roll that plays this synth" onClick={() => p.onCreateTrack(slot.id)}>＋ NOTES TRACK</button>
         <button className="auto-btn" disabled={full} onClick={() => create(`${slot.name} copy`, slot.patch)}>⧉ DUPLICATE</button>
         <button className="auto-btn" onClick={() => edit(() => randomPatch())} title="Replace this sound with a random one">🎲 RANDOMIZE</button>
         <button className="auto-btn danger" onClick={remove}>🗑 DELETE</button>
@@ -226,6 +231,9 @@ export default function SynthPanel(p: Props) {
 
       <Keyboard patch={patch} onDown={n => p.onKeyDown(patch, n)} onUp={n => p.onKeyUp(patch, n)} onStop={p.onKeysStop} />
       <div className="lab-scope"><Scope getWaveform={p.getWaveform} /></div>
+      <div className="lab-notes">
+        {noteTrack ? p.renderTrack(noteTrack) : <div className="lab-empty">This synth has no note track yet. Press <b>＋ NOTES TRACK</b> to record notes for it on a piano roll (it also appears as its own tab).</div>}
+      </div>
 
       <div className="lab-grid">
         <OscEditor title="Oscillator 1" osc={patch.osc1} onChange={osc1 => edit(pt => ({ ...pt, osc1 }))} />

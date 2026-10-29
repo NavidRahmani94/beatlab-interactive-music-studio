@@ -24,6 +24,11 @@ Tip: run the browser test with a normal-sized window (the script uses 1280×1000
 10. Stop/Play 10 times: no doubled notes, always starts at bar 1 step 1. Browser console: no red errors.
 
 
+## v0.10 tests
+- `tracks.test.ts`: add/remove/rename, limits, reserved ids, mixer sync.
+- `project.test.ts`: version 4 → 5 conversion, renamed/added tracks round trip, bad track lists.
+- `e2e-v10.cjs <url>` (Playwright): default tabs, rename, SYNTH piano roll, add/delete, 8-track limit, lab notes track, save, old v4 file, WAV export, phone width.
+
 ## v0.9 tests
 
 - `synth.test.ts`: patch validation/clamping/random, library integrity (every sound valid, ids unique, groups), the synth list, synths inside project files (round trip, missing synth, v3 files).

@@ -2,7 +2,17 @@ import { DrumPattern, STEPS, makePattern } from './pattern';
 import { MelodyNote } from './melody';
 
 // A PATTERN is 32 steps (2 bars) of all four tracks. The PLAYLIST places patterns in slots, so a song can be any length.
-export type PatternData = { name: string; drums: DrumPattern; melody: MelodyNote[]; ambient: MelodyNote[]; arp: MelodyNote[] };
+export type PatternData = { name: string; drums: DrumPattern; notes: Record<string, MelodyNote[]> };
+/** The notes of one track in a pattern (tracks added later simply start empty). */
+export const notesFor = (p: PatternData, trackId: string): MelodyNote[] => p.notes[trackId] ?? [];
+/** Notes are stored canonically: a track with no notes in a pattern simply has no entry. */
+export const compactNotes = (notes: Record<string, MelodyNote[]>): Record<string, MelodyNote[]> =>
+  Object.fromEntries(Object.entries(notes).filter(([, list]) => list.length > 0));
+export const withNotes = (p: PatternData, trackId: string, notes: MelodyNote[]): PatternData => ({ ...p, notes: compactNotes({ ...p.notes, [trackId]: notes }) });
+/** Forgets the notes of a deleted track in every pattern. */
+export function dropTrackNotes(patterns: PatternData[], trackId: string): PatternData[] {
+  return patterns.map(p => { if (!(trackId in p.notes)) return p; const { [trackId]: _gone, ...rest } = p.notes; return { ...p, notes: rest }; });
+}
 /** One slot per pattern-length (32 steps): the index of a pattern, or null for a silent slot. */
 export type Playlist = (number | null)[];
 export type PlayMode = 'pattern' | 'song';
@@ -15,8 +25,8 @@ export const MAX_PATTERN_NAME = 24;
 export function emptyDrumPattern(): DrumPattern {
   return { kick: Array(STEPS).fill(false), snare: Array(STEPS).fill(false), hat: Array(STEPS).fill(false), clap: Array(STEPS).fill(false) };
 }
-export function emptyPattern(name: string): PatternData { return { name, drums: emptyDrumPattern(), melody: [], ambient: [], arp: [] }; }
-export function defaultPatternData(name = 'Pattern 1', melody: MelodyNote[] = []): PatternData { return { name, drums: makePattern(), melody, ambient: [], arp: [] }; }
+export function emptyPattern(name: string): PatternData { return { name, drums: emptyDrumPattern(), notes: {} }; }
+export function defaultPatternData(name = 'Pattern 1', melody: MelodyNote[] = []): PatternData { return { name, drums: makePattern(), notes: compactNotes({ melody }) }; }
 
 export function cleanPatternName(name: string, fallback: string): string {
   const t = name.replace(/\s+/g, ' ').trim().slice(0, MAX_PATTERN_NAME);

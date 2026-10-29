@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { INSTRUMENTS, DrumPattern, Instrument, STEPS } from './pattern';
 import { useFollowPlayhead } from './useFollow';
-import { CHANNEL_LABELS, Channels } from './mixer';
+import { DRUM_LABELS, Channels } from './mixer';
 import { DRUM_KITS, DRUM_KIT_IDS, DrumKitId } from './instruments';
 
 type Props = {
@@ -20,7 +20,7 @@ type Props = {
 
 /** The drum machine (unchanged behaviour; now one tab among four). */
 export default function DrumPanel({ pattern, kit, channels, playingStep, onToggle, onMute, onSolo, onAllMute, onAllSolo, onKit, onClear }: Props) {
-  const labels = CHANNEL_LABELS as Record<Instrument, string>;
+  const labels = DRUM_LABELS as Record<Instrument, string>;
   const wrapRef = useRef<HTMLDivElement>(null);
   useFollowPlayhead(wrapRef, playingStep, 150);
   const allOff = INSTRUMENTS.every(i => channels[i].muted);

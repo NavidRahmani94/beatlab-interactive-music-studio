@@ -16,7 +16,7 @@ body,.panel,button,select,input{transition:background-color .15s,color .15s,bord
 .vel-num{position:absolute;top:3px;left:0;right:0;text-align:center;font-family:'DM Mono',monospace;font-size:9px;color:var(--text);pointer-events:none;text-shadow:0 0 3px var(--bg)}.melody-controls .seg{flex-wrap:wrap}
 
 /* ---------- v0.6: tabs, stretched notes, playlist, visualiser, mixer groups ---------- */
-.inst-dot.ambient{background:var(--peri)}.inst-dot.arp{background:var(--orange)}
+.inst-dot.synth{background:var(--violet)}.inst-dot.ambient{background:var(--peri)}.inst-dot.arp{background:var(--orange)}
 .tabs{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 14px;position:sticky;top:0;z-index:20;padding:10px 0;background:color-mix(in srgb,var(--bg) 93%,transparent);backdrop-filter:blur(6px)}
 .tab{display:flex;align-items:center;gap:9px;height:40px;padding:0 20px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--text3);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1.3px}
 .tab.sel{background:var(--accent);color:var(--onaccent);border-color:var(--accent);font-weight:700}
@@ -201,3 +201,12 @@ body,.panel,button,select,input{transition:background-color .15s,color .15s,bord
 .bkey{position:absolute;top:0;right:-32%;width:64%;height:62%;z-index:2;border:1px solid #000;border-radius:0 0 4px 4px;background:#16181f;touch-action:none}
 .bkey.down{background:var(--accent-text)}
 @media (max-width:700px){.lab-top,.lab-head,.lab-grid,.lab-keys-wrap,.lab-scope{padding-left:12px;padding-right:12px}.lab-grid{grid-template-columns:1fr}.lab-keys{height:96px}.wkey-slot{min-width:0}.wkey{font-size:7px}}
+
+/* v0.10 dynamic tracks */
+.add-track{position:relative;display:inline-flex}
+.add-menu{position:absolute;top:calc(100% + 6px);left:0;z-index:30;display:flex;flex-direction:column;gap:4px;padding:6px;border-radius:8px;border:1px solid var(--line);background:var(--surface);box-shadow:0 8px 24px rgba(0,0,0,.35);min-width:150px}
+.add-menu button{height:34px;padding:0 12px;border-radius:6px;border:1px solid var(--line);background:var(--surface2,var(--surface));color:var(--text);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1.2px;text-align:left}
+.add-menu button:hover{border-color:var(--accent);color:var(--accent-text)}
+.lab-notes{margin:14px 0}
+.lab-notes .panel{margin:0}
+.track-head{align-items:flex-end}

@@ -107,14 +107,14 @@ describe('synths inside a project file', () => {
   const withSynth = () => {
     const p = defaultProject();
     p.synths = addSynth([], 'My lead', makePatch({ osc1: { wave: 'square' }, chorus: 0.4 }));
-    p.tracks = { ...p.tracks, melody: customRef(p.synths[0].id) };
+    p.tracks = p.tracks.map(t => t.id === 'synth' ? { ...t, instrument: customRef(p.synths[0].id) } : t);
     return p;
   };
   it('survive save and open unchanged', () => {
     const p = withSynth();
     const r = parseProject(serializeProject(p));
     expect(r.ok).toBe(true);
-    if (r.ok) { expect(r.project.synths).toEqual(p.synths); expect(r.project.tracks.melody).toBe('synth:s1'); expect(r.project.schemaVersion).toBe(4); }
+    if (r.ok) { expect(r.project.synths).toEqual(p.synths); expect(r.project.tracks.find(t => t.id === 'synth')?.instrument).toBe('synth:s1'); expect(r.project.schemaVersion).toBe(5); }
   });
   it('a track may not use a synth that is not in the file', () => {
     const p: any = JSON.parse(serializeProject(withSynth()));
@@ -128,7 +128,7 @@ describe('synths inside a project file', () => {
     p.schemaVersion = 3; delete p.synths;
     const r = validateProject(p);
     expect(r.ok).toBe(true);
-    if (r.ok) { expect(r.project.synths).toEqual([]); expect(r.project.schemaVersion).toBe(4); }
+    if (r.ok) { expect(r.project.synths).toEqual([]); expect(r.project.schemaVersion).toBe(5); }
   });
   it('a broken synth in the file is reported', () => {
     const p: any = JSON.parse(serializeProject(withSynth()));
@@ -139,7 +139,7 @@ describe('synths inside a project file', () => {
   });
   it('library sounds and every drum kit are accepted by the project check', () => {
     const p: any = JSON.parse(serializeProject(defaultProject()));
-    FACTORY_IDS.forEach(id => { p.tracks.melody = id; expect(validateProject(p).ok, id).toBe(true); });
+    FACTORY_IDS.forEach(id => { p.tracks[0].instrument = id; expect(validateProject(p).ok, id).toBe(true); });
     DRUM_KIT_IDS.forEach(k => { p.drumKit = k; expect(validateProject(p).ok, k).toBe(true); });
   });
 });

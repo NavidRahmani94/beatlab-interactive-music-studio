@@ -28,6 +28,13 @@ project.ts ── one BeatLabProject (schemaVersion 2). validateProject on Open 
 * **Visualiser.** Two `Tone.Analyser` nodes after the limiter (FFT + waveform) feed a canvas drawn with `requestAnimationFrame` (no React re-renders); the playlist highlights the playing bar.
 
 
+## v0.10 additions – dynamic tracks (schema 5)
+- `tracks.ts` (pure): `TrackDef {id,name,kind,instrument,arp}`, kinds melody|ambient|arp|synth, add/remove/rename helpers, max 8 tracks, reserved ids (`drums`, `lab`, drum names, `__proto__`…).
+- `PatternData.notes: Record<trackId, MelodyNote[]>` (empty tracks have no entry, see `compactNotes`). `channels` has the 4 drum channels plus one per track (`syncChannels`).
+- `Rig.setTracks(defs)` builds one voice per track; arpeggio settings come from each arp track. The same Rig is used for live play and offline export.
+- `project.ts#toV5` converts schema 1–4 files before validation.
+- App: `view` is `'drums' | trackId | 'lab'`; `SynthPanel` embeds the piano roll of the Synth track bound to the selected synth.
+
 ## v0.9 additions
 
 - `synth.ts` (pure): `SynthPatch` model, limits, `validatePatch`/`clampPatch`/`randomPatch`, the library `FACTORY_SOUNDS` (patch data per instrument) and the helpers for the project's `synths` list (`synth:<id>` references).

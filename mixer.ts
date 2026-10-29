@@ -1,6 +1,7 @@
-// Channels: 4 drum voices (unchanged) + 3 melodic tracks. Every channel has its own strip; all strips feed ONE master.
-export const CHANNEL_NAMES = ['kick', 'snare', 'hat', 'clap', 'melody', 'ambient', 'arp'] as const;
-export type ChannelName = typeof CHANNEL_NAMES[number];
+// Channels: 4 drum voices + one channel per track (tracks are created by the user). Every channel has its own strip; all strips feed ONE master.
+import { DRUM_IDS, TrackDef, TrackKind } from './tracks';
+export const DRUM_CHANNELS = DRUM_IDS;
+export type ChannelName = string;
 export type ChannelSettings = { volumeDb: number; muted: boolean; solo: boolean; pan: number; reverbSend: number; delaySend: number };
 export type Channels = Record<ChannelName, ChannelSettings>;
 
@@ -10,29 +11,45 @@ export const MAX_FEEDBACK = 0.9;
 export const EQ_MIN_DB = -12;
 export const EQ_MAX_DB = 12;
 
-export const CHANNEL_LABELS: Record<ChannelName, string> = { kick: 'KICK', snare: 'SNARE', hat: 'HI-HAT', clap: 'CLAP', melody: 'MELODY', ambient: 'AMBIENT', arp: 'ARPEGGIO' };
-export const CHANNEL_GROUPS: { label: string; channels: ChannelName[] }[] = [
-  { label: 'DRUMS', channels: ['kick', 'snare', 'hat', 'clap'] },
-  { label: 'MELODY', channels: ['melody'] },
-  { label: 'AMBIENT', channels: ['ambient'] },
-  { label: 'ARPEGGIO', channels: ['arp'] }
-];
+export const DRUM_LABELS: Record<string, string> = { kick: 'KICK', snare: 'SNARE', hat: 'HI-HAT', clap: 'CLAP' };
+export const channelLabel = (name: ChannelName, tracks: TrackDef[]): string => DRUM_LABELS[name] ?? (tracks.find(t => t.id === name)?.name ?? name).toUpperCase();
+/** Mixer sections: the drums, then every track. */
+export function channelGroups(tracks: TrackDef[]): { label: string; channels: ChannelName[]; kind: TrackKind | 'drums' }[] {
+  return [{ label: 'DRUMS', channels: [...DRUM_CHANNELS], kind: 'drums' }, ...tracks.map(t => ({ label: t.name.toUpperCase(), channels: [t.id], kind: t.kind }))];
+}
 
-export function defaultChannel(name: ChannelName): ChannelSettings {
+export function defaultChannel(name: ChannelName, kind?: TrackKind): ChannelSettings {
   const base: ChannelSettings = { volumeDb: 0, muted: false, solo: false, pan: 0, reverbSend: 0, delaySend: 0 };
   switch (name) {
     case 'snare': return { ...base, pan: -0.1 };
     case 'hat': return { ...base, pan: 0.25 };
     case 'clap': return { ...base, pan: -0.2, reverbSend: 0.2 };
+  }
+  switch (kind) {
     case 'melody': return { ...base, reverbSend: 0.2, delaySend: 0.15 };
     case 'ambient': return { ...base, reverbSend: 0.35 };
     case 'arp': return { ...base, pan: 0.15, reverbSend: 0.15, delaySend: 0.25 };
+    case 'synth': return { ...base, reverbSend: 0.2, delaySend: 0.2 };
     default: return base;
   }
 }
 
-export function defaultChannels(): Channels {
-  return Object.fromEntries(CHANNEL_NAMES.map(n => [n, defaultChannel(n)])) as Channels;
+export function defaultChannels(tracks: TrackDef[]): Channels {
+  const out: Channels = {};
+  DRUM_CHANNELS.forEach(n => { out[n] = defaultChannel(n); });
+  tracks.forEach(t => { out[t.id] = defaultChannel(t.id, t.kind); });
+  return out;
+}
+
+/** Keeps the mixer in step with the track list: new tracks get a default channel, deleted tracks lose theirs. */
+export function syncChannels(channels: Channels, tracks: TrackDef[]): Channels {
+  const wanted = new Set<string>([...DRUM_CHANNELS, ...tracks.map(t => t.id)]);
+  const keys = Object.keys(channels);
+  if (keys.length === wanted.size && keys.every(k => wanted.has(k))) return channels;
+  const out: Channels = {};
+  DRUM_CHANNELS.forEach(n => { out[n] = channels[n] ?? defaultChannel(n); });
+  tracks.forEach(t => { out[t.id] = channels[t.id] ?? defaultChannel(t.id, t.kind); });
+  return out;
 }
 
 // ---------- small clamping helpers (NaN-safe) ----------
@@ -55,6 +72,7 @@ export function clampEq(value: number): number {
 /** Returns a new Channels object with one channel patched (values are clamped). */
 export function patchChannel(channels: Channels, name: ChannelName, patch: Partial<ChannelSettings>): Channels {
   const c = channels[name];
+  if (!c) return channels;
   return {
     ...channels,
     [name]: {
@@ -70,8 +88,10 @@ export function patchChannel(channels: Channels, name: ChannelName, patch: Parti
 
 /** A channel is silent when it is muted, or when ANOTHER channel is soloed. */
 export function effectiveMuted(channels: Channels, name: ChannelName): boolean {
-  const anySolo = CHANNEL_NAMES.some(n => channels[n].solo);
-  return channels[name].muted || (anySolo && !channels[name].solo);
+  const c = channels[name];
+  if (!c) return false;
+  const anySolo = Object.values(channels).some(x => x.solo);
+  return c.muted || (anySolo && !c.solo);
 }
 
 // ---------- master bus (mixing → mastering) ----------

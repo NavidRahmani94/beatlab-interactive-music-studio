@@ -29,7 +29,10 @@ Attach this zip and say: "Continue BeatLab from PROJECT_STATUS.md". Keep the fla
 - Touch mode toggle for drawing notes on phones.
 - Verified: 127 unit tests; WAV (89.9 s, peak -4 dB, intro/break quieter than verse/hook) and MP3 192 header/duration of the demo export in headless Chromium. NOT verified: human listening, real phone, WAV24/MP3 320 in browser, e2e-full.cjs (still the v0.6 script; needs updating for 32 steps).
 
-## v0.9.0 (latest)
+## v0.10.0 (latest)
+Dynamic tracks: synth note track, rename / add / delete tracks, schema 5 with automatic upgrade. Verified by unit tests, 19 browser checks and a WAV export; not heard by ear, not tried on a real phone. Live recording from the Synth Lab keyboard is not done.
+
+## v0.9.0
 - **Light / dark / auto theme** (button top-right, remembered in the browser). All colours are CSS variables at the top of `main.css`; `theme.ts` holds the logic.
 - **81 built-in melodic sounds in 12 families** (`synth.ts` → `FACTORY_SOUNDS`, plus the 11 older ones) incl. Persian santur / tar / kamancheh / ney / oud; **11 drum kits** (`rig.ts` → `KITS`).
 - **Synth Lab** tab (`SynthPanel.tsx`): 2 oscillators (+FM, unison, pulse/PWM, noise), filter + envelope, amp envelope, LFO (vibrato / wobble / tremolo), drive, chorus, on-screen + computer keyboard, scope. Up to 16 synths per project, saved in the file (`synths`, schema 4), selectable on Melody/Ambient/Arpeggio as `synth:<id>`. Every library sound is also a patch and can be opened in the lab.

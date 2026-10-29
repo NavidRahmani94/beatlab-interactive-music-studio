@@ -77,7 +77,7 @@ const ok = (n, c, d = '') => { results.push(c); console.log((c ? 'PASS ' : 'FAIL
   const [dl] = await Promise.all([p.waitForEvent('download'), p.click('button:text-is("SAVE")')]);
   const saved = path.join(OUT, 'with_synths.beatlab.json'); await dl.saveAs(saved);
   const json = JSON.parse(fs.readFileSync(saved, 'utf8'));
-  ok('saved file has schema 4 and 4 synths', json.schemaVersion === 4 && json.synths.length === 4 && json.tracks.melody === 'synth:s1', `${json.schemaVersion}/${json.synths.length}/${json.tracks.melody}`);
+  ok('saved file has schema 5 and 4 synths', json.schemaVersion === 5 && json.synths.length === 4 && json.tracks.find(t => t.id === 'melody').instrument === 'synth:s1', `${json.schemaVersion}/${json.synths.length}`);
   // delete the synth in use
   await p.click('[aria-label="Your synths"] .chip:has-text("Test Lead")');
   await p.click('button:has-text("DELETE")');

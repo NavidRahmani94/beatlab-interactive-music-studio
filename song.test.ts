@@ -8,19 +8,19 @@ describe('patterns', () => {
     p = addPattern(p);
     expect(p).toHaveLength(2);
     expect(p[1].name).toBe('Pattern 2');
-    expect(p[1].melody).toEqual([]);
+    expect(p[1].notes).toEqual({});
     expect(p[1].drums.kick.some(Boolean)).toBe(false);
     while (p.length < MAX_PATTERNS) p = addPattern(p);
     expect(addPattern(p)).toBe(p);
     expect(new Set(p.map(x => x.name)).size).toBe(p.length);
   });
   it('duplicate makes an independent copy', () => {
-    const a = [{ ...emptyPattern('A'), melody: toggleNote([], 60, 0, 4) }];
+    const a = [{ ...emptyPattern('A'), notes: { melody: toggleNote([], 60, 0, 4) } }];
     const b = duplicatePattern(a, 0);
     expect(b).toHaveLength(2);
     expect(b[1].name).toBe('A copy');
-    expect(b[1].melody).toEqual(a[0].melody);
-    expect(b[1].melody).not.toBe(a[0].melody);
+    expect(b[1].notes.melody).toEqual(a[0].notes.melody);
+    expect(b[1].notes.melody).not.toBe(a[0].notes.melody);
     expect(b[1].drums).not.toBe(a[0].drums);
     expect(duplicatePattern(a, 5)).toBe(a);
   });

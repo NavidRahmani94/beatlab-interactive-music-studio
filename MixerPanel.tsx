@@ -1,11 +1,13 @@
 import { Fragment, useEffect, useRef } from 'react';
 import {
-  CHANNEL_GROUPS, CHANNEL_LABELS, ChannelName, ChannelSettings, Channels, DELAY_DIVISIONS, DelayDivision, MAX_FEEDBACK, MasterSettings,
+  channelGroups, channelLabel, ChannelName, ChannelSettings, Channels, DELAY_DIVISIONS, DelayDivision, MAX_FEEDBACK, MasterSettings,
   REVERB_SIZES, ReverbSize, VOLUME_MAX_DB, VOLUME_MIN_DB, EQ_MAX_DB, EQ_MIN_DB
 } from './mixer';
+import { TrackDef } from './tracks';
 
 type Props = {
   channels: Channels;
+  tracks: TrackDef[];
   master: MasterSettings;
   onChannel: (name: ChannelName, patch: Partial<ChannelSettings>) => void;
   onMaster: (patch: Partial<MasterSettings>) => void;
@@ -16,7 +18,7 @@ type Props = {
 const fmtDb = (v: number) => `${v > 0 ? '+' : ''}${v} dB`;
 const fmtPan = (p: number) => (Math.abs(p) < 0.02 ? 'C' : p < 0 ? `L${Math.round(-p * 100)}` : `R${Math.round(p * 100)}`);
 
-export default function MixerPanel({ channels, master, onChannel, onMaster, getLevelDb, playing }: Props) {
+export default function MixerPanel({ channels, tracks, master, onChannel, onMaster, getLevelDb, playing }: Props) {
   const meterRef = useRef<HTMLDivElement>(null);
   const peakRef = useRef<HTMLSpanElement>(null);
 
@@ -37,14 +39,15 @@ export default function MixerPanel({ channels, master, onChannel, onMaster, getL
   }, [playing, getLevelDb]);
 
   return <section className="panel mixer">
-    <div className="panel-label">MIXER <span>7 CHANNELS → ONE MASTER (EQ · COMPRESSOR · REVERB · DELAY)</span></div>
+    <div className="panel-label">MIXER <span>{4 + tracks.length} CHANNELS → ONE MASTER (EQ · COMPRESSOR · REVERB · DELAY)</span></div>
     <div className="mixer-body">
       <div className="mix-row mix-head"><span /><span>M / S</span><span>PAN</span><span>VOLUME</span><span>REVERB SEND</span><span>DELAY SEND</span></div>
-      {CHANNEL_GROUPS.flatMap(g => g.channels.map((name, idx) => ({ name, group: idx === 0 ? g.label : null }))).map(({ name, group }) => {
+      {channelGroups(tracks).flatMap(g => g.channels.map((name, idx) => ({ name, group: idx === 0 ? g.label : null, kind: g.kind }))).map(({ name, group, kind }) => {
         const c = channels[name];
-        const label = CHANNEL_LABELS[name];
+        const label = channelLabel(name, tracks);
+        if (!c) return null;
         return <Fragment key={name}>{group && <div className="mix-group">{group}</div>}<div className={'mix-row' + (c.muted ? ' is-muted' : '')}>
-          <div className="instrument-name"><span className={'inst-dot ' + name} />{label}</div>
+          <div className="instrument-name"><span className={'inst-dot ' + (kind === 'drums' ? name : kind)} />{label}</div>
           <div className="seg small" role="group" aria-label={`${label} mute and solo`}>
             <button className={c.muted ? 'sel warn' : ''} aria-pressed={c.muted} aria-label={`${label} mixer ${c.muted ? 'muted' : 'on'}`} title="Mute" onClick={() => onChannel(name, { muted: !c.muted })}>M</button>
             <button className={c.solo ? 'sel' : ''} aria-pressed={c.solo} aria-label={`${label} solo`} title="Solo" onClick={() => onChannel(name, { solo: !c.solo })}>S</button>

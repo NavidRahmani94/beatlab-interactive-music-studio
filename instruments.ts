@@ -48,20 +48,3 @@ export const DRUM_KITS = {
 export type DrumKitId = keyof typeof DRUM_KITS;
 export const DRUM_KIT_IDS = Object.keys(DRUM_KITS) as DrumKitId[];
 export const isDrumKit = (v: unknown): v is DrumKitId => typeof v === 'string' && own(DRUM_KITS, v);
-
-// ---------- the four "modes" (tabs) ----------
-export const MELODIC_TRACKS = ['melody', 'ambient', 'arp'] as const;
-export type MelodicTrack = typeof MELODIC_TRACKS[number];
-export const TAB_ORDER = ['ambient', 'drums', 'melody', 'arp'] as const;
-export type TabId = typeof TAB_ORDER[number];
-export const TAB_LABELS: Record<TabId, string> = { ambient: 'AMBIENT', drums: 'DRUMS', melody: 'MELODY', arp: 'ARPEGGIO' };
-export const TAB_HINTS: Record<TabId, string> = {
-  ambient: 'long, slow atmosphere (pads, drones)',
-  drums: 'kick · snare · hi-hat · clap',
-  melody: 'the tune',
-  arp: 'a held chord is played note by note'
-};
-export const isMelodicTrack = (v: unknown): v is MelodicTrack => typeof v === 'string' && (MELODIC_TRACKS as readonly string[]).includes(v);
-export const TRACK_DEFAULT_INSTRUMENT: Record<MelodicTrack, MelodyInstrumentId> = { melody: 'electricPiano', ambient: 'warmPad', arp: 'pluck' };
-/** Default length (in steps) of a note added with a single click on each track. */
-export const TRACK_DEFAULT_LENGTH: Record<MelodicTrack, number> = { melody: 1, ambient: 8, arp: 8 };

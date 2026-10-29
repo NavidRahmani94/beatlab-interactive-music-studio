@@ -1,12 +1,13 @@
 import * as Tone from 'tone';
 import { Instrument } from './pattern';
 import { MelodyNote } from './melody';
-import { CHANNEL_NAMES, ChannelName, Channels, MasterSettings, REVERB_SIZES, compressorSettings, defaultChannels, defaultMaster, delaySeconds, effectiveMuted } from './mixer';
-import { DrumKitId, MELODIC_TRACKS, MelodicTrack, MelodyInstrumentId, TRACK_DEFAULT_INSTRUMENT } from './instruments';
+import { ChannelName, Channels, DRUM_CHANNELS, MasterSettings, REVERB_SIZES, compressorSettings, defaultChannel, defaultMaster, delaySeconds, effectiveMuted } from './mixer';
+import { DrumKitId, MelodyInstrumentId } from './instruments';
+import { KIND_DEFAULT_INSTRUMENT, TrackDef } from './tracks';
 import { FACTORY_SOUNDS, SynthPatch, SynthSlot, customId, isCustomRef, isFactorySound } from './synth';
 import { NoteSynth, PatchSynth } from './patchSynth';
-import { ArpSettings, arpAt } from './arp';
-import { PatternData } from './song';
+import { arpAt } from './arp';
+import { PatternData, notesFor } from './song';
 
 type Strip = { vol: Tone.Volume; pan: Tone.Panner; reverbSend: Tone.Gain; delaySend: Tone.Gain };
 
@@ -156,13 +157,14 @@ function buildMelody(id: MelodyInstrumentId): MelodyBuild {
 }
 
 type Voice = { sig: string; synth: NoteSynth; filter: Tone.Filter | null; shift: number };
+type TrackRuntime = { def: TrackDef; voice: Voice };
 
 /** Notes that START on this step (the ones that need a trigger). */
 export function notesStartingAt(notes: MelodyNote[], step: number): MelodyNote[] { return notes.filter(n => n.step === step); }
 
 /**
  * The complete sound path:
- *   instruments -> 7 channel strips (volume, pan, mute/solo) -> [reverb send / delay send buses] -> ONE master in
+ *   instruments -> channel strips (volume, pan, mute/solo; 4 drums + one per track) -> [reverb send / delay send buses] -> ONE master in
  *   -> EQ (low/mid/high) -> compressor -> master reverb -> master volume -> limiter -> output (+ meter, analyser)
  * The SAME class is used for live playback and for the offline WAV render, so both sound identical.
  * Create it while the Tone context you want (live or offline) is the active one.
@@ -184,14 +186,14 @@ export class Rig {
   private snare: Tone.NoiseSynth;
   private hat: Tone.MetalSynth;
   private clap: Tone.NoiseSynth;
-  private voices = {} as Record<MelodicTrack, Voice>;
-  private refs: Record<MelodicTrack, MelodyInstrumentId> = { ...TRACK_DEFAULT_INSTRUMENT };
+  private tracks = new Map<string, TrackRuntime>();
   private custom = new Map<string, SynthSlot>();
   private audition: { sig: string; synth: PatchSynth } | null = null;
   private auditionOut: Tone.Volume;
   private kitDur: Record<Instrument, number> = KITS.classic.dur;
   private kickNote = 'C1';
-  private muted = Object.fromEntries(CHANNEL_NAMES.map(n => [n, false])) as Record<ChannelName, boolean>;
+  private muted: Record<ChannelName, boolean> = {};
+  private channels: Channels = {};
   private bpm = 120;
   private master: MasterSettings = defaultMaster();
 
@@ -218,19 +220,7 @@ export class Rig {
     this.delay.wet.value = 1;
     this.delay.connect(this.masterIn);
 
-    CHANNEL_NAMES.forEach(name => {
-      const vol = new Tone.Volume(0);
-      const pan = new Tone.Panner(0);
-      const reverbSend = new Tone.Gain(0);
-      const delaySend = new Tone.Gain(0);
-      vol.connect(pan);
-      pan.connect(this.masterIn);
-      pan.connect(reverbSend);
-      reverbSend.connect(this.sendReverb);
-      pan.connect(delaySend);
-      delaySend.connect(this.delay);
-      this.strips[name] = { vol, pan, reverbSend, delaySend };
-    });
+    DRUM_CHANNELS.forEach(name => this.makeStrip(name));
 
     const classic = KITS.classic;
     this.kick = new Tone.MembraneSynth(classic.kick).connect(this.strips.kick.vol);
@@ -243,11 +233,32 @@ export class Rig {
     this.hat.volume.value = -12;
     this.clap.volume.value = -11;
 
-    MELODIC_TRACKS.forEach(t => { this.voices[t] = this.makeVoice(t, TRACK_DEFAULT_INSTRUMENT[t]); });
-
     this.auditionOut = new Tone.Volume(0).connect(this.masterIn);
-    this.setChannels(defaultChannels());
     this.setMaster(defaultMaster());
+  }
+
+  private makeStrip(name: ChannelName): Strip {
+    const vol = new Tone.Volume(0);
+    const pan = new Tone.Panner(0);
+    const reverbSend = new Tone.Gain(0);
+    const delaySend = new Tone.Gain(0);
+    vol.connect(pan);
+    pan.connect(this.masterIn);
+    pan.connect(reverbSend);
+    reverbSend.connect(this.sendReverb);
+    pan.connect(delaySend);
+    delaySend.connect(this.delay);
+    const strip = { vol, pan, reverbSend, delaySend };
+    this.strips[name] = strip;
+    this.muted[name] = false;
+    return strip;
+  }
+  private disposeStrip(name: ChannelName): void {
+    const s = this.strips[name];
+    if (!s) return;
+    s.vol.dispose(); s.pan.dispose(); s.reverbSend.dispose(); s.delaySend.dispose();
+    delete this.strips[name];
+    delete this.muted[name];
   }
 
   /** The patch behind an instrument id (built-in library sound or the user's own synth), or null for the older built-in sounds. */
@@ -261,11 +272,12 @@ export class Rig {
     return p ? `${ref}|${JSON.stringify(p)}` : ref;
   }
 
-  private makeVoice(track: MelodicTrack, wanted: MelodyInstrumentId): Voice {
-    // a deleted user synth falls back to the track's default sound instead of silence
-    const ref = isCustomRef(wanted) && !this.custom.has(customId(wanted)) ? TRACK_DEFAULT_INSTRUMENT[track] : wanted;
+  private makeVoice(def: TrackDef): Voice {
+    // a deleted user synth falls back to the kind's default sound instead of silence
+    const wanted = def.instrument;
+    const ref = isCustomRef(wanted) && !this.custom.has(customId(wanted)) ? KIND_DEFAULT_INSTRUMENT[def.kind] : wanted;
     const patch = this.patchFor(ref);
-    const out = this.strips[track].vol;
+    const out = this.strips[def.id].vol;
     if (patch) {
       const synth = new PatchSynth(patch);
       synth.connect(out);
@@ -276,11 +288,32 @@ export class Rig {
     if (m.filter) { m.synth.connect(m.filter); m.filter.connect(out); } else m.synth.connect(out);
     return { sig: this.signature(wanted), synth: m.synth, filter: m.filter, shift: m.shift };
   }
+  private disposeVoice(v: Voice): void { v.synth.releaseAll(); v.synth.dispose(); v.filter?.dispose(); }
+
+  /**
+   * Makes the audio graph match the track list: new tracks get a strip and an instrument, deleted tracks are removed,
+   * and a track whose instrument (or user synth patch) changed gets a fresh voice.
+   */
+  setTracks(defs: TrackDef[]): void {
+    const wanted = new Set(defs.map(d => d.id));
+    for (const [id, rt] of [...this.tracks]) if (!wanted.has(id)) { this.disposeVoice(rt.voice); this.tracks.delete(id); this.disposeStrip(id); }
+    defs.forEach(def => {
+      const have = this.tracks.get(def.id);
+      if (!have) {
+        if (!this.strips[def.id]) this.makeStrip(def.id);
+        this.tracks.set(def.id, { def, voice: this.makeVoice(def) });
+        return;
+      }
+      have.def = def;
+      if (have.voice.sig !== this.signature(def.instrument)) { this.disposeVoice(have.voice); have.voice = this.makeVoice(def); }
+    });
+    this.setChannels(this.channels);
+  }
 
   /** The user's own synths. Tracks that use one are rebuilt when its patch changes. */
   setSynths(synths: SynthSlot[]): void {
     this.custom = new Map(synths.map(s => [s.id, s]));
-    MELODIC_TRACKS.forEach(t => this.setTrackInstrument(t, this.refs[t]));
+    this.setTracks([...this.tracks.values()].map(t => t.def));
   }
 
   // ---- the Synth Lab keyboard: one extra voice that is heard even when no track uses the synth
@@ -302,8 +335,9 @@ export class Rig {
   async ready(): Promise<void> { await Promise.all([this.sendReverb.ready, this.masterReverb.ready]); }
 
   setChannels(channels: Channels): void {
-    CHANNEL_NAMES.forEach(name => {
-      const c = channels[name];
+    this.channels = channels;
+    Object.keys(this.strips).forEach(name => {
+      const c = channels[name] ?? defaultChannel(name, this.tracks.get(name)?.def.kind);
       const strip = this.strips[name];
       const muted = effectiveMuted(channels, name);
       strip.vol.volume.value = c.volumeDb;
@@ -312,7 +346,7 @@ export class Rig {
       strip.reverbSend.gain.value = c.reverbSend;
       strip.delaySend.gain.value = c.delaySend;
       this.muted[name] = muted;
-      if (muted && (MELODIC_TRACKS as readonly string[]).includes(name)) this.voices[name as MelodicTrack].synth.releaseAll();
+      if (muted) this.tracks.get(name)?.voice.synth.releaseAll();
     });
   }
 
@@ -345,16 +379,6 @@ export class Rig {
     this.kickNote = kit.kickNote ?? 'C1';
   }
 
-  setTrackInstrument(track: MelodicTrack, id: MelodyInstrumentId): void {
-    this.refs[track] = id;
-    const old = this.voices[track];
-    if (old && old.sig === this.signature(id)) return;
-    old.synth.releaseAll();
-    old.synth.dispose();
-    old.filter?.dispose();
-    this.voices[track] = this.makeVoice(track, id);
-  }
-
   /** Master output level in dB (for the meter). */
   getLevelDb(): number {
     const v = this.meter.getValue();
@@ -365,20 +389,12 @@ export class Rig {
   /** Waveform samples (-1..1) for the visualiser. */
   getWaveform(): Float32Array { return this.wave.getValue() as Float32Array; }
 
-  private playNotes(track: MelodicTrack, notes: MelodyNote[], time: number, stepSeconds: number, hold: number): void {
-    const v = this.voices[track];
-    notes.forEach(n => {
-      const pitch = v.shift ? Tone.Frequency(n.pitch).transpose(v.shift).toNote() : n.pitch;
-      v.synth.triggerAttackRelease(pitch, Math.max(0.05, n.lengthSteps * stepSeconds * hold), time, n.velocity);
-    });
-  }
-
   /**
    * Plays everything that sits on one 16th-note step of one pattern at an explicit audio time.
    * `pattern` is null for an empty playlist bar. Durations of drum hits are fixed seconds, so timbre never depends on BPM.
    * `tick` (global step counter) only feeds the arpeggiator's random mode.
    */
-  triggerStep(step: number, time: number, pattern: PatternData | null, arp: ArpSettings, tick: number, stepSeconds: number): void {
+  triggerStep(step: number, time: number, pattern: PatternData | null, tick: number, stepSeconds: number): void {
     if (!pattern) return;
     const d = this.kitDur;
     const voices: Record<Instrument, () => void> = {
@@ -388,28 +404,36 @@ export class Rig {
       clap: () => this.clap.triggerAttackRelease(d.clap, time)
     };
     (Object.keys(voices) as Instrument[]).forEach(name => { if (!this.muted[name] && pattern.drums[name][step]) voices[name](); });
-    if (!this.muted.melody) this.playNotes('melody', notesStartingAt(pattern.melody, step), time, stepSeconds, 0.95);
-    if (!this.muted.ambient) this.playNotes('ambient', notesStartingAt(pattern.ambient, step), time, stepSeconds, 1);
-    if (!this.muted.arp) {
-      arpAt(pattern.arp, step, arp, tick).forEach(e => {
-        const v = this.voices.arp;
-        const pitch = v.shift ? Tone.Frequency(e.pitch).transpose(v.shift).toNote() : e.pitch;
-        v.synth.triggerAttackRelease(pitch, Math.max(0.05, e.durationSteps * stepSeconds), time, e.velocity);
+    this.tracks.forEach(({ def, voice }, id) => {
+      if (this.muted[id]) return;
+      const notes = notesFor(pattern, id);
+      if (def.kind === 'arp') {
+        arpAt(notes, step, def.arp, tick).forEach(e => {
+          const pitch = voice.shift ? Tone.Frequency(e.pitch).transpose(voice.shift).toNote() : e.pitch;
+          voice.synth.triggerAttackRelease(pitch, Math.max(0.05, e.durationSteps * stepSeconds), time, e.velocity);
+        });
+        return;
+      }
+      const hold = def.kind === 'ambient' ? 1 : 0.95;
+      notesStartingAt(notes, step).forEach(n => {
+        const pitch = voice.shift ? Tone.Frequency(n.pitch).transpose(voice.shift).toNote() : n.pitch;
+        voice.synth.triggerAttackRelease(pitch, Math.max(0.05, n.lengthSteps * stepSeconds * hold), time, n.velocity);
       });
-    }
+    });
   }
 
   releaseAll(): void {
     this.kick.triggerRelease();
-    MELODIC_TRACKS.forEach(t => this.voices[t].synth.releaseAll());
+    this.tracks.forEach(t => t.voice.synth.releaseAll());
   }
 
   dispose(): void {
     this.releaseAll();
+    this.tracks.forEach(t => this.disposeVoice(t.voice));
+    this.tracks.clear();
     [this.kick, this.snare, this.hat, this.clap, this.sendReverb, this.delay, this.eq, this.comp, this.masterReverb, this.masterVol, this.limiter, this.meter, this.spectrum, this.wave, this.masterIn].forEach(n => n.dispose());
-    MELODIC_TRACKS.forEach(t => { this.voices[t].synth.dispose(); this.voices[t].filter?.dispose(); });
     this.audition?.synth.dispose();
     this.auditionOut.dispose();
-    CHANNEL_NAMES.forEach(name => { const s = this.strips[name]; s.vol.dispose(); s.pan.dispose(); s.reverbSend.dispose(); s.delaySend.dispose(); });
+    Object.keys(this.strips).forEach(name => this.disposeStrip(name));
   }
 }

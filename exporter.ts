@@ -62,7 +62,7 @@ export async function renderProjectToWav(project: BeatLabProject, loops: number,
     const rig = new Rig();
     rig.setSynths(project.synths);
     rig.setDrumKit(project.drumKit);
-    (['melody', 'ambient', 'arp'] as const).forEach(t => rig.setTrackInstrument(t, project.tracks[t]));
+    rig.setTracks(project.tracks);
     rig.setMaster(project.master);
     rig.setChannels(project.channels);
     rig.setTempo(project.bpm);
@@ -73,7 +73,7 @@ export async function renderProjectToWav(project: BeatLabProject, loops: number,
       if (count >= totalSteps) return;
       const frame = frameAt(count, playlist, options.mode, options.pattern);
       const pattern = frame.pattern === null ? null : project.patterns[frame.pattern] ?? null;
-      rig.triggerStep(frame.step, time, pattern, project.arp, count, stepSeconds);
+      rig.triggerStep(frame.step, time, pattern, count, stepSeconds);
       count++;
     }, '16n', 0, totalSteps * stepSeconds);
     transport.start(EXPORT_LEAD_IN);

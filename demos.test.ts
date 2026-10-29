@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SAMPLE_PROJECTS, hasAudibleContent, parseProject, serializeProject } from './project';
 import { MAX_MIDI, MIN_MIDI, noteToMidi } from './melody';
-import { MELODIC_TRACKS, isDrumKit, isMelodyInstrument } from './instruments';
+import { isDrumKit, isMelodyInstrument } from './instruments';
 import { STEPS } from './pattern';
 
 const DEMOS = ['Hip Hop Demo', 'Lo-Fi Chill', 'House 124', 'Trap 140', 'Persian Mood', 'Synthwave 108', 'Chiptune 150'];
@@ -20,12 +20,12 @@ describe('demo songs in several styles', () => {
       it('would make sound and uses real instruments and a real drum kit', () => {
         expect(hasAudibleContent(p)).toBe(true);
         expect(isDrumKit(p.drumKit)).toBe(true);
-        MELODIC_TRACKS.forEach(t => expect(isMelodyInstrument(p.tracks[t]), `${t}: ${p.tracks[t]}`).toBe(true));
+        p.tracks.forEach(t => expect(isMelodyInstrument(t.instrument), `${t.id}: ${t.instrument}`).toBe(true));
       });
       it('has 32-step patterns with every note inside the keyboard range', () => {
         p.patterns.forEach(pt => {
           (Object.values(pt.drums) as boolean[][]).forEach(row => expect(row).toHaveLength(STEPS));
-          MELODIC_TRACKS.forEach(t => pt[t].forEach(n => {
+          Object.values(pt.notes).forEach(list => list.forEach(n => {
             const midi = noteToMidi(n.pitch) ?? -1;
             expect(midi).toBeGreaterThanOrEqual(MIN_MIDI); expect(midi).toBeLessThanOrEqual(MAX_MIDI);
             expect(n.step + n.lengthSteps).toBeLessThanOrEqual(STEPS);
@@ -44,6 +44,6 @@ describe('demo songs in several styles', () => {
     const list = DEMOS.map(n => SAMPLE_PROJECTS[n]());
     expect(new Set(list.map(p => p.bpm)).size).toBe(DEMOS.length);
     expect(new Set(list.map(p => p.drumKit)).size).toBeGreaterThanOrEqual(6);
-    expect(new Set(list.map(p => p.tracks.melody)).size).toBe(DEMOS.length);
+    expect(new Set(list.map(p => p.tracks[0].instrument)).size).toBe(DEMOS.length);
   });
 });

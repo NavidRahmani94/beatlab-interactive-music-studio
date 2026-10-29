@@ -1,8 +1,8 @@
 import * as Tone from 'tone';
 import { clampBpm } from './pattern';
-import { Channels, MasterSettings, defaultChannels, defaultMaster } from './mixer';
-import { DrumKitId, MelodicTrack, MelodyInstrumentId, TRACK_DEFAULT_INSTRUMENT } from './instruments';
-import { ArpSettings, defaultArp } from './arp';
+import { Channels, MasterSettings, defaultMaster } from './mixer';
+import { DrumKitId } from './instruments';
+import { TrackDef } from './tracks';
 import { Frame, PatternData, PlayMode, Playlist, frameAt } from './song';
 import { Rig } from './rig';
 import { SynthPatch, SynthSlot } from './synth';
@@ -14,10 +14,9 @@ export class BeatLabEngine {
   private rig: Rig | null = null;
   private eventId: number | null = null;
   private song: SongState;
-  private arp: ArpSettings = defaultArp();
-  private channels: Channels = defaultChannels();
+  private trackDefs: TrackDef[] = [];
+  private channels: Channels = {};
   private master: MasterSettings = defaultMaster();
-  private instruments: Record<MelodicTrack, MelodyInstrumentId> = { ...TRACK_DEFAULT_INSTRUMENT };
   private kit: DrumKitId = 'classic';
   private synths: SynthSlot[] = [];
   private bpm = 120;
@@ -31,14 +30,9 @@ export class BeatLabEngine {
     this.frameCallback = onFrame;
   }
   setSong(song: SongState): void { this.song = song; }
-  setArp(arp: ArpSettings): void { this.arp = arp; }
+  setTracks(tracks: TrackDef[]): void { this.trackDefs = tracks; this.rig?.setTracks(tracks); }
   setChannels(channels: Channels): void { this.channels = channels; this.rig?.setChannels(channels); }
   setMaster(master: MasterSettings): void { this.master = master; this.rig?.setMaster(master); }
-  setTrackInstrument(track: MelodicTrack, id: MelodyInstrumentId): void {
-    this.instruments[track] = id;
-    this.rig?.setTrackInstrument(track, id);
-    this.rig?.setChannels(this.channels);
-  }
   setSynths(synths: SynthSlot[]): void { this.synths = synths; this.rig?.setSynths(synths); }
   setDrumKit(id: DrumKitId): void { this.kit = id; this.rig?.setDrumKit(id); }
   setFrameCallback(callback: (frame: Frame) => void): void { this.frameCallback = callback; }
@@ -59,7 +53,7 @@ export class BeatLabEngine {
     this.rig = rig;
     rig.setSynths(this.synths);
     rig.setDrumKit(this.kit);
-    (Object.keys(this.instruments) as MelodicTrack[]).forEach(t => rig.setTrackInstrument(t, this.instruments[t]));
+    rig.setTracks(this.trackDefs);
     rig.setMaster(this.master);
     rig.setChannels(this.channels);
     rig.setTempo(this.bpm);
@@ -93,7 +87,7 @@ export class BeatLabEngine {
       const { patterns, playlist, mode, current } = this.song;
       const frame = frameAt(tick, playlist, mode, current);
       const pattern = frame.pattern === null ? null : patterns[frame.pattern] ?? null;
-      this.rig?.triggerStep(frame.step, time, pattern, this.arp, tick, 60 / transport.bpm.value / 4);
+      this.rig?.triggerStep(frame.step, time, pattern, tick, 60 / transport.bpm.value / 4);
       Tone.getDraw().schedule(() => { if (this.active) this.frameCallback(frame); }, time);
     }, '16n', 0);
     this.active = true;
