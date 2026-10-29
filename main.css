@@ -40,3 +40,12 @@
 .mix-group{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.4px;color:#e7ff74;margin:6px 0 10px;padding-top:10px;border-top:1px solid #272b37;min-width:860px}
 .mix-group:first-of-type{border-top:0;padding-top:0}
 @media (max-width:700px){.tab{padding:0 12px}.tab-pattern{width:100%;margin:4px 0 0}}
+
+.chip-group{display:inline-flex;border-radius:6px}
+.chip-group .chip{border-top-right-radius:0;border-bottom-right-radius:0;border-right:0}
+.chip-play{height:30px;width:30px;border-radius:0 6px 6px 0;border:1px solid #343846;background:#272b37;color:var(--c);font-size:11px}
+.chip-group.sel .chip-play{border-color:var(--c)}
+.chip-play.on{background:var(--c);color:#11140d}
+
+.auto-btn.listen{margin-left:8px;height:40px}
+.auto-btn.listen.on{background:#e7ff74;color:#11140d}

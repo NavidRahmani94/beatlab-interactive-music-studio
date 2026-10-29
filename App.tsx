@@ -181,6 +181,25 @@ export default function App() {
     const r = deletePattern(patterns, playlist, cur);
     setPatterns(r.patterns); setPlaylist(r.playlist); setCurrent(Math.max(0, Math.min(cur, r.patterns.length - 1)));
   }
+  // listen to one pattern on its own: switch to PATTERN mode, loop it; press again to stop
+  function audition(i: number) {
+    if (latest.current.playing && mode === 'pattern' && cur === i) { stop(); return; }
+    setCurrent(i); setMode('pattern');
+    engine.current?.setSong({ patterns, playlist, mode: 'pattern', current: i });
+    if (!latest.current.playing) void play();
+  }
+  // listen to ONE track of the selected pattern on its own (uses the mixer's solo; press again to hear everything again)
+  const trackChannels = (t: TabId): ChannelName[] => t === 'drums' ? ['kick', 'snare', 'hat', 'clap'] : [t];
+  const soloedNow = (Object.keys(channels) as ChannelName[]).filter(n => channels[n].solo);
+  const aloneActive = soloedNow.length === trackChannels(tab).length && trackChannels(tab).every(n => channels[n].solo);
+  function listenAlone() {
+    if (aloneActive) { setChannels(c => (Object.keys(c) as ChannelName[]).reduce((acc, n) => patchChannel(acc, n, { solo: false }), c)); return; }
+    const target = trackChannels(tab);
+    setChannels(c => (Object.keys(c) as ChannelName[]).reduce((acc, n) => patchChannel(acc, n, { solo: target.includes(n), muted: target.includes(n) ? false : acc[n].muted }), c));
+    setMode('pattern');
+    engine.current?.setSong({ patterns, playlist, mode: 'pattern', current: cur });
+    if (!latest.current.playing) void play();
+  }
   const paint = (bar: number) => setPlaylist(pl => setSlot(pl, bar, pl[bar] === cur ? null : cur));
 
   const playFrame = playing ? frame : null;
@@ -201,6 +220,8 @@ export default function App() {
       {TAB_ORDER.map(t => <button key={t} role="tab" aria-selected={tab === t} className={'tab' + (tab === t ? ' sel' : '') + (mutedTab(t) ? ' muted' : '')} onClick={() => setTab(t)}>
         <i className={'tab-dot' + (hasNotes(t) ? ' has' : '')} data-track={t} />{TAB_LABELS[t]}
       </button>)}
+      <button className={'auto-btn listen' + (aloneActive ? ' on' : '')} aria-pressed={aloneActive} aria-label={`Listen to ${TAB_LABELS[tab]} alone`}
+        title="Hear only this track of the selected pattern (loops it). Press again to hear everything." onClick={listenAlone}>{aloneActive ? '■ BACK TO FULL MIX' : `🎧 LISTEN TO ${TAB_LABELS[tab]} ALONE`}</button>
       <span className="tab-pattern">EDITING <b>{pattern.name}</b></span>
     </div>
 
@@ -213,7 +234,7 @@ export default function App() {
       arp={arp} onArp={patch => setArp(a => ({ ...a, ...patch }))} playingStep={stepHere} />}
 
     <PlaylistPanel patterns={patterns} playlist={playlist} current={cur} mode={mode} playing={playing} playBar={playFrame?.bar ?? -1} playPattern={playFrame?.pattern ?? null}
-      onSelect={setCurrent} onNew={newPattern} onDuplicate={duplicate} onDelete={remove} onRename={n => setPatterns(ps => renamePattern(ps, cur, n))}
+      onSelect={setCurrent} onAudition={audition} onNew={newPattern} onDuplicate={duplicate} onDelete={remove} onRename={n => setPatterns(ps => renamePattern(ps, cur, n))}
       onSlot={paint} onBars={n => setPlaylist(pl => resizePlaylist(pl, n))} onClearBars={() => setPlaylist(pl => pl.map(() => null))} onMode={setMode} />
     <MixerPanel channels={channels} master={master} onChannel={changeChannel} onMaster={changeMaster} getLevelDb={getLevelDb} playing={playing} />
     <div role={status.kind === 'error' ? 'alert' : 'status'} className={'status ' + status.kind}>{status.text}</div>

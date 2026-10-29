@@ -9,6 +9,7 @@ type Props = {
   playBar: number;          // bar being played (SONG mode), -1 when stopped
   playPattern: number | null;
   onSelect: (index: number) => void;
+  onAudition: (index: number) => void;
   onNew: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
@@ -36,8 +37,13 @@ export default function PlaylistPanel(p: Props) {
       </div>
       <div className="ctl grow">PATTERNS (click to edit — the editor above shows the selected one)
         <div className="chips" role="group" aria-label="Patterns">
-          {p.patterns.map((pat, i) => <button key={i} className={'chip' + (i === p.current ? ' sel' : '')} aria-pressed={i === p.current} aria-label={`Select pattern ${pat.name}`}
-            style={{ ['--c' as string]: patternColor(i) }} onClick={() => p.onSelect(i)}><i />{pat.name}</button>)}
+          {p.patterns.map((pat, i) => {
+            const auditioning = p.playing && !song && i === p.current;
+            return <span key={i} className={'chip-group' + (i === p.current ? ' sel' : '')} style={{ ['--c' as string]: patternColor(i) }}>
+              <button className={'chip' + (i === p.current ? ' sel' : '')} aria-pressed={i === p.current} aria-label={`Select pattern ${pat.name}`} onClick={() => p.onSelect(i)}><i />{pat.name}</button>
+              <button className={'chip-play' + (auditioning ? ' on' : '')} aria-label={`${auditioning ? 'Stop' : 'Play'} pattern ${pat.name} alone`} title={auditioning ? 'Stop' : 'Listen to this pattern alone (loops it)'} onClick={() => p.onAudition(i)}>{auditioning ? '■' : '▶'}</button>
+            </span>;
+          })}
         </div>
       </div>
       <label className="ctl">NAME
@@ -68,6 +74,6 @@ export default function PlaylistPanel(p: Props) {
         <button aria-label="Clear playlist" onClick={p.onClearBars}>CLEAR</button>
       </div>
     </div>
-    <div className="grid-footer"><span>SELECT A PATTERN, THEN CLICK BARS TO PLACE IT · CLICK AGAIN TO CLEAR · PRESS SONG, THEN PLAY</span><span>{p.patterns.length}/{MAX_PATTERNS} PATTERNS · UP TO {MAX_BARS} BARS</span></div>
+    <div className="grid-footer"><span>▶ NEXT TO A PATTERN = LISTEN TO IT ALONE · SELECT A PATTERN, THEN CLICK BARS TO PLACE IT · CLICK AGAIN TO CLEAR · PRESS SONG, THEN PLAY</span><span>{p.patterns.length}/{MAX_PATTERNS} PATTERNS · UP TO {MAX_BARS} BARS</span></div>
   </section>;
 }
