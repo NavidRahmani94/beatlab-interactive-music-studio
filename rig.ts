@@ -7,6 +7,7 @@ import { KIND_DEFAULT_INSTRUMENT, TrackDef } from './tracks';
 import { FACTORY_SOUNDS, SynthPatch, SynthSlot, customId, isCustomRef, isFactorySound } from './synth';
 import { NoteSynth, PatchSynth } from './patchSynth';
 import { arpAt } from './arp';
+import { Groove, defaultGroove, drumHits, stepDrift, swingDelay } from './groove';
 import { PatternData, notesFor } from './song';
 
 type Strip = { vol: Tone.Volume; pan: Tone.Panner; reverbSend: Tone.Gain; delaySend: Tone.Gain };
@@ -14,6 +15,7 @@ type Strip = { vol: Tone.Volume; pan: Tone.Panner; reverbSend: Tone.Gain; delayS
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type KitDef = { kick: any; snare: any; hat: any; clap: any; dur: Record<Instrument, number>; kickNote?: string };
 const hatOf = (decay: number, resonance: number, mod = 28, oct = 1.2) => ({ envelope: { attack: 0.001, decay, release: 0.01 }, harmonicity: 5.1, modulationIndex: mod, resonance, octaves: oct });
+const HAT_HZ = 260;
 const KITS: Record<DrumKitId, KitDef> = {
   classic: {
     kick: { pitchDecay: 0.05, octaves: 8, envelope: { attack: 0.001, decay: 0.35, sustain: 0, release: 0.08 } },
@@ -192,6 +194,7 @@ export class Rig {
   private auditionOut: Tone.Volume;
   private kitDur: Record<Instrument, number> = KITS.classic.dur;
   private kickNote = 'C1';
+  private groove: Groove = defaultGroove();
   private muted: Record<ChannelName, boolean> = {};
   private channels: Channels = {};
   private bpm = 120;
@@ -226,7 +229,7 @@ export class Rig {
     this.kick = new Tone.MembraneSynth(classic.kick).connect(this.strips.kick.vol);
     this.snare = new Tone.NoiseSynth(classic.snare).connect(this.strips.snare.vol);
     this.hat = new Tone.MetalSynth(classic.hat).connect(this.strips.hat.vol);
-    this.hat.frequency.value = 260;
+    this.hat.frequency.value = HAT_HZ;
     this.clap = new Tone.NoiseSynth(classic.clap).connect(this.strips.clap.vol);
     this.kick.volume.value = -7;
     this.snare.volume.value = -13;
@@ -369,6 +372,7 @@ export class Rig {
   private updateDelay(): void { this.delay.delayTime.value = delaySeconds(this.bpm, this.master.delayDivision); }
   setTempo(bpm: number): void { this.bpm = bpm; this.updateDelay(); }
 
+  setGroove(g: Groove): void { this.groove = g; }
   setDrumKit(id: DrumKitId): void {
     const kit = KITS[id];
     this.kick.set(kit.kick);
@@ -392,32 +396,38 @@ export class Rig {
   /**
    * Plays everything that sits on one 16th-note step of one pattern at an explicit audio time.
    * `pattern` is null for an empty playlist bar. Durations of drum hits are fixed seconds, so timbre never depends on BPM.
-   * `tick` (global step counter) only feeds the arpeggiator's random mode.
+   * `tick` (global step counter) feeds the arpeggiator's random mode and the repeatable randomness of the groove.
    */
   triggerStep(step: number, time: number, pattern: PatternData | null, tick: number, stepSeconds: number): void {
     if (!pattern) return;
     const d = this.kitDur;
-    const voices: Record<Instrument, () => void> = {
-      kick: () => this.kick.triggerAttackRelease(this.kickNote, d.kick, time),
-      snare: () => this.snare.triggerAttackRelease(d.snare, time),
-      hat: () => this.hat.triggerAttackRelease(d.hat, time),
-      clap: () => this.clap.triggerAttackRelease(d.clap, time)
-    };
-    (Object.keys(voices) as Instrument[]).forEach(name => { if (!this.muted[name] && pattern.drums[name][step]) voices[name](); });
+    const g = this.groove;
+    const base = time + swingDelay(step, stepSeconds, g.swing);        // swing moves the whole odd step, drums and notes together
+    drumHits(pattern.drums, step, tick, g).forEach(({ inst, delay, velocity }) => {
+      if (this.muted[inst]) return;
+      const t = base + delay;
+      if (inst === 'kick') this.kick.triggerAttackRelease(this.kickNote, d.kick, t, velocity);
+      else if (inst === 'snare') this.snare.triggerAttackRelease(d.snare, t, velocity);
+      // the first argument of a Tone.MetalSynth is its pitch (260 Hz, as set in the constructor); the old call put the duration there, which made the hats nearly silent
+      else if (inst === 'hat') this.hat.triggerAttackRelease(HAT_HZ, d.hat, t, velocity);
+      else this.clap.triggerAttackRelease(d.clap, t, velocity);
+    });
+    const drift = stepDrift(tick, g);
+    time = base + drift.delay;
     this.tracks.forEach(({ def, voice }, id) => {
       if (this.muted[id]) return;
       const notes = notesFor(pattern, id);
       if (def.kind === 'arp') {
         arpAt(notes, step, def.arp, tick).forEach(e => {
           const pitch = voice.shift ? Tone.Frequency(e.pitch).transpose(voice.shift).toNote() : e.pitch;
-          voice.synth.triggerAttackRelease(pitch, Math.max(0.05, e.durationSteps * stepSeconds), time, e.velocity);
+          voice.synth.triggerAttackRelease(pitch, Math.max(0.05, e.durationSteps * stepSeconds), time, e.velocity * drift.gain);
         });
         return;
       }
       const hold = def.kind === 'ambient' ? 1 : 0.95;
       notesStartingAt(notes, step).forEach(n => {
         const pitch = voice.shift ? Tone.Frequency(n.pitch).transpose(voice.shift).toNote() : n.pitch;
-        voice.synth.triggerAttackRelease(pitch, Math.max(0.05, n.lengthSteps * stepSeconds * hold), time, n.velocity);
+        voice.synth.triggerAttackRelease(pitch, Math.max(0.05, n.lengthSteps * stepSeconds * hold), time, n.velocity * drift.gain);
       });
     });
   }

@@ -24,6 +24,16 @@ Tip: run the browser test with a normal-sized window (the script uses 1280×1000
 10. Stop/Play 10 times: no doubled notes, always starts at bar 1 step 1. Browser console: no red errors.
 
 
+## v0.13 tests
+`groove.test.ts` (off = unchanged, repeatable, ghost/fill positions, validation), groove cases in `project.test.ts`, `e2e-v13.cjs` (sliders, preset→custom, two exports differ, save). Two exports of the same groove were compared offline: correlation 0.994 (only the reverb's own noise differs).
+
+## v0.12 tests
+`chords.test.ts` (chord names in several keys, range of every voicing in every key, placement styles, suggestions). `e2e-v12.cjs <url>`: builder in the browser.
+
+## v0.11 tests
+- `history.test.ts`: undo/redo rules, 100-step limit, autosave with a blocked or full storage.
+- `e2e-v11.cjs <url>`: undo/redo buttons and shortcuts, grouped changes, undo of a deleted track, autosave restore / discard / cleared by SAVE.
+
 ## v0.10 tests
 - `tracks.test.ts`: add/remove/rename, limits, reserved ids, mixer sync.
 - `project.test.ts`: version 4 → 5 conversion, renamed/added tracks round trip, bad track lists.

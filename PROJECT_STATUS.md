@@ -29,7 +29,16 @@ Attach this zip and say: "Continue BeatLab from PROJECT_STATUS.md". Keep the fla
 - Touch mode toggle for drawing notes on phones.
 - Verified: 127 unit tests; WAV (89.9 s, peak -4 dB, intro/break quieter than verse/hook) and MP3 192 header/duration of the demo export in headless Chromium. NOT verified: human listening, real phone, WAV24/MP3 320 in browser, e2e-full.cjs (still the v0.6 script; needs updating for 32 steps).
 
-## v0.10.0 (latest)
+## v0.13.0 (latest)
+Drum Groove Engine + hi-hat bug fix. Known: exporting a long song (about 85 s of audio) took more than 4 minutes on a 2-core test machine.
+
+## v0.12.0
+Smart Chord Builder. Before it: v0.11 Undo/Redo + Autosave.
+
+## v0.11.0
+Undo / Redo and Autosave. Next planned, in this order: MIDI, Arrangement drag & drop, Visuals, Sample Library.
+
+## v0.10.0
 Dynamic tracks: synth note track, rename / add / delete tracks, schema 5 with automatic upgrade. Verified by unit tests, 19 browser checks and a WAV export; not heard by ear, not tried on a real phone. Live recording from the Synth Lab keyboard is not done.
 
 ## v0.9.0

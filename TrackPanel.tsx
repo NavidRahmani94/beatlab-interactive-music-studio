@@ -8,6 +8,7 @@ import { ARP_MODES, ARP_RATES, ArpMode, ArpRate, ArpSettings, clampGate } from '
 import { MELODY_INSTRUMENTS, instrumentGroups, MelodyInstrumentId } from './instruments';
 import { KIND_DEFAULT_LENGTH, MAX_TRACK_NAME, TRACK_KINDS, TrackDef, TrackKind } from './tracks';
 import PianoRoll from './PianoRoll';
+import ChordBuilder from './ChordBuilder';
 
 type Props = {
   track: TrackDef;
@@ -145,6 +146,7 @@ export default function TrackPanel(p: Props) {
       <button className="mute-btn" style={{ marginLeft: 0 }} aria-label={`${name} ${p.enabled ? 'on' : 'off'}`} aria-pressed={p.enabled}
         onClick={() => p.onEnabled(!p.enabled)}>{p.enabled ? 'ON' : 'OFF'}</button>
     </div>
+    <ChordBuilder keyPc={p.keyPc} scale={p.scale} kind={kind} onNotes={p.onNotes} onOutOfKey={() => setAdvanced(true)} />
     {touchDevice && <div className="touch-mode" role="group" aria-label="Touch mode">
       <span>FINGER:</span>
       <button className={!touchDraw ? 'sel' : ''} aria-pressed={!touchDraw} onClick={() => setTouchDraw(false)}>↔ SCROLL (tap = note)</button>

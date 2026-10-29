@@ -210,3 +210,53 @@ body,.panel,button,select,input{transition:background-color .15s,color .15s,bord
 .lab-notes{margin:14px 0}
 .lab-notes .panel{margin:0}
 .track-head{align-items:flex-end}
+
+/* v0.11 undo / redo / autosave */
+.undo-redo{display:flex;gap:6px}
+.undo-redo button{height:36px;padding:0 12px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--text);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1.2px}
+.undo-redo button:disabled{opacity:.4}
+.restore-banner{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:0 0 14px;padding:12px 14px;border-radius:10px;border:1px solid var(--accent);background:var(--surface);font-size:13px}
+.restore-banner span{flex:1 1 240px}
+
+/* v0.12 chord builder */
+.chord-builder{margin:6px 0 12px}
+.chord-body{margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.chord-row{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.chord-btn{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 2px;border-radius:8px;border:1px solid var(--line);background:var(--surface2,var(--surface));color:var(--text);font-family:'DM Mono',monospace}
+.chord-btn small{font-size:10px;color:var(--muted)}
+.chord-btn b{font-size:14px;font-weight:600}
+.chord-btn.hint{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.chord-btn:hover{border-color:var(--accent)}
+.chord-next{margin:10px 0;font-size:12px;color:var(--text3);display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}
+.chip-note b{color:var(--accent-text)}
+.ctl.chk{flex-direction:row;align-items:center;gap:6px}
+@media (max-width:700px){.chord-row{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
+/* hero animation (v0.13) */
+.intro.hero{display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap}
+.intro.hero .hero-text{flex:1 1 320px;min-width:0}
+.hero-art{--beat:.5s;position:relative;flex:1 1 360px;max-width:560px;height:190px;overflow:hidden;border-radius:18px;isolation:isolate;
+  background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 10%,transparent),color-mix(in srgb,var(--violet,var(--accent)) 12%,transparent));
+  border:1px solid color-mix(in srgb,var(--accent) 22%,var(--line))}
+.hero-art .orb{position:absolute;width:150px;height:150px;border-radius:50%;opacity:.55;will-change:transform;
+  background:radial-gradient(circle at 35% 35%,color-mix(in srgb,var(--accent) 70%,transparent),transparent 68%);animation:orbDrift calc(var(--beat)*24) ease-in-out infinite alternate}
+.hero-art .o1{left:-30px;top:-40px}
+.hero-art .o2{right:-40px;bottom:-60px;background:radial-gradient(circle at 40% 40%,color-mix(in srgb,var(--violet,var(--accent)) 70%,transparent),transparent 68%);animation-duration:calc(var(--beat)*32);animation-direction:alternate-reverse}
+.hero-art .wave{position:absolute;left:0;width:200%;height:60px;fill:none;stroke-width:2;stroke-linecap:round;will-change:transform;opacity:.55}
+.hero-art .w1{top:34px;stroke:var(--accent);animation:waveSlide calc(var(--beat)*16) linear infinite}
+.hero-art .w2{bottom:34px;stroke:var(--violet,var(--accent));animation:waveSlide calc(var(--beat)*22) linear infinite reverse;opacity:.4}
+.hero-art .eq{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:5px;padding:0 20px}
+.hero-art .eq span{flex:1 1 0;max-width:10px;height:68%;border-radius:99px;transform-origin:center;transform:scaleY(calc(.12 + var(--h)*.16));will-change:transform;
+  background:linear-gradient(to top,var(--accent),var(--violet,var(--accent)));opacity:.7;
+  animation:eqIdle calc(var(--beat)*4) ease-in-out infinite;animation-delay:calc(var(--i)*-.19s)}
+.hero-art.live .eq span{opacity:1;animation-name:eqLive;animation-duration:calc(var(--beat)*(1 + var(--h)*.5));animation-delay:calc(var(--i)*-.07s)}
+.hero-art .note{position:absolute;bottom:-24px;left:calc(8% + var(--n)*15%);font-size:20px;font-weight:400;color:var(--accent-text,var(--accent));opacity:0;will-change:transform,opacity;
+  animation:noteRise calc(var(--beat)*14) ease-in infinite;animation-delay:calc(var(--n)*var(--beat)*-2.3)}
+.hero-art.live .note{animation-duration:calc(var(--beat)*8)}
+@keyframes eqIdle{0%,100%{transform:scaleY(calc(.12 + var(--h)*.16))}50%{transform:scaleY(calc(.2 + var(--h)*.3))}}
+@keyframes eqLive{0%,100%{transform:scaleY(calc(.15 + var(--h)*.2))}50%{transform:scaleY(calc(.35 + var(--h)*.65))}}
+@keyframes waveSlide{to{transform:translateX(-50%)}}
+@keyframes orbDrift{to{transform:translate(70px,40px) scale(1.2)}}
+@keyframes noteRise{0%{transform:translateY(0) rotate(-8deg);opacity:0}12%{opacity:.8}85%{opacity:.5}100%{transform:translateY(-230px) rotate(10deg);opacity:0}}
+@media (max-width:700px){.hero-art{flex-basis:100%;height:120px;max-width:none}.hero-art .eq{gap:3px;padding:0 12px}.hero-art .note{font-size:16px}}
+@media (prefers-reduced-motion:reduce){.hero-art *{animation:none!important}.hero-art .note{display:none}}

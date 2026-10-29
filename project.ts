@@ -4,6 +4,7 @@ import { DRUM_CHANNELS, ChannelSettings, Channels, MAX_FEEDBACK, MasterSettings,
 import { DrumKitId, isDrumKit, isMelodyInstrument } from './instruments';
 import { KIND_DEFAULT_INSTRUMENT, MAX_TRACKS, MAX_TRACK_NAME, TrackDef, defaultTrackDefs, isTrackKind, isValidTrackId, makeTrack } from './tracks';
 import { ArpSettings, defaultArp, isArpMode, isArpOctaves, isArpRate } from './arp';
+import { Groove, GROOVE_PRESETS, defaultGroove, validateGroove } from './groove';
 import { MAX_BARS, MAX_PATTERNS, PatternData, Playlist, compactNotes, defaultPatternData, emptyDrumPattern } from './song';
 import { toggleNote } from './melody';
 import { SynthSlot, customId, isCustomRef, validateSynths } from './synth';
@@ -21,6 +22,7 @@ export type BeatLabProject = {
   tracks: TrackDef[];    // the user's tracks (drums are fixed and not listed). Each has a name, kind, instrument and (for arpeggio) its settings
   synths: SynthSlot[];   // the user's own Synth Lab sounds; a track uses one as "synth:<id>"
   drumKit: DrumKitId;
+  groove: Groove;       // swing / humanize / ghost notes / variation of the drums
   melodyView: { key: number; scale: ScaleName };
   channels: Channels;
   master: MasterSettings;
@@ -34,7 +36,7 @@ export function defaultProject(): BeatLabProject {
   return {
     schemaVersion: 5, name: 'Untitled', bpm: 120,
     patterns: [defaultPatternData('Pattern 1', makePreset('happy', 0).notes)], playlist: [0],
-    tracks: defaultTrackDefs(), synths: [], drumKit: 'classic', melodyView: { key: 0, scale: 'majorPent' },
+    tracks: defaultTrackDefs(), synths: [], drumKit: 'classic', groove: defaultGroove(), melodyView: { key: 0, scale: 'majorPent' },
     channels: defaultChannels(defaultTrackDefs()), master: defaultMaster()
   };
 }
@@ -277,6 +279,12 @@ export const SAMPLE_PROJECTS_EXTRA: Record<string, () => BeatLabProject> = {
 };
 
 Object.assign(SAMPLE_PROJECTS, SAMPLE_PROJECTS_EXTRA);
+// the genre demos get a fitting groove (the plain samples above stay straight)
+const DEMO_GROOVE: Record<string, Groove> = {
+  'Hip Hop Demo': { swing: 0.35, humanize: 0.4, ghost: 0.4, fill: 0.3 }, 'Lo-Fi Chill': GROOVE_PRESETS['Lo-Fi loose'], 'House 124': { swing: 0.12, humanize: 0.15, ghost: 0, fill: 0.2 },
+  'Trap 140': { swing: 0, humanize: 0.15, ghost: 0, fill: 0.3 }, 'Persian Mood': { swing: 0.15, humanize: 0.3, ghost: 0.15, fill: 0.2 }, 'Synthwave 108': { swing: 0.05, humanize: 0.1, ghost: 0, fill: 0.3 }, 'Chiptune 150': defaultGroove()
+};
+Object.entries(DEMO_GROOVE).forEach(([name, groove]) => { const make = SAMPLE_PROJECTS[name]; SAMPLE_PROJECTS[name] = () => ({ ...make(), groove }); });
 
 export function serializeProject(project: BeatLabProject): string {
   return JSON.stringify(project, null, 2);
@@ -470,6 +478,12 @@ export function validateProject(input: unknown): ParseResult {
     drumKit = data.drumKit;
   }
 
+  let groove = defaultGroove();
+  if (data.groove !== undefined) {
+    const gr = validateGroove(data.groove);
+    if (!gr.ok) return fail(gr.error);
+    groove = gr.groove;
+  }
   let melodyView = { key: 0, scale: 'majorPent' as ScaleName };
   if (data.melodyView !== undefined) {
     const v = data.melodyView;
@@ -519,7 +533,7 @@ export function validateProject(input: unknown): ParseResult {
     };
   }
 
-  return { ok: true, project: { schemaVersion: 5, name: data.name, bpm: Math.round(data.bpm), patterns, playlist, tracks, synths, drumKit, melodyView, channels, master } };
+  return { ok: true, project: { schemaVersion: 5, name: data.name, bpm: Math.round(data.bpm), patterns, playlist, tracks, synths, drumKit, groove, melodyView, channels, master } };
 }
 
 export function parseProject(text: string): ParseResult {

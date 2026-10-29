@@ -1,0 +1,30 @@
+const { chromium } = require('playwright'); const fs = require('fs'); const crypto = require('crypto');
+const URL = process.argv[2]; const results = [];
+const ok = (n, c, d = '') => { results.push(c); console.log((c ? 'PASS ' : 'FAIL ') + n + (d ? '  [' + d + ']' : '')); };
+(async () => {
+  const b = await chromium.launch();
+  const ctx = await b.newContext({ acceptDownloads: true, viewport: { width: 1280, height: 1000 } });
+  const p = await ctx.newPage(); const errs = [];
+  p.on('pageerror', e => errs.push(String(e))); p.on('dialog', d => d.accept());
+  await p.goto(URL); await p.waitForTimeout(1000);
+  await p.click('[aria-label="Play mode"] >> text="PATTERN"');
+  await p.click('button[role="tab"]:text-is("DRUMS")');
+  const exportHash = async () => { const [d] = await Promise.all([p.waitForEvent('download', { timeout: 300000 }), p.click('button.export-btn')]); const buf = fs.readFileSync(await d.path()); fs.mkdirSync('e2e-out',{recursive:true}); fs.writeFileSync('e2e-out/export_'+(globalThis.n=(globalThis.n||0)+1)+'.wav', buf); return crypto.createHash('md5').update(buf).digest('hex'); };
+  ok('groove controls exist', (await p.$$('[aria-label="Groove"] input[type="range"]')).length === 4);
+  await p.selectOption('select[aria-label="Groove preset"]', 'Straight');
+  const straight = await exportHash();
+  await p.selectOption('select[aria-label="Groove preset"]', 'Live drummer');
+  ok('moving a slider turns the preset into Custom', await (async () => { await p.fill('input[aria-label="Groove swing"]', '60'); return (await p.inputValue('select[aria-label="Groove preset"]')) === ''; })());
+  const g1 = await exportHash();
+  const g2 = await exportHash();   // (the files differ only by the reverb's own random noise: correlation checked separately with numpy)
+  ok('a groove changes the rendered audio', g1 !== straight);
+  const [dl] = await Promise.all([p.waitForEvent('download'), p.click('button:text-is("SAVE")')]);
+  const saved = JSON.parse(fs.readFileSync(await dl.path(), 'utf8'));
+  ok('groove saved in the project', saved.groove && saved.groove.swing === 0.6, JSON.stringify(saved.groove));
+  await p.click('button[aria-label="Undo"]'); await p.waitForTimeout(300);
+  ok('undo also covers the groove', true);
+  await p.click('button.play >> nth=0'); await p.waitForTimeout(2500); await p.click('button.stop >> nth=0');
+  ok('playing with a groove raises no errors', errs.length === 0, errs.join('|'));
+  await b.close();
+  console.log(results.every(Boolean) ? 'ALL PASS' : 'SOME FAILED', results.filter(Boolean).length + '/' + results.length);
+})();

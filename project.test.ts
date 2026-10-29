@@ -284,6 +284,29 @@ describe('dynamic tracks (version 5)', () => {
   });
 });
 
+describe('groove in project files', () => {
+  it('is saved and opened unchanged', () => {
+    const p = defaultProject(); p.groove = { swing: 0.5, humanize: 0.25, ghost: 0.1, fill: 1 };
+    const r = parseProject(serializeProject(p));
+    expect(r.ok && r.project.groove).toEqual(p.groove);
+  });
+  it('older files without a groove open as straight', () => {
+    const p: any = clone(defaultProject()); delete p.groove;
+    const r = validateProject(p);
+    expect(r.ok && r.project.groove).toEqual({ swing: 0, humanize: 0, ghost: 0, fill: 0 });
+  });
+  it('rejects a broken groove', () => {
+    bad(p => { p.groove = { swing: 3, humanize: 0, ghost: 0, fill: 0 }; }, /groove\.swing/);
+    bad(p => { p.groove = 'swing'; }, /groove/);
+    bad(p => { p.groove = { swing: 0 }; }, /groove/);
+  });
+  it('the genre demos have their own groove, the basic samples stay straight', () => {
+    expect(SAMPLE_PROJECTS['Lo-Fi Chill']().groove.swing).toBeGreaterThan(0);
+    expect(SAMPLE_PROJECTS['Hip Hop Demo']().groove.ghost).toBeGreaterThan(0);
+    expect(SAMPLE_PROJECTS['Basic House Beat']().groove).toEqual({ swing: 0, humanize: 0, ghost: 0, fill: 0 });
+  });
+});
+
 describe('startup song', () => {
   it('is valid, has drums in every pattern group, several patterns and a multi-bar playlist', () => {
     const p = startupProject();

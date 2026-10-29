@@ -28,6 +28,16 @@ project.ts ── one BeatLabProject (schemaVersion 2). validateProject on Open 
 * **Visualiser.** Two `Tone.Analyser` nodes after the limiter (FFT + waveform) feed a canvas drawn with `requestAnimationFrame` (no React re-renders); the playlist highlights the playing bar.
 
 
+## v0.13 additions
+`groove.ts` (pure): `drumHits(drums, step, tick, groove)` returns the hits of a step (own hits + ghost notes + fills, with delay and velocity), `swingDelay`, `stepDrift`, and a hash-based `rand(tick, salt)`. The Rig calls them in `triggerStep`, so live play and export are identical. `groove` is a field of the project (optional in the file, default straight).
+
+## v0.12 additions
+`chords.ts` (pure): diatonic chords from key + scale (pentatonic uses the parent 7-note scale), voicing/inversion kept inside C3–C6, block/strum/arp placement, merge into a track, next-chord suggestions, progressions. `ChordBuilder.tsx` is the UI inside `TrackPanel`.
+
+## v0.11 additions
+- `history.ts` (pure): `commit / undo / redo` on `{past, future}` lists of whole-project snapshots (max 100). `autosave.ts`: localStorage wrapper that never throws.
+- App commits a snapshot 500 ms after the last change (`flushHistory`), restores with `setAll`. Autosave waits until the restore question is answered.
+
 ## v0.10 additions – dynamic tracks (schema 5)
 - `tracks.ts` (pure): `TrackDef {id,name,kind,instrument,arp}`, kinds melody|ambient|arp|synth, add/remove/rename helpers, max 8 tracks, reserved ids (`drums`, `lab`, drum names, `__proto__`…).
 - `PatternData.notes: Record<trackId, MelodyNote[]>` (empty tracks have no entry, see `compactNotes`). `channels` has the 4 drum channels plus one per track (`syncChannels`).

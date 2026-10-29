@@ -2,9 +2,12 @@ import { useRef } from 'react';
 import { INSTRUMENTS, DrumPattern, Instrument, STEPS } from './pattern';
 import { useFollowPlayhead } from './useFollow';
 import { DRUM_LABELS, Channels } from './mixer';
+import { GROOVE_KEYS, GROOVE_LABELS, GROOVE_PRESETS, Groove, clampGroove } from './groove';
 import { DRUM_KITS, DRUM_KIT_IDS, DrumKitId } from './instruments';
 
 type Props = {
+  groove: Groove;
+  onGroove: (g: Groove) => void;
   pattern: DrumPattern;
   kit: DrumKitId;
   channels: Channels;
@@ -19,7 +22,7 @@ type Props = {
 };
 
 /** The drum machine (unchanged behaviour; now one tab among four). */
-export default function DrumPanel({ pattern, kit, channels, playingStep, onToggle, onMute, onSolo, onAllMute, onAllSolo, onKit, onClear }: Props) {
+export default function DrumPanel({ groove, onGroove, pattern, kit, channels, playingStep, onToggle, onMute, onSolo, onAllMute, onAllSolo, onKit, onClear }: Props) {
   const labels = DRUM_LABELS as Record<Instrument, string>;
   const wrapRef = useRef<HTMLDivElement>(null);
   useFollowPlayhead(wrapRef, playingStep, 150);
@@ -31,6 +34,16 @@ export default function DrumPanel({ pattern, kit, channels, playingStep, onToggl
       <button className={'mute-btn wide' + (allOff ? ' off' : '')} style={{ marginLeft: 0 }} aria-pressed={!allOff} aria-label={`All drums ${allOff ? 'off' : 'on'}`} title="Turn the whole drum machine on / off" onClick={() => onAllMute(!allOff)}>DRUMS {allOff ? 'OFF' : 'ON'}</button>
       <button className={'mute-btn wide solo' + (allSolo ? ' sel' : '')} style={{ marginLeft: 0 }} aria-pressed={allSolo} aria-label="Solo all drums" title="Hear only the drums (everything else is muted). Press again to hear everything." onClick={() => onAllSolo(!allSolo)}>SOLO DRUMS</button>
       <label className="ctl">DRUM KIT<select value={kit} aria-label="Drum kit" onChange={e => onKit(e.target.value as DrumKitId)}>{DRUM_KIT_IDS.map(k => <option key={k} value={k}>{DRUM_KITS[k].label}</option>)}</select></label></div>
+    <div className="melody-controls second groove" role="group" aria-label="Groove">
+      <label className="ctl">GROOVE
+        <select aria-label="Groove preset" value={Object.keys(GROOVE_PRESETS).find(n => JSON.stringify(GROOVE_PRESETS[n]) === JSON.stringify(groove)) ?? ''} onChange={e => { if (e.target.value) onGroove(GROOVE_PRESETS[e.target.value]); }}>
+          <option value="">Custom</option>{Object.keys(GROOVE_PRESETS).map(n => <option key={n} value={n}>{n}</option>)}
+        </select>
+      </label>
+      {GROOVE_KEYS.map(k => <label key={k} className="ctl" title={GROOVE_LABELS[k].hint}>{GROOVE_LABELS[k].label}
+        <span className="fader"><input type="range" min={0} max={100} value={Math.round(groove[k] * 100)} aria-label={`Groove ${k}`} onChange={e => onGroove(clampGroove({ ...groove, [k]: Number(e.target.value) / 100 }))} /><b>{Math.round(groove[k] * 100)}</b></span>
+      </label>)}
+    </div>
     <div className="grid-wrap" ref={wrapRef}>
       <div className="step-numbers"><span /> {Array.from({ length: STEPS }, (_, i) => <span key={i} data-step={i}>{String(i + 1).padStart(2, '0')}</span>)}</div>
       {INSTRUMENTS.map(inst => {

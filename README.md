@@ -53,6 +53,26 @@ More: `ARCHITECTURE.md`, `TESTING.md`, `DEMO_SCRIPT.md`, `BeatLab_Project_Master
 Push to a repository's `main` branch, then in the repo go to **Settings → Pages → Source: GitHub Actions**. The workflow in `.github/workflows/pages.yml` runs the tests, builds, and publishes the site at `https://<user>.github.io/<repo>/`. (If your tooling cannot keep the `.github` folder, delete it; the app itself stays flat.)
 
 
+## New in v0.13.1 – animated header
+The top of the page has a light animation (`HeroArt.tsx`): mirrored equalizer bars, two drifting waves and rising notes in the theme colours. It follows the tempo, wakes up while the song plays, and stops for people who prefer reduced motion. Only transform/opacity are animated, so it is cheap.
+
+## New in v0.13 – Drum Groove Engine
+On the DRUMS tab, the **GROOVE** row has four sliders and presets (Straight, Light swing, MPC swing, Lo-Fi loose, Live drummer):
+- **Swing** – every second 16th note is played late (up to 0.4 of a step), drums and notes together.
+- **Humanize** – small timing and loudness differences, different for each hit.
+- **Ghost notes** – very quiet snare hits next to the backbeat.
+- **Variation** – a drum fill in the last bar of every 4 and the odd missing hi-hat.
+Everything is calculated from the step number, so a given groove always sounds the same and the WAV / MP3 export matches playback. The genre demos come with a fitting groove. Groove is saved in the project (older files open as “Straight”).
+
+**Bug fixed:** the hi-hat was being triggered with a wrong argument, which made it almost inaudible (and slightly early) in every earlier version. It now plays at its designed pitch and timing, so hats are clearly louder than before; use the HI-HAT fader in the mixer if you want them softer.
+
+## New in v0.12 – Smart Chord Builder
+Open **🎹 CHORD BUILDER** on any note track. The seven chords of your key are buttons (I, ii, iii … with their names); click one to put it on the grid. It then moves forward by the chord length and highlights the chords that usually sound good next, with a short reason. Choose length, style (block / strum / arpeggio), register, inversion and 7th chords, or fill the pattern with a ready-made progression (pop, emotional, jazz, epic, dark…). The piano roll switches to ADVANCED automatically when a chord uses notes outside the EASY view.
+
+## New in v0.11 – Undo / Redo and Autosave
+- **↶ UNDO / ↷ REDO** (also Ctrl/Cmd+Z, Ctrl+Shift+Z, Ctrl+Y): up to 100 steps for everything in the project, including deleted tracks. Quick changes (a slider drag, several clicks in a row) count as one step. Opening or creating a project starts a fresh history.
+- **Autosave:** unsaved work is copied into this browser every 1.5 s. If the page was closed or crashed, a banner offers RESTORE IT or DISCARD. Saving a file clears the copy. It works only in this browser on this device.
+
 ## New in v0.10 – your own tracks
 - **Synth has its own notes.** The SYNTH tab (and the Synth Lab, via ＋ NOTES TRACK) has a piano roll like the other tracks. Every pattern keeps its own synth notes.
 - **Rename any track** (Melody, Ambient, Arpeggio, Synth): type in TRACK NAME at the top of its tab. The mixer follows.
