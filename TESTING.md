@@ -2,7 +2,7 @@
 
 ## Automatic
 ```bash
-npm test                      # 121 unit tests: pattern, melody (scales, moods, auto melody, velocity, resizeNote, ambient/arp presets), arpeggiator, song (patterns, playlist, frameAt), mixer + master, project validation (+ v0.5 upgrade), WAV encoder
+npm test                      # 122 unit tests: pattern, melody (scales, moods, auto melody, velocity, resizeNote, ambient/arp presets), arpeggiator, song (patterns, playlist, frameAt), mixer + master, project validation (+ v0.5 upgrade), WAV encoder
 npm run build                 # TypeScript + production build
 # optional browser test (needs: npm i -D playwright && npx playwright install chromium)
 npm run preview &             # serves http://localhost:4173

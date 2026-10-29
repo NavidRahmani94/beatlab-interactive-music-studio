@@ -12,7 +12,7 @@ import { ChannelName, Channels, ChannelSettings, MasterSettings, patchChannel, p
 import { DrumKitId, MELODIC_TRACKS, MelodicTrack, MelodyInstrumentId, TAB_LABELS, TAB_ORDER, TabId } from './instruments';
 import { ArpSettings } from './arp';
 import { Frame, PatternData, PlayMode, Playlist, addPattern, deletePattern, duplicatePattern, emptyDrumPattern, renamePattern, resizePlaylist, setSlot } from './song';
-import { BeatLabProject, MAX_FILE_BYTES, SAMPLE_PROJECTS, TrackInstruments, defaultProject, hasAudibleContent, parseProject, safeFileName, serializeProject } from './project';
+import { BeatLabProject, MAX_FILE_BYTES, SAMPLE_PROJECTS, TrackInstruments, defaultProject, hasAudibleContent, startupProject, parseProject, safeFileName, serializeProject } from './project';
 import { renderProjectToWav } from './exporter';
 import './main.css';
 
@@ -30,13 +30,13 @@ const mapNotes = (patterns: PatternData[], fn: (notes: MelodyNote[]) => MelodyNo
   patterns.map(p => ({ ...p, melody: fn(p.melody), ambient: fn(p.ambient), arp: fn(p.arp) }));
 
 export default function App() {
-  const initial = useMemo(defaultProject, []);
+  const initial = useMemo(startupProject, []);
   const [name, setName] = useState(initial.name);
   const [bpm, setBpm] = useState(initial.bpm);
   const [patterns, setPatterns] = useState<PatternData[]>(initial.patterns);
   const [playlist, setPlaylist] = useState<Playlist>(initial.playlist);
   const [current, setCurrent] = useState(0);
-  const [mode, setMode] = useState<PlayMode>('pattern');
+  const [mode, setMode] = useState<PlayMode>('song');
   const [tab, setTab] = useState<TabId>('melody');
   const [tracks, setTracks] = useState<TrackInstruments>(initial.tracks);
   const [arp, setArp] = useState<ArpSettings>(initial.arp);

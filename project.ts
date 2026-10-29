@@ -86,6 +86,16 @@ export const SAMPLE_PROJECTS: Record<string, () => BeatLabProject> = {
   }
 };
 
+/** The song that is loaded when the app starts (NEW still gives an empty-ish project). Plays as a SONG through its patterns. */
+export function startupProject(): BeatLabProject {
+  const p = SAMPLE_PROJECTS['Full Song']();
+  const intro = p.patterns[0];
+  return {
+    ...p, name: 'My First Song',
+    patterns: [{ ...intro, drums: drumsOf([0, 8], [], [2, 6, 10, 14], []) }, ...p.patterns.slice(1)]
+  };
+}
+
 export function serializeProject(project: BeatLabProject): string {
   return JSON.stringify(project, null, 2);
 }

@@ -3,6 +3,7 @@ import {
   SAMPLE_PROJECTS, defaultProject, hasAudibleContent, parseProject, safeFileName, serializeProject, validateProject, emptyDrums, MAX_NOTES
 } from './project';
 import { makePreset } from './melody';
+import { startupProject } from './project';
 import { defaultChannels, defaultMaster, patchChannel, patchMaster, clampVolumeDb, clampSend, clampPan, clampFeedback, effectiveMuted, delaySeconds } from './mixer';
 import { toggleNote } from './melody';
 
@@ -222,6 +223,18 @@ describe('patterns, playlist and the new tracks', () => {
   it('version-1 errors are still readable', () => {
     const r = validateProject({ schemaVersion: 1, name: 'x', bpm: 100, stepsPerBar: 16, bars: 2 });
     expect(r.ok).toBe(false);
+  });
+});
+
+describe('startup song', () => {
+  it('is valid, has drums in every pattern group, several patterns and a multi-bar playlist', () => {
+    const p = startupProject();
+    expect(parseProject(serializeProject(p)).ok).toBe(true);
+    expect(p.patterns.length).toBeGreaterThanOrEqual(3);
+    expect(p.playlist.length).toBeGreaterThanOrEqual(8);
+    expect(p.patterns[0].drums.kick.some(Boolean)).toBe(true);
+    expect(p.patterns[1].drums.kick.some(Boolean)).toBe(true);
+    expect(hasAudibleContent(p)).toBe(true);
   });
 });
 
