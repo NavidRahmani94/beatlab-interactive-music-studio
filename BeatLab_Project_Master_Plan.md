@@ -272,7 +272,7 @@ beatlab/
 - [x] فاز 0: راه‌اندازی (build موفق)
 - [~] فاز 1: موتور صوتی (کد و smoke test انجام شد؛ منتظر تست شنیداری)
 - [~] فاز 2: Drum Grid (پیش‌نمایش موجود)
-- [ ] فاز 3: Piano Roll
+- [~] فاز 3: Piano Roll / Melody (حالت Easy و Advanced پیاده شد؛ منتظر تست شنیداری)
 - [ ] فاز 4: Mixer
 - [ ] فاز 5: Save/Open
 - [ ] فاز 6: WAV Export
