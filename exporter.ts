@@ -60,6 +60,7 @@ export async function renderProjectToWav(project: BeatLabProject, loops: number,
 
   const buffer = await Tone.Offline(async ({ transport }) => {
     const rig = new Rig();
+    rig.setSynths(project.synths);
     rig.setDrumKit(project.drumKit);
     (['melody', 'ambient', 'arp'] as const).forEach(t => rig.setTrackInstrument(t, project.tracks[t]));
     rig.setMaster(project.master);

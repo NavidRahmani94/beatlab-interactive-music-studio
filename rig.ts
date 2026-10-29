@@ -3,13 +3,16 @@ import { Instrument } from './pattern';
 import { MelodyNote } from './melody';
 import { CHANNEL_NAMES, ChannelName, Channels, MasterSettings, REVERB_SIZES, compressorSettings, defaultChannels, defaultMaster, delaySeconds, effectiveMuted } from './mixer';
 import { DrumKitId, MELODIC_TRACKS, MelodicTrack, MelodyInstrumentId, TRACK_DEFAULT_INSTRUMENT } from './instruments';
+import { FACTORY_SOUNDS, SynthPatch, SynthSlot, customId, isCustomRef, isFactorySound } from './synth';
+import { NoteSynth, PatchSynth } from './patchSynth';
 import { ArpSettings, arpAt } from './arp';
 import { PatternData } from './song';
 
 type Strip = { vol: Tone.Volume; pan: Tone.Panner; reverbSend: Tone.Gain; delaySend: Tone.Gain };
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-type KitDef = { kick: any; snare: any; hat: any; clap: any; dur: Record<Instrument, number> };
+type KitDef = { kick: any; snare: any; hat: any; clap: any; dur: Record<Instrument, number>; kickNote?: string };
+const hatOf = (decay: number, resonance: number, mod = 28, oct = 1.2) => ({ envelope: { attack: 0.001, decay, release: 0.01 }, harmonicity: 5.1, modulationIndex: mod, resonance, octaves: oct });
 const KITS: Record<DrumKitId, KitDef> = {
   classic: {
     kick: { pitchDecay: 0.05, octaves: 8, envelope: { attack: 0.001, decay: 0.35, sustain: 0, release: 0.08 } },
@@ -31,10 +34,66 @@ const KITS: Record<DrumKitId, KitDef> = {
     hat: { envelope: { attack: 0.001, decay: 0.03, release: 0.01 }, harmonicity: 5.1, modulationIndex: 20, resonance: 4000, octaves: 1 },
     clap: { noise: { type: 'pink' }, envelope: { attack: 0.001, decay: 0.12, sustain: 0 } },
     dur: { kick: 0.2, snare: 0.1, hat: 0.08, clap: 0.1 }
+  },
+  house909: {
+    kick: { pitchDecay: 0.04, octaves: 6, envelope: { attack: 0.001, decay: 0.42, sustain: 0, release: 0.1 } },
+    snare: { noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.2, sustain: 0 } },
+    hat: hatOf(0.05, 7000, 32, 1.5),
+    clap: { noise: { type: 'white' }, envelope: { attack: 0.002, decay: 0.28, sustain: 0 } },
+    dur: { kick: 0.3, snare: 0.15, hat: 0.1, clap: 0.18 }
+  },
+  trap: {
+    kick: { pitchDecay: 0.15, octaves: 3, envelope: { attack: 0.001, decay: 1.5, sustain: 0, release: 0.3 } },
+    snare: { noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.13, sustain: 0 } },
+    hat: hatOf(0.025, 8000, 34, 1.5),
+    clap: { noise: { type: 'white' }, envelope: { attack: 0.002, decay: 0.22, sustain: 0 } },
+    dur: { kick: 0.9, snare: 0.1, hat: 0.06, clap: 0.15 }
+  },
+  lofi: {
+    kick: { pitchDecay: 0.06, octaves: 5, envelope: { attack: 0.002, decay: 0.32, sustain: 0, release: 0.1 } },
+    snare: { noise: { type: 'pink' }, envelope: { attack: 0.002, decay: 0.22, sustain: 0 } },
+    hat: hatOf(0.04, 2800, 16, 1),
+    clap: { noise: { type: 'pink' }, envelope: { attack: 0.003, decay: 0.26, sustain: 0 } },
+    dur: { kick: 0.25, snare: 0.15, hat: 0.07, clap: 0.18 }
+  },
+  rock: {
+    kick: { pitchDecay: 0.02, octaves: 4, envelope: { attack: 0.001, decay: 0.24, sustain: 0, release: 0.06 } },
+    snare: { noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.24, sustain: 0 } },
+    hat: hatOf(0.08, 3500, 22, 1),
+    clap: { noise: { type: 'pink' }, envelope: { attack: 0.001, decay: 0.16, sustain: 0 } },
+    dur: { kick: 0.2, snare: 0.18, hat: 0.1, clap: 0.12 }
+  },
+  electro: {
+    kick: { pitchDecay: 0.07, octaves: 7, envelope: { attack: 0.001, decay: 0.3, sustain: 0, release: 0.08 } },
+    snare: { noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.15, sustain: 0 } },
+    hat: hatOf(0.045, 6000, 30, 1.3),
+    clap: { noise: { type: 'white' }, envelope: { attack: 0.002, decay: 0.2, sustain: 0 } },
+    dur: { kick: 0.22, snare: 0.12, hat: 0.08, clap: 0.14 }
+  },
+  dnb: {
+    kick: { pitchDecay: 0.025, octaves: 5, envelope: { attack: 0.001, decay: 0.2, sustain: 0, release: 0.05 } },
+    snare: { noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.17, sustain: 0 } },
+    hat: hatOf(0.03, 7000, 26, 1.2),
+    clap: { noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.14, sustain: 0 } },
+    dur: { kick: 0.15, snare: 0.12, hat: 0.06, clap: 0.1 }
+  },
+  industrial: {
+    kick: { pitchDecay: 0.08, octaves: 10, envelope: { attack: 0.001, decay: 0.5, sustain: 0, release: 0.12 } },
+    snare: { noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.32, sustain: 0 } },
+    hat: hatOf(0.11, 1800, 40, 1),
+    clap: { noise: { type: 'white' }, envelope: { attack: 0.002, decay: 0.38, sustain: 0 } },
+    dur: { kick: 0.35, snare: 0.25, hat: 0.12, clap: 0.28 }
+  },
+  chip: {
+    kick: { pitchDecay: 0.02, octaves: 3, oscillator: { type: 'square' }, envelope: { attack: 0.001, decay: 0.16, sustain: 0, release: 0.03 } },
+    snare: { noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.09, sustain: 0 } },
+    hat: hatOf(0.02, 9000, 12, 1),
+    clap: { noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.07, sustain: 0 } },
+    dur: { kick: 0.12, snare: 0.07, hat: 0.04, clap: 0.06 }
   }
 };
 
-type MelodyBuild = { synth: Tone.PolySynth<any>; filter: Tone.Filter | null; volume: number; shift: number };
+type MelodyBuild = { synth: NoteSynth; filter: Tone.Filter | null; volume: number; shift: number };
 function buildMelody(id: MelodyInstrumentId): MelodyBuild {
   switch (id) {
     case 'electricPiano':
@@ -96,7 +155,7 @@ function buildMelody(id: MelodyInstrumentId): MelodyBuild {
   }
 }
 
-type Voice = { id: MelodyInstrumentId; synth: Tone.PolySynth<any>; filter: Tone.Filter | null; shift: number };
+type Voice = { sig: string; synth: NoteSynth; filter: Tone.Filter | null; shift: number };
 
 /** Notes that START on this step (the ones that need a trigger). */
 export function notesStartingAt(notes: MelodyNote[], step: number): MelodyNote[] { return notes.filter(n => n.step === step); }
@@ -126,7 +185,12 @@ export class Rig {
   private hat: Tone.MetalSynth;
   private clap: Tone.NoiseSynth;
   private voices = {} as Record<MelodicTrack, Voice>;
+  private refs: Record<MelodicTrack, MelodyInstrumentId> = { ...TRACK_DEFAULT_INSTRUMENT };
+  private custom = new Map<string, SynthSlot>();
+  private audition: { sig: string; synth: PatchSynth } | null = null;
+  private auditionOut: Tone.Volume;
   private kitDur: Record<Instrument, number> = KITS.classic.dur;
+  private kickNote = 'C1';
   private muted = Object.fromEntries(CHANNEL_NAMES.map(n => [n, false])) as Record<ChannelName, boolean>;
   private bpm = 120;
   private master: MasterSettings = defaultMaster();
@@ -181,17 +245,58 @@ export class Rig {
 
     MELODIC_TRACKS.forEach(t => { this.voices[t] = this.makeVoice(t, TRACK_DEFAULT_INSTRUMENT[t]); });
 
+    this.auditionOut = new Tone.Volume(0).connect(this.masterIn);
     this.setChannels(defaultChannels());
     this.setMaster(defaultMaster());
   }
 
-  private makeVoice(track: MelodicTrack, id: MelodyInstrumentId): Voice {
-    const m = buildMelody(id);
-    m.synth.volume.value = m.volume;
-    const out = this.strips[track].vol;
-    if (m.filter) { m.synth.connect(m.filter); m.filter.connect(out); } else m.synth.connect(out);
-    return { id, synth: m.synth, filter: m.filter, shift: m.shift };
+  /** The patch behind an instrument id (built-in library sound or the user's own synth), or null for the older built-in sounds. */
+  private patchFor(ref: MelodyInstrumentId): SynthPatch | null {
+    if (isFactorySound(ref)) return FACTORY_SOUNDS[ref].patch;
+    if (isCustomRef(ref)) return this.custom.get(customId(ref))?.patch ?? null;
+    return null;
   }
+  private signature(ref: MelodyInstrumentId): string {
+    const p = this.patchFor(ref);
+    return p ? `${ref}|${JSON.stringify(p)}` : ref;
+  }
+
+  private makeVoice(track: MelodicTrack, wanted: MelodyInstrumentId): Voice {
+    // a deleted user synth falls back to the track's default sound instead of silence
+    const ref = isCustomRef(wanted) && !this.custom.has(customId(wanted)) ? TRACK_DEFAULT_INSTRUMENT[track] : wanted;
+    const patch = this.patchFor(ref);
+    const out = this.strips[track].vol;
+    if (patch) {
+      const synth = new PatchSynth(patch);
+      synth.connect(out);
+      return { sig: this.signature(wanted), synth, filter: null, shift: 0 };
+    }
+    const m = buildMelody(ref);
+    m.synth.volume.value = m.volume;
+    if (m.filter) { m.synth.connect(m.filter); m.filter.connect(out); } else m.synth.connect(out);
+    return { sig: this.signature(wanted), synth: m.synth, filter: m.filter, shift: m.shift };
+  }
+
+  /** The user's own synths. Tracks that use one are rebuilt when its patch changes. */
+  setSynths(synths: SynthSlot[]): void {
+    this.custom = new Map(synths.map(s => [s.id, s]));
+    MELODIC_TRACKS.forEach(t => this.setTrackInstrument(t, this.refs[t]));
+  }
+
+  // ---- the Synth Lab keyboard: one extra voice that is heard even when no track uses the synth
+  private ensureAudition(patch: SynthPatch): PatchSynth {
+    const sig = JSON.stringify(patch);
+    if (!this.audition || this.audition.sig !== sig) {
+      if (this.audition) this.audition.synth.dispose();
+      const synth = new PatchSynth(patch);
+      synth.connect(this.auditionOut);
+      this.audition = { sig, synth };
+    }
+    return this.audition.synth;
+  }
+  auditionDown(patch: SynthPatch, note: string, velocity = 0.8): void { this.ensureAudition(patch).triggerAttack(note, Tone.now() + 0.005, velocity); }
+  auditionUp(patch: SynthPatch, note: string): void { this.ensureAudition(patch).triggerRelease(note, Tone.now()); }
+  auditionStop(): void { this.audition?.synth.releaseAll(); }
 
   /** Resolves when the reverb impulse responses have been generated. */
   async ready(): Promise<void> { await Promise.all([this.sendReverb.ready, this.masterReverb.ready]); }
@@ -237,11 +342,13 @@ export class Rig {
     this.hat.set(kit.hat);
     this.clap.set(kit.clap);
     this.kitDur = kit.dur;
+    this.kickNote = kit.kickNote ?? 'C1';
   }
 
   setTrackInstrument(track: MelodicTrack, id: MelodyInstrumentId): void {
+    this.refs[track] = id;
     const old = this.voices[track];
-    if (old.id === id) return;
+    if (old && old.sig === this.signature(id)) return;
     old.synth.releaseAll();
     old.synth.dispose();
     old.filter?.dispose();
@@ -275,7 +382,7 @@ export class Rig {
     if (!pattern) return;
     const d = this.kitDur;
     const voices: Record<Instrument, () => void> = {
-      kick: () => this.kick.triggerAttackRelease('C1', d.kick, time),
+      kick: () => this.kick.triggerAttackRelease(this.kickNote, d.kick, time),
       snare: () => this.snare.triggerAttackRelease(d.snare, time),
       hat: () => this.hat.triggerAttackRelease(d.hat, time),
       clap: () => this.clap.triggerAttackRelease(d.clap, time)
@@ -301,6 +408,8 @@ export class Rig {
     this.releaseAll();
     [this.kick, this.snare, this.hat, this.clap, this.sendReverb, this.delay, this.eq, this.comp, this.masterReverb, this.masterVol, this.limiter, this.meter, this.spectrum, this.wave, this.masterIn].forEach(n => n.dispose());
     MELODIC_TRACKS.forEach(t => { this.voices[t].synth.dispose(); this.voices[t].filter?.dispose(); });
+    this.audition?.synth.dispose();
+    this.auditionOut.dispose();
     CHANNEL_NAMES.forEach(name => { const s = this.strips[name]; s.vol.dispose(); s.pan.dispose(); s.reverbSend.dispose(); s.delaySend.dispose(); });
   }
 }

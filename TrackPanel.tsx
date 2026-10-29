@@ -1,10 +1,11 @@
+import { SynthSlot, customRef } from './synth';
 import { Dispatch, SetStateAction, useState } from 'react';
 import {
   DEFAULT_VELOCITY, MelodyNote, NOTE_NAMES, PRESETS, PRESET_NAMES, PresetName, SCALES, ScaleName, TRACK_PRESETS, TrackPresetName,
   generateMelody, makePreset, makeTrackPreset, presetsForTrack, snapNotesToScale
 } from './melody';
 import { ARP_MODES, ARP_RATES, ArpMode, ArpRate, ArpSettings, clampGate } from './arp';
-import { MELODY_INSTRUMENTS, MELODY_INSTRUMENT_IDS, MelodicTrack, MelodyInstrumentId, TAB_HINTS, TRACK_DEFAULT_LENGTH } from './instruments';
+import { MELODY_INSTRUMENTS, instrumentGroups, MelodicTrack, MelodyInstrumentId, TAB_HINTS, TRACK_DEFAULT_LENGTH } from './instruments';
 import PianoRoll from './PianoRoll';
 
 type Props = {
@@ -20,6 +21,7 @@ type Props = {
   onKeyChange: (keyPc: number) => void;
   onScaleChange: (scale: ScaleName) => void;
   instrument: MelodyInstrumentId;
+  synths: SynthSlot[];
   onInstrument: (id: MelodyInstrumentId) => void;
   arp: ArpSettings;
   onArp: (patch: Partial<ArpSettings>) => void;
@@ -68,7 +70,8 @@ export default function TrackPanel(p: Props) {
       </div>
       <label className="ctl">INSTRUMENT
         <select value={p.instrument} aria-label={`${name} instrument`} onChange={e => p.onInstrument(e.target.value as MelodyInstrumentId)}>
-          {MELODY_INSTRUMENT_IDS.map(id => <option key={id} value={id}>{MELODY_INSTRUMENTS[id].label} — {MELODY_INSTRUMENTS[id].hint}</option>)}
+          {p.synths.length > 0 && <optgroup label="★ My synths (Synth Lab)">{p.synths.map(s => <option key={s.id} value={customRef(s.id)}>{s.name}</option>)}</optgroup>}
+          {instrumentGroups().map(g => <optgroup key={g.group} label={g.group}>{g.ids.map(id => <option key={id} value={id}>{MELODY_INSTRUMENTS[id].label} — {MELODY_INSTRUMENTS[id].hint}</option>)}</optgroup>)}
         </select>
       </label>
       {track === 'melody' ? <>

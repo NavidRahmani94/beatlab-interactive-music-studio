@@ -5,20 +5,22 @@ import { DrumKitId, MELODIC_TRACKS, MelodicTrack, MelodyInstrumentId, TRACK_DEFA
 import { ArpSettings, defaultArp, isArpMode, isArpOctaves, isArpRate } from './arp';
 import { MAX_BARS, MAX_PATTERNS, PatternData, Playlist, defaultPatternData, emptyDrumPattern, emptyPattern } from './song';
 import { toggleNote } from './melody';
+import { SynthSlot, customId, isCustomRef, validateSynths } from './synth';
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 export const MAX_FILE_BYTES = 1_000_000;
 export const MAX_NOTES = 256; // per track, per pattern
 
 export type TrackInstruments = Record<MelodicTrack, MelodyInstrumentId>;
 
 export type BeatLabProject = {
-  schemaVersion: 3;
+  schemaVersion: 4;
   name: string;
   bpm: number;
   patterns: PatternData[];
   playlist: Playlist;
   tracks: TrackInstruments;
+  synths: SynthSlot[];   // the user's own Synth Lab sounds; a track uses one as "synth:<id>"
   arp: ArpSettings;
   drumKit: DrumKitId;
   melodyView: { key: number; scale: ScaleName };
@@ -36,9 +38,9 @@ export function defaultTracks(): TrackInstruments {
 
 export function defaultProject(): BeatLabProject {
   return {
-    schemaVersion: 3, name: 'Untitled', bpm: 120,
+    schemaVersion: 4, name: 'Untitled', bpm: 120,
     patterns: [defaultPatternData('Pattern 1', makePreset('happy', 0).notes)], playlist: [0],
-    tracks: defaultTracks(), arp: defaultArp(), drumKit: 'classic', melodyView: { key: 0, scale: 'majorPent' },
+    tracks: defaultTracks(), synths: [], arp: defaultArp(), drumKit: 'classic', melodyView: { key: 0, scale: 'majorPent' },
     channels: defaultChannels(), master: defaultMaster()
   };
 }
@@ -142,10 +144,138 @@ export function hipHopDemo(): BeatLabProject {
   };
 }
 
+// ---------- demo songs in other styles (each one uses the newer instruments and kits) ----------
+type N4 = [number, number, number, number];
+/** Two whole-bar chords: `a` on steps 0–15 and `b` on steps 16–31. */
+const twoChords = (a: number[], b: number[], vel: number): N4[] => [...a.map(m => [m, 0, 16, vel] as N4), ...b.map(m => [m, 16, 16, vel] as N4)];
+const mk = (name: string, drums: DrumPattern, melody: N4[], ambient: N4[], arp: N4[]): PatternData => ({ name, drums, melody: notesOf(melody), ambient: notesOf(ambient), arp: notesOf(arp) });
+const noDrums = (): DrumPattern => drums32([], [], [], []);
+const demo = (name: string, bpm: number, kit: DrumKitId, patterns: PatternData[], playlist: Playlist, tracks: TrackInstruments, arp: ArpSettings, key: number, scale: ScaleName, ch: { [K in keyof Channels]?: Partial<Channels[K]> }, master: Partial<MasterSettings>): BeatLabProject => {
+  const base = defaultProject();
+  const channels = { ...base.channels } as Channels;
+  (Object.keys(ch) as (keyof Channels)[]).forEach(k => { channels[k] = { ...base.channels[k], ...ch[k] }; });
+  return { ...base, name, bpm, drumKit: kit, patterns, playlist, tracks, arp, melodyView: { key, scale }, channels, master: { ...defaultMaster(), ...master } };
+};
+const every = (step: number, from = 0, to = STEPS): number[] => { const r: number[] = []; for (let i = from; i < to; i += step) r.push(i); return r; };
+
+/** Lo-fi chill: 78 BPM, D minor, soft dusty drums, vibraphone tune over a nylon-guitar arpeggio and a dark pad. */
+export function lofiDemo(): BeatLabProject {
+  const Dm7 = [50, 53, 57, 60], Bbmaj7 = [53, 57, 58, 62], Gm7 = [55, 58, 62, 65], Am7 = [55, 57, 60, 64];
+  const chordsA = twoChords(Dm7, Bbmaj7, 0.5), chordsB = twoChords(Gm7, Am7, 0.5);
+  const tuneA: N4[] = [[69, 0, 3, 0.8], [65, 4, 2, 0.7], [62, 8, 3, 0.75], [64, 12, 2, 0.7], [65, 16, 4, 0.8], [62, 22, 2, 0.7], [60, 26, 3, 0.7]];
+  const tuneB: N4[] = [[67, 0, 3, 0.8], [70, 4, 2, 0.7], [74, 8, 3, 0.8], [72, 12, 2, 0.7], [69, 16, 4, 0.85], [64, 22, 2, 0.7], [65, 26, 5, 0.75]];
+  const beat = drums32([0, 10, 16, 26], [8, 24], every(2, 2).filter(i => i % 4 === 2), []);
+  const patterns = [
+    mk('Intro', drums32([], [], every(4, 2), []), [], chordsA, chordsA),
+    mk('Groove A', beat, tuneA, chordsA, chordsA),
+    mk('Groove B', beat, tuneB, chordsB, chordsB),
+    mk('Outro', drums32([0], [], [], []), [[62, 0, 8, 0.7]], chordsA, [])
+  ];
+  return demo('Lo-Fi Chill', 78, 'lofi', patterns, [0, 0, 1, 1, 2, 2, 1, 1, 2, 2, 3, 3], { melody: 'vibraphone', ambient: 'darkPad', arp: 'nylonGuitar' },
+    { mode: 'up', rate: '8n', octaves: 1, gate: 0.9 }, 2, 'minor',
+    { ambient: { volumeDb: -5, reverbSend: 0.3 }, arp: { volumeDb: -3, pan: -0.2, reverbSend: 0.2 }, melody: { pan: 0.15, reverbSend: 0.25 } },
+    { reverbMix: 0.18, eqHigh: -3, compAmount: 0.3, delayFeedback: 0.25 });
+}
+
+/** House: 124 BPM, A minor, four-on-the-floor, plucked bass, trance stabs and a wide pad. */
+export function houseDemo(): BeatLabProject {
+  const Am = [57, 60, 64], F = [53, 57, 60], C = [60, 64, 67], G = [55, 59, 62];
+  const bassA: N4[] = every(4, 2).map(s => [s < 16 ? 57 : 53, s, 1, 0.9] as N4);
+  const bassB: N4[] = every(4, 2).map(s => [s < 16 ? 60 : 55, s, 1, 0.9] as N4);
+  const full = (): DrumPattern => drums32(every(4), [], every(4, 2), [4, 12, 20, 28]);
+  const patterns = [
+    mk('Intro', drums32(every(4), [], [], []), [], twoChords(Am, F, 0.4), []),
+    mk('Groove', full(), bassA, twoChords(Am, F, 0.4), twoChords(Am, F, 0.6)),
+    mk('Drop', drums32(every(4), [], every(2, 1), [4, 12, 20, 28]), bassB, twoChords(C, G, 0.5), twoChords(C, G, 0.75)),
+    mk('Break', noDrums(), [], twoChords(Am, F, 0.55), twoChords(Am, F, 0.55))
+  ];
+  return demo('House 124', 124, 'house909', patterns, [0, 0, 1, 1, 1, 1, 3, 3, 2, 2, 2, 2, 1, 1, 0, 0], { melody: 'pluckBass', ambient: 'ensemblePad', arp: 'tranceStab' },
+    { mode: 'up', rate: '8n', octaves: 1, gate: 0.5 }, 9, 'minor',
+    { ambient: { volumeDb: -6, reverbSend: 0.35 }, arp: { volumeDb: -4, pan: 0.15, reverbSend: 0.2, delaySend: 0.3 }, melody: { reverbSend: 0 } },
+    { reverbMix: 0.1, compAmount: 0.45, delayFeedback: 0.3 });
+}
+
+/** Trap: 140 BPM, A minor, half-time snare, rolling hats, long 808 sub bass over a dark pad and music-box bells. */
+export function trapDemo(): BeatLabProject {
+  const Am = [57, 60, 64], F = [53, 57, 60];
+  const rolls = [...every(2), 11, 27, 29, 30, 31].filter((v, i, a) => a.indexOf(v) === i);
+  const sub: N4[] = [[57, 0, 6, 0.95], [57, 8, 2, 0.8], [60, 12, 3, 0.85], [53, 16, 6, 0.95], [53, 24, 2, 0.8], [55, 28, 3, 0.85]];
+  const bells: N4[] = [[81, 0, 2, 0.7], [76, 2, 2, 0.6], [72, 4, 2, 0.7], [76, 6, 2, 0.6], [77, 16, 2, 0.7], [72, 18, 2, 0.6], [69, 20, 2, 0.7], [72, 22, 2, 0.6]];
+  const patterns = [
+    mk('Intro', noDrums(), [], twoChords(Am, F, 0.45), bells),
+    mk('Verse', drums32([0, 10, 16, 24], [8, 24], rolls, [8, 24]), sub, twoChords(Am, F, 0.4), []),
+    mk('Hook', drums32([0, 6, 10, 16, 22, 26], [8, 24], rolls, [8, 24]), sub, twoChords(Am, F, 0.5), bells),
+    mk('Outro', drums32([0], [], every(4), []), [[57, 0, 8, 0.9]], twoChords(Am, F, 0.4), [])
+  ];
+  return demo('Trap 140', 140, 'trap', patterns, [0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 2, 2, 3], { melody: 'subBass', ambient: 'darkPad', arp: 'musicBox' },
+    { mode: 'up', rate: '8n', octaves: 1, gate: 0.7 }, 9, 'minor',
+    { ambient: { volumeDb: -6, reverbSend: 0.4 }, arp: { volumeDb: -5, pan: 0.25, reverbSend: 0.3, delaySend: 0.35 }, melody: { volumeDb: 0 } },
+    { reverbMix: 0.12, eqLow: 3, compAmount: 0.4, delayFeedback: 0.35 });
+}
+
+/** A Persian-inspired mood (synth imitations of santur, tar and ney): A with a flat second (Phrygian-dominant colour), 100 BPM. */
+export function persianDemo(): BeatLabProject {
+  const avaz: N4[] = [[69, 0, 2, 0.9], [70, 2, 2, 0.8], [73, 4, 2, 0.85], [70, 6, 1, 0.7], [69, 7, 1, 0.7], [70, 8, 4, 0.8], [69, 12, 2, 0.8], [67, 14, 2, 0.75],
+    [65, 16, 3, 0.85], [67, 19, 1, 0.7], [69, 20, 4, 0.9], [70, 24, 2, 0.8], [69, 26, 2, 0.75], [64, 28, 4, 0.8]];
+  const reply: N4[] = [[76, 0, 2, 0.9], [74, 2, 2, 0.8], [73, 4, 2, 0.8], [70, 6, 2, 0.75], [69, 8, 4, 0.85], [70, 12, 2, 0.75], [73, 14, 2, 0.8],
+    [74, 16, 3, 0.9], [73, 19, 1, 0.7], [70, 20, 2, 0.75], [69, 22, 2, 0.7], [65, 24, 3, 0.8], [64, 28, 4, 0.85]];
+  const drone: N4[] = [[57, 0, 32, 0.5], [64, 0, 32, 0.35]];
+  const tarChords: N4[] = [[57, 0, 16, 0.6], [64, 0, 16, 0.6], [69, 0, 16, 0.6], [58, 16, 16, 0.6], [65, 16, 16, 0.6], [70, 16, 16, 0.6]];
+  const daf = drums32([0, 10, 16, 26], [], [], [6, 14, 22, 30]);
+  const patterns = [
+    mk('Intro', noDrums(), [], drone, tarChords),
+    mk('Avaz', daf, avaz, drone, tarChords),
+    mk('Reply', drums32([0, 10, 16, 26], [], every(4, 2), [6, 14, 22, 30]), reply, drone, tarChords),
+    mk('Ending', noDrums(), [[69, 0, 12, 0.8]], drone, [])
+  ];
+  return demo('Persian Mood', 100, 'tight', patterns, [0, 0, 1, 1, 2, 2, 1, 1, 2, 2, 3], { melody: 'santur', ambient: 'ney', arp: 'tar' },
+    { mode: 'updown', rate: '8n', octaves: 1, gate: 0.8 }, 9, 'minor',
+    { ambient: { volumeDb: -5, reverbSend: 0.4 }, arp: { volumeDb: -3, pan: -0.25, reverbSend: 0.25 }, melody: { reverbSend: 0.3, delaySend: 0.2 } },
+    { reverbMix: 0.2, reverbSize: 'hall', delayFeedback: 0.3 });
+}
+
+/** Synthwave: 108 BPM, A minor, gated pulse lead over an arcade arpeggio and a string-machine pad. */
+export function synthwaveDemo(): BeatLabProject {
+  const Am = [57, 60, 64], F = [53, 57, 60], C = [60, 64, 67], G = [55, 59, 62];
+  const leadA: N4[] = [[76, 0, 3, 0.9], [74, 4, 2, 0.8], [72, 6, 2, 0.8], [69, 8, 6, 0.9], [72, 16, 3, 0.9], [74, 20, 2, 0.8], [76, 22, 2, 0.8], [77, 24, 6, 0.9]];
+  const leadB: N4[] = [[79, 0, 3, 0.9], [77, 4, 2, 0.8], [76, 6, 2, 0.8], [72, 8, 6, 0.9], [74, 16, 3, 0.9], [76, 20, 2, 0.8], [74, 22, 2, 0.8], [71, 24, 6, 0.9]];
+  const beat = drums32([0, 8, 16, 24], [8, 24], every(2), [8, 24]);
+  const patterns = [
+    mk('Intro', drums32([0, 8, 16, 24], [], every(4, 2), []), [], twoChords(Am, F, 0.5), twoChords(Am, F, 0.6)),
+    mk('Verse', beat, leadA, twoChords(Am, F, 0.5), twoChords(Am, F, 0.65)),
+    mk('Chorus', beat, leadB, twoChords(C, G, 0.55), twoChords(C, G, 0.7)),
+    mk('Bridge', drums32([0, 16], [], [], []), [], twoChords(F, G, 0.55), twoChords(F, G, 0.55))
+  ];
+  return demo('Synthwave 108', 108, 'electro', patterns, [0, 0, 1, 1, 2, 2, 3, 3, 1, 1, 2, 2, 2, 2], { melody: 'pwmLead', ambient: 'vintageStrings', arp: 'arcadeArp' },
+    { mode: 'up', rate: '16n', octaves: 2, gate: 0.5 }, 9, 'minor',
+    { ambient: { volumeDb: -6, reverbSend: 0.4 }, arp: { volumeDb: -6, pan: -0.2, reverbSend: 0.2, delaySend: 0.3 }, melody: { volumeDb: -1, reverbSend: 0.25, delaySend: 0.25 } },
+    { reverbMix: 0.2, delayFeedback: 0.35, compAmount: 0.35 });
+}
+
+/** Chiptune: 150 BPM, C major, square lead, triangle bass and a fast pulse arpeggio on the 8-bit kit. */
+export function chiptuneDemo(): BeatLabProject {
+  const C = [60, 64, 67], Am = [57, 60, 64], F = [53, 57, 60], G = [55, 59, 62];
+  const lead: N4[] = [[72, 0, 2, 0.9], [76, 2, 2, 0.9], [79, 4, 2, 0.9], [76, 6, 2, 0.9], [74, 8, 2, 0.9], [77, 10, 2, 0.9], [81, 12, 4, 0.9],
+    [79, 16, 2, 0.9], [77, 18, 2, 0.9], [76, 20, 2, 0.9], [74, 22, 2, 0.9], [72, 24, 4, 0.9], [67, 28, 4, 0.9]];
+  const bass: N4[] = [[48, 0, 4, 0.9], [48, 4, 4, 0.9], [57, 8, 4, 0.9], [57, 12, 4, 0.9], [53, 16, 4, 0.9], [53, 20, 4, 0.9], [55, 24, 4, 0.9], [55, 28, 4, 0.9]];
+  const beat = drums32([0, 8, 16, 24], [8, 24], every(2), []);
+  const patterns = [
+    mk('Intro', drums32([0, 16], [], every(4), []), [], bass, twoChords(C, Am, 0.6)),
+    mk('Level', beat, lead, bass, twoChords(C, Am, 0.7)),
+    mk('Boss', drums32([0, 4, 8, 12, 16, 20, 24, 28], [8, 24], every(2), []), lead, bass, twoChords(F, G, 0.75))
+  ];
+  return demo('Chiptune 150', 150, 'chip', patterns, [0, 0, 1, 1, 1, 1, 2, 2, 1, 1], { melody: 'chipSquare', ambient: 'chipTri', arp: 'arcadeArp' },
+    { mode: 'up', rate: '16n', octaves: 2, gate: 0.4 }, 0, 'major',
+    { ambient: { volumeDb: 0, reverbSend: 0 }, arp: { volumeDb: -7, pan: 0.2, reverbSend: 0.05 }, melody: { reverbSend: 0.05 } },
+    { reverbMix: 0.05, compAmount: 0.3, delayFeedback: 0.2 });
+}
+
 /** The song that is loaded when the app starts (NEW still gives a simple project). */
 export function startupProject(): BeatLabProject { return hipHopDemo(); }
 
-export const SAMPLE_PROJECTS_EXTRA: Record<string, () => BeatLabProject> = { 'Hip Hop Demo': hipHopDemo };
+export const SAMPLE_PROJECTS_EXTRA: Record<string, () => BeatLabProject> = {
+  'Hip Hop Demo': hipHopDemo, 'Lo-Fi Chill': lofiDemo, 'House 124': houseDemo, 'Trap 140': trapDemo, 'Persian Mood': persianDemo, 'Synthwave 108': synthwaveDemo, 'Chiptune 150': chiptuneDemo
+};
 
 Object.assign(SAMPLE_PROJECTS, SAMPLE_PROJECTS_EXTRA);
 
@@ -247,8 +377,8 @@ export function validateProject(input: unknown): ParseResult {
     data = widenV2(upgradeV1(input));
   } else if (input.schemaVersion === 2) {
     data = widenV2(input);
-  } else if (input.schemaVersion !== SCHEMA_VERSION) {
-    return fail(`Unsupported schemaVersion (${String(input.schemaVersion)}); this app reads versions 1, 2 and ${SCHEMA_VERSION}.`);
+  } else if (input.schemaVersion !== 3 && input.schemaVersion !== SCHEMA_VERSION) {
+    return fail(`Unsupported schemaVersion (${String(input.schemaVersion)}); this app reads versions 1 to ${SCHEMA_VERSION}.`);
   }
   const legacy = data.legacy === true;
   if (typeof data.name !== 'string' || data.name.length > 80) return fail('"name" must be text of at most 80 characters.');
@@ -285,6 +415,11 @@ export function validateProject(input: unknown): ParseResult {
     playlist.push(s);
   }
 
+  // the user's own synths (before the tracks, because a track may use one)
+  const synthResult = validateSynths(data.synths);
+  if (!synthResult.ok) return fail(synthResult.error);
+  const synths = synthResult.synths;
+
   // instruments
   const tracks = defaultTracks();
   if (data.tracks !== undefined) {
@@ -292,7 +427,9 @@ export function validateProject(input: unknown): ParseResult {
     for (const t of MELODIC_TRACKS) {
       const v = data.tracks[t];
       if (v === undefined) continue;
-      if (!isMelodyInstrument(v)) return fail(`tracks.${t} is not a known instrument.`);
+      if (typeof v === 'string' && isCustomRef(v)) {
+        if (!synths.some(x => x.id === customId(v))) return fail(`tracks.${t} uses the synth "${customId(v)}", which is not in this file.`);
+      } else if (!isMelodyInstrument(v)) return fail(`tracks.${t} is not a known instrument.`);
       tracks[t] = v;
     }
   }
@@ -358,7 +495,7 @@ export function validateProject(input: unknown): ParseResult {
     };
   }
 
-  return { ok: true, project: { schemaVersion: 3, name: data.name, bpm: Math.round(data.bpm), patterns, playlist, tracks, arp, drumKit, melodyView, channels, master } };
+  return { ok: true, project: { schemaVersion: 4, name: data.name, bpm: Math.round(data.bpm), patterns, playlist, tracks, synths, arp, drumKit, melodyView, channels, master } };
 }
 
 export function parseProject(text: string): ParseResult {

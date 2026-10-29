@@ -26,3 +26,12 @@ project.ts ── one BeatLabProject (schemaVersion 2). validateProject on Open 
 * **Validation.** `validateProject` checks every field (ranges, 16 steps, notes inside the bar, playlist indices, known instrument/kit/reverb/delay/arp ids). Invalid files are rejected with a message and the current project is kept. Older files open with defaults.
 * **Export.** Offline render (44.1 kHz stereo). SONG mode renders the playlist up to its last used bar × the chosen number of repeats; PATTERN mode renders the selected pattern for N bars. The tail depends on the master reverb size; `wav.ts` writes 16-bit PCM with clipping protection.
 * **Visualiser.** Two `Tone.Analyser` nodes after the limiter (FFT + waveform) feed a canvas drawn with `requestAnimationFrame` (no React re-renders); the playlist highlights the playing bar.
+
+
+## v0.9 additions
+
+- `synth.ts` (pure): `SynthPatch` model, limits, `validatePatch`/`clampPatch`/`randomPatch`, the library `FACTORY_SOUNDS` (patch data per instrument) and the helpers for the project's `synths` list (`synth:<id>` references).
+- `patchSynth.ts`: `PatchSynth` = polyphonic voice pool (osc1 + osc2 + noise -> filter -> amp envelope -> tremolo -> drive -> chorus -> volume). Sources only run while a note sounds. It captures the audio context at construction because voices are created lazily during playback (in the offline export the global context has already changed by then).
+- `rig.ts`: `setSynths()`, instrument resolution (built-in PolySynth sounds, library patch, or the user's patch), a signature per voice so a track is rebuilt when its patch changes, and an extra audition voice for the Synth Lab keyboard. `engine.ts` forwards `setSynths` and `auditionDown/Up/Stop`; `exporter.ts` calls `rig.setSynths(project.synths)` before building the tracks.
+- `project.ts`: schema 4 (`synths`), tracks may reference `synth:<id>`, version-3 files still open; seven demo songs.
+- `theme.ts` + CSS variables in `main.css` (dark default, `[data-theme=light]` overrides); a tiny script in `index.html` sets the theme before the first paint.

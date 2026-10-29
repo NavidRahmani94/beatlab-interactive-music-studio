@@ -211,7 +211,7 @@ describe('patterns, playlist and the new tracks', () => {
     const r = validateProject(old);
     expect(r.ok).toBe(true);
     if (r.ok) {
-      expect(r.project.schemaVersion).toBe(3);
+      expect(r.project.schemaVersion).toBe(4);
       expect(r.project.patterns).toHaveLength(1);
       expect(r.project.playlist).toEqual([0]);
       expect(r.project.patterns[0].melody).toHaveLength(old.melody.length * 2);   // the 16-step phrase plays twice in 32 steps

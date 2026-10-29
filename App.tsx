@@ -6,15 +6,18 @@ import MixerPanel from './MixerPanel';
 import PlaylistPanel from './PlaylistPanel';
 import ProjectBar from './ProjectBar';
 import TrackPanel from './TrackPanel';
+import SynthPanel from './SynthPanel';
 import Visualizer from './Visualizer';
 import { MelodyNote, ScaleName, easyRoot, remapToScale, transposeNotes } from './melody';
 import { ChannelName, Channels, ChannelSettings, MasterSettings, patchChannel, patchMaster } from './mixer';
-import { DrumKitId, MELODIC_TRACKS, MelodicTrack, MelodyInstrumentId, TAB_LABELS, TAB_ORDER, TabId } from './instruments';
+import { DrumKitId, MELODIC_TRACKS, MelodicTrack, MelodyInstrumentId, TAB_LABELS, TAB_ORDER, TRACK_DEFAULT_INSTRUMENT, TabId } from './instruments';
 import { ArpSettings } from './arp';
 import { Frame, PatternData, PlayMode, Playlist, addPattern, deletePattern, duplicatePattern, emptyDrumPattern, renamePattern, resizePlaylist, setSlot } from './song';
 import { BeatLabProject, MAX_FILE_BYTES, SAMPLE_PROJECTS, TrackInstruments, defaultProject, hasAudibleContent, startupProject, parseProject, safeFileName, serializeProject } from './project';
+import { SynthPatch, SynthSlot, customId, isCustomRef } from './synth';
 import { ExportFormat, renderProjectToWav } from './exporter';
 import { STEPS } from './pattern';
+import { ThemeChoice, THEME_LABEL, applyTheme, loadTheme, nextTheme, saveTheme } from './theme';
 import './main.css';
 
 type Status = { kind: 'info' | 'error'; text: string };
@@ -39,7 +42,10 @@ export default function App() {
   const [current, setCurrent] = useState(0);
   const [mode, setMode] = useState<PlayMode>('song');
   const [tab, setTab] = useState<TabId>('melody');
+  const [lab, setLab] = useState(false);              // true while the Synth Lab is shown instead of a track
+  const [synthId, setSynthId] = useState<string | null>(initial.synths[0]?.id ?? null);
   const [tracks, setTracks] = useState<TrackInstruments>(initial.tracks);
+  const [synths, setSynths] = useState<SynthSlot[]>(initial.synths);
   const [arp, setArp] = useState<ArpSettings>(initial.arp);
   const [kit, setKit] = useState<DrumKitId>(initial.drumKit);
   const [keyPc, setKeyPc] = useState(initial.melodyView.key);
@@ -52,14 +58,25 @@ export default function App() {
   const [loops, setLoops] = useState(1);
   const [format, setFormat] = useState<ExportFormat>('wav16');
   const [exporting, setExporting] = useState(false);
+  const [theme, setTheme] = useState<ThemeChoice>(loadTheme);
   const [savedJson, setSavedJson] = useState(() => serializeProject(initial));
+
+  useEffect(() => {
+    applyTheme(theme); saveTheme(theme);
+    if (theme !== 'auto') return;
+    let mq: MediaQueryList | null = null;
+    try { mq = window.matchMedia('(prefers-color-scheme: dark)'); } catch { return; }
+    const on = () => applyTheme('auto');
+    mq.addEventListener('change', on);
+    return () => mq?.removeEventListener('change', on);
+  }, [theme]);
 
   const cur = Math.min(current, patterns.length - 1);
   const pattern = patterns[cur];
 
   const project: BeatLabProject = useMemo(() => ({
-    schemaVersion: 3, name, bpm, patterns, playlist, tracks, arp, drumKit: kit, melodyView: { key: keyPc, scale }, channels, master
-  }), [name, bpm, patterns, playlist, tracks, arp, kit, keyPc, scale, channels, master]);
+    schemaVersion: 4, name, bpm, patterns, playlist, tracks, synths, arp, drumKit: kit, melodyView: { key: keyPc, scale }, channels, master
+  }), [name, bpm, patterns, playlist, tracks, synths, arp, kit, keyPc, scale, channels, master]);
   const dirty = useMemo(() => serializeProject(project) !== savedJson, [project, savedJson]);
 
   const engine = useRef<BeatLabEngine | null>(null);
@@ -73,11 +90,25 @@ export default function App() {
   }, []);
   useEffect(() => { engine.current?.setSong({ patterns, playlist, mode, current: cur }); }, [patterns, playlist, mode, cur]);
   useEffect(() => { engine.current?.setBpm(bpm); }, [bpm]);
+  useEffect(() => { engine.current?.setSynths(synths); }, [synths]);
   useEffect(() => { engine.current?.setArp(arp); }, [arp]);
   useEffect(() => { engine.current?.setChannels(channels); }, [channels]);
   useEffect(() => { engine.current?.setMaster(master); }, [master]);
   useEffect(() => { MELODIC_TRACKS.forEach(t => engine.current?.setTrackInstrument(t, tracks[t])); }, [tracks]);
   useEffect(() => { engine.current?.setDrumKit(kit); }, [kit]);
+  const keysDown = useCallback((patch: SynthPatch, note: string) => { void engine.current?.auditionDown(patch, note); }, []);
+  const keysUp = useCallback((patch: SynthPatch, note: string) => { engine.current?.auditionUp(patch, note); }, []);
+  const keysStop = useCallback(() => { engine.current?.auditionStop(); }, []);
+  // a track that points at a deleted synth goes back to its default sound
+  useEffect(() => {
+    setTracks(t => {
+      let changed = false;
+      const next = { ...t };
+      MELODIC_TRACKS.forEach(tr => { if (isCustomRef(t[tr]) && !synths.some(s => s.id === customId(t[tr]))) { next[tr] = TRACK_DEFAULT_INSTRUMENT[tr]; changed = true; } });
+      return changed ? next : t;
+    });
+    setSynthId(id => (id && synths.some(s => s.id === id) ? id : synths[0]?.id ?? null));
+  }, [synths]);
   const getLevelDb = useCallback(() => engine.current?.getLevelDb() ?? -Infinity, []);
   const getSpectrum = useCallback(() => engine.current?.getSpectrum() ?? null, []);
   const getWaveform = useCallback(() => engine.current?.getWaveform() ?? null, []);
@@ -108,7 +139,7 @@ export default function App() {
   }, []);
 
   function apply(p: BeatLabProject) {
-    setName(p.name); setBpm(p.bpm); setPatterns(p.patterns); setPlaylist(p.playlist); setCurrent(0); setTracks(p.tracks); setArp(p.arp);
+    setName(p.name); setBpm(p.bpm); setPatterns(p.patterns); setPlaylist(p.playlist); setCurrent(0); setTracks(p.tracks); setSynths(p.synths); setArp(p.arp);
     setChannels(p.channels); setMaster(p.master); setKit(p.drumKit); setKeyPc(p.melodyView.key); setScale(p.melodyView.scale);
     setSavedJson(serializeProject(p));
   }
@@ -211,7 +242,7 @@ export default function App() {
   const bars = mode === 'song' ? playlist.length : 1;
 
   return <main className="shell" style={{ ['--bar-s' as string]: `${(STEPS * 15) / bpm}s` }}>
-    <header><div><div className="eyebrow">INTERACTIVE MUSIC STUDIO</div><h1><span>BEAT</span>LAB<span className="dot">.</span></h1></div><div className="phase">PHASE 01–09 <span>• V0.8 TEST BUILD</span></div></header>
+    <header><div><div className="eyebrow">INTERACTIVE MUSIC STUDIO</div><h1><span>BEAT</span>LAB<span className="dot">.</span></h1></div><div className="head-right"><button className="theme-btn" aria-label="Colour theme" title="Switch between automatic, dark and light" onClick={() => setTheme(nextTheme(theme))}>{THEME_LABEL[theme]}</button><div className="phase">PHASE 01–09 <span>• V0.9 TEST BUILD</span></div></div></header>
     <section className="intro"><div className="eyebrow">YOUR FIRST SONG</div><h2>Make some noise.</h2><p>Ambient. Drums. Melody. Arpeggio. Mix. Master. Arrange. Export WAV / MP3.</p></section>
     <ProjectBar name={name} onName={setName} dirty={dirty} exporting={exporting} loops={loops} unit={mode === 'song' ? 'song' : 'pattern'} onLoops={setLoops} format={format} onFormat={setFormat}
       onNew={newProject} onOpenFile={openFile} onSave={save} onSample={loadSample} onExport={exportWav} />
@@ -221,20 +252,26 @@ export default function App() {
     <div className="tabs" role="tablist" aria-label="Tracks">
       <button className={'mini-play' + (playing ? ' on' : '')} aria-label={playing ? 'Stop (quick)' : 'Play (quick)'} title="Play / stop from here (Space also works)" onClick={playing ? stop : play}>{playing ? '■' : '▶'}</button>
       <button className={'mini-play pat' + (playing && mode === 'pattern' ? ' on' : '')} aria-label={`Play only ${pattern.name} (quick)`} title="Loop only the pattern you are editing" onClick={() => audition(cur)}>{playing && mode === 'pattern' ? '■' : '▶'} THIS PATTERN</button>
-      {TAB_ORDER.map(t => <button key={t} role="tab" aria-selected={tab === t} className={'tab' + (tab === t ? ' sel' : '') + (mutedTab(t) ? ' muted' : '')} onClick={() => setTab(t)}>
+      {TAB_ORDER.map(t => <button key={t} role="tab" aria-selected={!lab && tab === t} className={'tab' + (!lab && tab === t ? ' sel' : '') + (mutedTab(t) ? ' muted' : '')} onClick={() => { setTab(t); setLab(false); }}>
         <i className={'tab-dot' + (hasNotes(t) ? ' has' : '')} data-track={t} />{TAB_LABELS[t]}
       </button>)}
-      <button className={'auto-btn listen' + (aloneActive ? ' on' : '')} aria-pressed={aloneActive} aria-label={`Listen to ${TAB_LABELS[tab]} alone`}
-        title="Hear only this track of the selected pattern (loops it). Press again to hear everything." onClick={listenAlone}>{aloneActive ? '■ BACK TO FULL MIX' : `🎧 LISTEN TO ${TAB_LABELS[tab]} ALONE`}</button>
+      <button role="tab" aria-selected={lab} className={'tab synth-tab' + (lab ? ' sel' : '')} onClick={() => { setLab(true); engine.current?.setSong({ patterns, playlist, mode, current: cur }); }}>
+        <i className={'tab-dot' + (synths.length ? ' has' : '')} />SYNTH LAB
+      </button>
+      {!lab && <button className={'auto-btn listen' + (aloneActive ? ' on' : '')} aria-pressed={aloneActive} aria-label={`Listen to ${TAB_LABELS[tab]} alone`}
+        title="Hear only this track of the selected pattern (loops it). Press again to hear everything." onClick={listenAlone}>{aloneActive ? '■ BACK TO FULL MIX' : `🎧 LISTEN TO ${TAB_LABELS[tab]} ALONE`}</button>}
       <span className="tab-pattern">EDITING <b>{pattern.name}</b></span>
     </div>
 
-    {tab === 'drums' && <DrumPanel pattern={pattern.drums} kit={kit} channels={channels} playingStep={stepHere} onKit={setKit}
+    {lab && <SynthPanel synths={synths} onSynths={fn => setSynths(fn)} selectedId={synthId} onSelect={setSynthId} tracks={tracks}
+      onUse={(t, ref) => { setTracks(tr => ({ ...tr, [t]: ref })); setStatus({ kind: 'info', text: `This synth is now the ${t} sound.` }); }}
+      onKeyDown={keysDown} onKeyUp={keysUp} onKeysStop={keysStop} getWaveform={getWaveform} />}
+    {!lab && tab === 'drums' && <DrumPanel pattern={pattern.drums} kit={kit} channels={channels} playingStep={stepHere} onKit={setKit}
       onToggle={(inst: Instrument, i: number) => editCurrent(p => ({ ...p, drums: toggleStep(p.drums, inst, i) }))}
       onMute={(inst, muted) => changeChannel(inst, { muted })} onSolo={(inst, solo) => changeChannel(inst, { solo })}
       onAllMute={muted => setChannels(c => (['kick', 'snare', 'hat', 'clap'] as const).reduce((acc, n) => patchChannel(acc, n, { muted }), c))}
       onAllSolo={solo => setChannels(c => (['kick', 'snare', 'hat', 'clap'] as const).reduce((acc, n) => patchChannel(acc, n, { solo }), c))} onClear={() => editCurrent(p => ({ ...p, drums: emptyDrumPattern() }))} />}
-    {tab !== 'drums' && <TrackPanel key={tab} track={tab} notes={pattern[tab]} onNotes={trackSetters[tab]} enabled={!channels[tab].muted}
+    {!lab && tab !== 'drums' && <TrackPanel key={tab} track={tab} synths={synths} notes={pattern[tab]} onNotes={trackSetters[tab]} enabled={!channels[tab].muted}
       onEnabled={on => changeChannel(tab, { muted: !on })} solo={channels[tab].solo} onSolo={solo => changeChannel(tab, { solo })} keyPc={keyPc} scale={scale} onKeyChange={changeKey} onScaleChange={changeScale}
       instrument={tracks[tab]} onInstrument={(id: MelodyInstrumentId) => setTracks(t => ({ ...t, [tab]: id }))}
       arp={arp} onArp={patch => setArp(a => ({ ...a, ...patch }))} playingStep={stepHere} />}

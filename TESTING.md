@@ -22,3 +22,12 @@ Tip: run the browser test with a normal-sized window (the script uses 1280×1000
 8. Save, press NEW, Open the file: everything returns. Open a broken JSON: you get an error and nothing changes. A file saved with v0.5 opens as one pattern.
 9. Export WAV in SONG mode and open it in another player: length, tempo, arrangement and reverb tail should match.
 10. Stop/Play 10 times: no doubled notes, always starts at bar 1 step 1. Browser console: no red errors.
+
+
+## v0.9 tests
+
+- `synth.test.ts`: patch validation/clamping/random, library integrity (every sound valid, ids unique, groups), the synth list, synths inside project files (round trip, missing synth, v3 files).
+- `demos.test.ts`: every demo song validates, round-trips, is audible, keeps notes in range, uses every pattern.
+- `theme.test.ts`: theme cycling and resolution.
+- Browser: `node e2e-v09.cjs http://localhost:4173/` (34 checks) and `node e2e-demos.cjs http://localhost:4173/` (exports six demos). Start the preview server in the same shell command (`npx vite preview --port 4173`).
+- Level calibration was done by rendering every library sound offline in Chromium (`Tone.Offline`) and measuring RMS/peak.
