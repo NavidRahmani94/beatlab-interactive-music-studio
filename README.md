@@ -57,6 +57,10 @@ Drum sounds are synthesized rather than loaded samples; exact sound character ma
 - `dev` no longer binds to 0.0.0.0 (use `dev:lan`).
 - UI phase labels corrected; 4 extra unit tests (8 total).
 
+## Changelog v0.1.3
+- Per-instrument ON/OFF button in the drum grid (pattern is kept; the voice is silenced).
+- Fixed timbre changing with tempo: drum notes now use fixed durations in seconds instead of musical values (e.g. '32n'), which cut the envelope differently at each BPM. Measured hi-hat spectral centroid: 4433/5040/5274 Hz at 60/120/200 BPM before, constant 6030 Hz after. Hi-hat volume raised to compensate.
+
 ## Verification status
 - `npm test` (8 pass) and `npm run build`: verified.
 - Headless Chromium smoke test: Play starts, playhead moves, BPM change applies, 10x Stop/Play leaves no stuck state, no app errors.

@@ -12,6 +12,7 @@ export class BeatLabEngine {
   private stepCallback: (step: number) => void;
   private active = false;
   private generation = 0;
+  private muted: Record<Instrument, boolean> = {kick: false, snare: false, hat: false, clap: false};
 
   constructor(pattern: DrumPattern, onStep: (step: number) => void) {
     this.pattern = pattern;
@@ -19,6 +20,7 @@ export class BeatLabEngine {
   }
   setPattern(pattern: DrumPattern): void { this.pattern = pattern; }
   setStepCallback(callback: (step: number) => void): void { this.stepCallback = callback; }
+  setMuted(name: Instrument, muted: boolean): void { this.muted[name] = muted; }
   setBpm(bpm: number): void { Tone.getTransport().bpm.value = clampBpm(bpm); }
   async start(bpm: number): Promise<void> {
     if (this.active) return;
@@ -50,18 +52,18 @@ export class BeatLabEngine {
     this.hat.frequency.value = 260;
     this.clap = new Tone.NoiseSynth({noise: {type: 'pink'}, envelope: {attack: 0.001, decay: 0.23, sustain: 0}}).connect(this.master);
     this.snare.volume.value = -13;
-    this.hat.volume.value = -20;
+    this.hat.volume.value = -12;
     this.clap.volume.value = -11;
     this.kick.volume.value = -7;
   }
   private triggerStep(step: number, time: number): void {
     const voices: Record<Instrument, () => void> = {
-      kick: () => this.kick?.triggerAttackRelease('C1', '8n', time),
-      snare: () => this.snare?.triggerAttackRelease('16n', time),
-      hat: () => this.hat?.triggerAttackRelease('32n', time),
-      clap: () => this.clap?.triggerAttackRelease('16n', time)
+      kick: () => this.kick?.triggerAttackRelease('C1', 0.25, time),
+      snare: () => this.snare?.triggerAttackRelease(0.12, time),
+      hat: () => this.hat?.triggerAttackRelease(0.1, time),
+      clap: () => this.clap?.triggerAttackRelease(0.12, time)
     };
-    (Object.keys(voices) as Instrument[]).forEach(name => { if (this.pattern[name][step]) voices[name](); });
+    (Object.keys(voices) as Instrument[]).forEach(name => { if (!this.muted[name] && this.pattern[name][step]) voices[name](); });
   }
   stop(): void {
     ++this.generation;
