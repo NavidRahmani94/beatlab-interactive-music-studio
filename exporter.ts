@@ -1,5 +1,6 @@
 import * as Tone from 'tone';
-import { Rig, groupMelodyByStep } from './rig';
+import { Rig } from './rig';
+import { frameAt, usedBars } from './song';
 import { BeatLabProject } from './project';
 import { encodeWav } from './wav';
 import { STEPS } from './pattern';
@@ -9,15 +10,17 @@ export const EXPORT_SAMPLE_RATE = 44100;
 export const EXPORT_MIN_TAIL_SECONDS = 3; // lets reverb/delay tails ring out
 export const EXPORT_LEAD_IN = 0.05;       // tiny silence before the first hit
 
-export type ExportResult = { blob: Blob; seconds: number; loops: number };
+export type ExportResult = { blob: Blob; seconds: number; loops: number; bars: number };
+export type ExportOptions = { mode: 'song' | 'pattern'; pattern: number };
 
 /** Longer master reverb -> longer tail, so the end of the file is never cut off. */
 export function exportTailSeconds(master: MasterSettings): number {
   return master.reverbMix > 0 ? Math.max(EXPORT_MIN_TAIL_SECONDS, REVERB_SIZES[master.reverbSize].seconds + 1.5) : EXPORT_MIN_TAIL_SECONDS;
 }
 
-export function exportDurationSeconds(bpm: number, loops: number, tailSeconds = EXPORT_MIN_TAIL_SECONDS): number {
-  return EXPORT_LEAD_IN + loops * STEPS * (60 / bpm / 4) + tailSeconds;
+/** Length of the WAV for a number of bars (one bar = 16 steps). */
+export function exportDurationSeconds(bpm: number, bars: number, tailSeconds = EXPORT_MIN_TAIL_SECONDS): number {
+  return EXPORT_LEAD_IN + bars * STEPS * (60 / bpm / 4) + tailSeconds;
 }
 
 /**
@@ -26,16 +29,18 @@ export function exportDurationSeconds(bpm: number, loops: number, tailSeconds = 
  * (Hits are triggered at the moment they are due, exactly like live — pre-scheduling every hit up front
  * makes Tone.MetalSynth throw "Start time must be strictly greater than previous start time".)
  */
-export async function renderProjectToWav(project: BeatLabProject, loops: number): Promise<ExportResult> {
+export async function renderProjectToWav(project: BeatLabProject, loops: number, options: ExportOptions = { mode: 'song', pattern: 0 }): Promise<ExportResult> {
   const stepSeconds = 60 / project.bpm / 4;
-  const totalSteps = loops * STEPS;
-  const seconds = exportDurationSeconds(project.bpm, loops, exportTailSeconds(project.master));
-  const melodyByStep = groupMelodyByStep(project.melody);
+  // SONG: the playlist up to its last used bar, repeated `loops` times. PATTERN: the chosen pattern for `loops` bars.
+  const playlist = project.playlist.slice(0, usedBars(project.playlist));
+  const bars = options.mode === 'song' ? playlist.length * loops : loops;
+  const totalSteps = bars * STEPS;
+  const seconds = exportDurationSeconds(project.bpm, bars, exportTailSeconds(project.master));
 
   const buffer = await Tone.Offline(async ({ transport }) => {
     const rig = new Rig();
     rig.setDrumKit(project.drumKit);
-    rig.setMelodyInstrument(project.melodyInstrument);
+    (['melody', 'ambient', 'arp'] as const).forEach(t => rig.setTrackInstrument(t, project.tracks[t]));
     rig.setMaster(project.master);
     rig.setChannels(project.channels);
     rig.setTempo(project.bpm);
@@ -44,7 +49,9 @@ export async function renderProjectToWav(project: BeatLabProject, loops: number)
     let count = 0;
     transport.scheduleRepeat(time => {
       if (count >= totalSteps) return;
-      rig.triggerStep(count % STEPS, time, project.drums, melodyByStep, stepSeconds);
+      const frame = frameAt(count, playlist, options.mode, options.pattern);
+      const pattern = frame.pattern === null ? null : project.patterns[frame.pattern] ?? null;
+      rig.triggerStep(frame.step, time, pattern, project.arp, count, stepSeconds);
       count++;
     }, '16n', 0, totalSteps * stepSeconds);
     transport.start(EXPORT_LEAD_IN);
@@ -53,5 +60,5 @@ export async function renderProjectToWav(project: BeatLabProject, loops: number)
   const audio = buffer.get();
   if (!audio) throw new Error('The browser did not return rendered audio.');
   const wav = encodeWav([audio.getChannelData(0), audio.getChannelData(1)], audio.sampleRate);
-  return { blob: new Blob([wav], { type: 'audio/wav' }), seconds, loops };
+  return { blob: new Blob([wav], { type: 'audio/wav' }), seconds, loops, bars };
 }

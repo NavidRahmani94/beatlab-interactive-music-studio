@@ -7,6 +7,7 @@ type Props = {
   dirty: boolean;
   exporting: boolean;
   loops: number;
+  unit: string;
   onLoops: (loops: number) => void;
   onNew: () => void;
   onOpenFile: (file: File) => void;
@@ -38,7 +39,7 @@ export default function ProjectBar(p: Props) {
       </label>
       <label className="ctl">EXPORT LENGTH
         <select value={p.loops} aria-label="Export length" onChange={e => p.onLoops(Number(e.target.value))}>
-          {[1, 2, 4, 8].map(n => <option key={n} value={n}>{n} loop{n > 1 ? 's' : ''}</option>)}
+          {[1, 2, 4, 8].map(n => <option key={n} value={n}>{n} {p.unit}{n > 1 ? 's' : ''}</option>)}
         </select>
       </label>
       <button className="export-btn" disabled={p.exporting} onClick={p.onExport}>{p.exporting ? 'RENDERING…' : '⬇ EXPORT WAV'}</button>

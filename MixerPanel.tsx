@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { Fragment, useEffect, useRef } from 'react';
 import {
-  CHANNEL_LABELS, CHANNEL_NAMES, ChannelName, ChannelSettings, Channels, DELAY_DIVISIONS, DelayDivision, MAX_FEEDBACK, MasterSettings,
-  REVERB_SIZES, ReverbSize, VOLUME_MAX_DB, VOLUME_MIN_DB
+  CHANNEL_GROUPS, CHANNEL_LABELS, ChannelName, ChannelSettings, Channels, DELAY_DIVISIONS, DelayDivision, MAX_FEEDBACK, MasterSettings,
+  REVERB_SIZES, ReverbSize, VOLUME_MAX_DB, VOLUME_MIN_DB, EQ_MAX_DB, EQ_MIN_DB
 } from './mixer';
 
 type Props = {
@@ -37,13 +37,13 @@ export default function MixerPanel({ channels, master, onChannel, onMaster, getL
   }, [playing, getLevelDb]);
 
   return <section className="panel mixer">
-    <div className="panel-label">MIXER <span>CHANNELS · MASTER REVERB · DELAY</span></div>
+    <div className="panel-label">MIXER <span>7 CHANNELS → ONE MASTER (EQ · COMPRESSOR · REVERB · DELAY)</span></div>
     <div className="mixer-body">
       <div className="mix-row mix-head"><span /><span>M / S</span><span>PAN</span><span>VOLUME</span><span>REVERB SEND</span><span>DELAY SEND</span></div>
-      {CHANNEL_NAMES.map(name => {
+      {CHANNEL_GROUPS.flatMap(g => g.channels.map((name, idx) => ({ name, group: idx === 0 ? g.label : null }))).map(({ name, group }) => {
         const c = channels[name];
         const label = CHANNEL_LABELS[name];
-        return <div key={name} className={'mix-row' + (c.muted ? ' is-muted' : '')}>
+        return <Fragment key={name}>{group && <div className="mix-group">{group}</div>}<div className={'mix-row' + (c.muted ? ' is-muted' : '')}>
           <div className="instrument-name"><span className={'inst-dot ' + name} />{label}</div>
           <div className="seg small" role="group" aria-label={`${label} mute and solo`}>
             <button className={c.muted ? 'sel warn' : ''} aria-pressed={c.muted} aria-label={`${label} mixer ${c.muted ? 'muted' : 'on'}`} title="Mute" onClick={() => onChannel(name, { muted: !c.muted })}>M</button>
@@ -57,7 +57,7 @@ export default function MixerPanel({ channels, master, onChannel, onMaster, getL
             onChange={e => onChannel(name, { reverbSend: Number(e.target.value) / 100 })} /><b>{Math.round(c.reverbSend * 100)}%</b></label>
           <label className="fader"><input type="range" min={0} max={100} step={1} value={Math.round(c.delaySend * 100)} aria-label={`${label} delay send`}
             onChange={e => onChannel(name, { delaySend: Number(e.target.value) / 100 })} /><b>{Math.round(c.delaySend * 100)}%</b></label>
-        </div>;
+        </div></Fragment>;
       })}
     </div>
 
@@ -85,6 +85,22 @@ export default function MixerPanel({ channels, master, onChannel, onMaster, getL
         <label className="ctl">DELAY FEEDBACK
           <span className="fader"><input type="range" min={0} max={MAX_FEEDBACK * 100} step={1} value={Math.round(master.delayFeedback * 100)} aria-label="Delay feedback"
             onChange={e => onMaster({ delayFeedback: Number(e.target.value) / 100 })} /><b>{Math.round(master.delayFeedback * 100)}%</b></span>
+        </label>
+        <label className="ctl">EQ LOW (bass)
+          <span className="fader"><input type="range" min={EQ_MIN_DB} max={EQ_MAX_DB} step={1} value={master.eqLow} aria-label="Master EQ low"
+            onChange={e => onMaster({ eqLow: Number(e.target.value) })} onDoubleClick={() => onMaster({ eqLow: 0 })} /><b>{fmtDb(master.eqLow)}</b></span>
+        </label>
+        <label className="ctl">EQ MID
+          <span className="fader"><input type="range" min={EQ_MIN_DB} max={EQ_MAX_DB} step={1} value={master.eqMid} aria-label="Master EQ mid"
+            onChange={e => onMaster({ eqMid: Number(e.target.value) })} onDoubleClick={() => onMaster({ eqMid: 0 })} /><b>{fmtDb(master.eqMid)}</b></span>
+        </label>
+        <label className="ctl">EQ HIGH (treble)
+          <span className="fader"><input type="range" min={EQ_MIN_DB} max={EQ_MAX_DB} step={1} value={master.eqHigh} aria-label="Master EQ high"
+            onChange={e => onMaster({ eqHigh: Number(e.target.value) })} onDoubleClick={() => onMaster({ eqHigh: 0 })} /><b>{fmtDb(master.eqHigh)}</b></span>
+        </label>
+        <label className="ctl">COMPRESSOR (glue)
+          <span className="fader"><input type="range" min={0} max={100} step={1} value={Math.round(master.compAmount * 100)} aria-label="Master compressor"
+            onChange={e => onMaster({ compAmount: Number(e.target.value) / 100 })} /><b>{master.compAmount === 0 ? 'OFF' : `${Math.round(master.compAmount * 100)}%`}</b></span>
         </label>
         <div className="ctl">LEVEL
           <div className="meter" aria-label="Master level meter" role="img"><div className="meter-fill" ref={meterRef} /><span className="meter-peak" ref={peakRef} /></div>

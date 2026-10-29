@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   MAX_MIDI, MIN_MIDI, PRESETS, PRESET_NAMES, SCALES, ScaleName, easyRoot, inScale, makePreset, generateMelody, setStepVelocity, stepVelocity, clampVelocity,
-  midiToNote, noteAt, noteToMidi, normalizeNotes, scaleRows, snapNotesToScale, toggleNote, transposeNotes, remapToScale
+  midiToNote, noteAt, resizeNote, makeTrackPreset, presetsForTrack, TRACK_PRESETS, TRACK_PRESET_NAMES, noteToMidi, normalizeNotes, scaleRows, snapNotesToScale, toggleNote, transposeNotes, remapToScale
 } from './melody';
 import { isMelodyInstrument } from './instruments';
 
@@ -190,5 +190,51 @@ describe('changing the scale changes the music', () => {
   });
   it('auto melody uses single-step cells only', () => {
     generateMelody(3, 'major', 'playful', 5).forEach(n => expect(n.lengthSteps).toBe(1));
+  });
+});
+
+describe('stretching notes', () => {
+  it('resizeNote changes the length and keeps everything else', () => {
+    const n = toggleNote([], 60, 2, 1);
+    const r = resizeNote(n, n[0].id, 6);
+    expect(r[0]).toMatchObject({ pitch: 'C4', step: 2, lengthSteps: 6, velocity: n[0].velocity });
+  });
+  it('cannot pass the end of the bar', () => {
+    const n = toggleNote([], 60, 12, 1);
+    expect(resizeNote(n, n[0].id, 10)[0].lengthSteps).toBe(4);
+  });
+  it('cannot run into the next note of the same pitch, but ignores other pitches', () => {
+    let n = toggleNote([], 60, 0, 1);
+    n = toggleNote(n, 60, 6, 1);
+    n = toggleNote(n, 64, 3, 1);
+    const id = n.find(x => x.step === 0)!.id;
+    expect(resizeNote(n, id, 12).find(x => x.step === 0)?.lengthSteps).toBe(6);
+  });
+  it('minimum length is 1; unknown id and NaN change nothing', () => {
+    const n = toggleNote([], 60, 0, 4);
+    expect(resizeNote(n, n[0].id, 0)[0].lengthSteps).toBe(1);
+    expect(resizeNote(n, 'nope', 3)).toBe(n);
+    expect(resizeNote(n, n[0].id, NaN)).toBe(n);
+    expect(resizeNote(n, n[0].id, 4)).toBe(n);
+  });
+});
+
+describe('ambient and arpeggio ready-made patterns', () => {
+  it('there are patterns for both tracks', () => {
+    expect(presetsForTrack('ambient').length).toBeGreaterThanOrEqual(3);
+    expect(presetsForTrack('arp').length).toBeGreaterThanOrEqual(3);
+  });
+  TRACK_PRESET_NAMES.forEach(name => it(`${name} is valid in every key`, () => {
+    for (let pc = 0; pc < 12; pc++) {
+      const { scale, notes, instrument } = makeTrackPreset(name, pc);
+      expect(isMelodyInstrument(instrument)).toBe(true);
+      expect(notes).toHaveLength(TRACK_PRESETS[name].notes.length);
+      expect(normalizeNotes(notes)).toEqual(notes);
+      const rows = scaleRows(pc, scale);
+      notes.forEach(n => { expect(rows).toContain(noteToMidi(n.pitch)); expect(n.step + n.lengthSteps).toBeLessThanOrEqual(16); });
+    }
+  }));
+  it('ambient notes are long', () => {
+    presetsForTrack('ambient').forEach(n => makeTrackPreset(n, 0).notes.forEach(x => expect(x.lengthSteps).toBeGreaterThanOrEqual(8)));
   });
 });

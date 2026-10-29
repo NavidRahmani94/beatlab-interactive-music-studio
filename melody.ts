@@ -217,3 +217,37 @@ export function generateMelody(keyPc: number, scale: ScaleName, mood: PresetName
   picks[picks.length - 1].degree = 0; // resolve on the root
   return normalizeNotes(picks.map(p => make(rows[p.degree], p.step, 1, p.velocity)));
 }
+
+// ---------- stretching / moving notes (drag in the piano roll) ----------
+/** Changes the length of one note. It can't pass the bar end or run into the next note of the same pitch. */
+export function resizeNote(notes: MelodyNote[], id: string, lengthSteps: number): MelodyNote[] {
+  const target = notes.find(n => n.id === id);
+  if (!target || !Number.isFinite(lengthSteps)) return notes;
+  const midi = midiOf(target);
+  let limit = STEPS - target.step;
+  for (const n of notes) if (n !== target && midiOf(n) === midi && n.step > target.step) limit = Math.min(limit, n.step - target.step);
+  const len = Math.max(1, Math.min(Math.round(lengthSteps), limit));
+  if (len === target.lengthSteps) return notes;
+  return notes.map(n => n === target ? { ...n, lengthSteps: len } : n);
+}
+
+// ---------- ready-made patterns for the AMBIENT and ARPEGGIO tracks ----------
+export type TrackPresetName = 'ambientDrift' | 'ambientAbyss' | 'ambientShimmer' | 'ambientSpace' | 'arpMinor' | 'arpMajor' | 'arpChanges' | 'arpBell';
+export const TRACK_PRESETS: Record<TrackPresetName, { track: 'ambient' | 'arp'; label: string; scale: ScaleName; instrument: MelodyInstrumentId; notes: [number, number, number, number][] }> = {
+  ambientDrift: { track: 'ambient', label: 'DRIFT', scale: 'majorPent', instrument: 'warmPad', notes: [[0, 0, 16, 0.5], [0, 2, 16, 0.45], [0, 3, 16, 0.45]] },
+  ambientAbyss: { track: 'ambient', label: 'ABYSS', scale: 'minor', instrument: 'drone', notes: [[0, 0, 16, 0.6], [0, 4, 16, 0.4]] },
+  ambientShimmer: { track: 'ambient', label: 'SHIMMER', scale: 'major', instrument: 'glassPad', notes: [[0, 0, 8, 0.5], [0, 2, 8, 0.45], [0, 4, 8, 0.45], [8, 3, 8, 0.5], [8, 5, 8, 0.45], [8, 7, 8, 0.4]] },
+  ambientSpace: { track: 'ambient', label: 'SPACE', scale: 'minorPent', instrument: 'airPad', notes: [[0, 0, 8, 0.5], [0, 3, 8, 0.45], [8, 2, 8, 0.5], [8, 4, 8, 0.45]] },
+  arpMinor: { track: 'arp', label: 'MINOR CHORD', scale: 'minor', instrument: 'pluck', notes: [[0, 0, 16, 0.8], [0, 2, 16, 0.8], [0, 4, 16, 0.8]] },
+  arpMajor: { track: 'arp', label: 'MAJOR CHORD', scale: 'major', instrument: 'electricPiano', notes: [[0, 0, 16, 0.8], [0, 2, 16, 0.8], [0, 4, 16, 0.8]] },
+  arpChanges: { track: 'arp', label: 'TWO CHORDS', scale: 'minor', instrument: 'pluck', notes: [[0, 0, 8, 0.8], [0, 2, 8, 0.8], [0, 4, 8, 0.8], [8, 5, 8, 0.8], [8, 7, 8, 0.8], [8, 2, 8, 0.8]] },
+  arpBell: { track: 'arp', label: 'BELL ARP', scale: 'majorPent', instrument: 'bell', notes: [[0, 0, 16, 0.7], [0, 2, 16, 0.7], [0, 3, 16, 0.7]] }
+};
+export const TRACK_PRESET_NAMES = Object.keys(TRACK_PRESETS) as TrackPresetName[];
+export const presetsForTrack = (track: 'ambient' | 'arp'): TrackPresetName[] => TRACK_PRESET_NAMES.filter(n => TRACK_PRESETS[n].track === track);
+
+export function makeTrackPreset(name: TrackPresetName, keyPc: number): { scale: ScaleName; instrument: MelodyInstrumentId; notes: MelodyNote[] } {
+  const p = TRACK_PRESETS[name];
+  const rows = scaleRows(keyPc, p.scale);
+  return { scale: p.scale, instrument: p.instrument, notes: normalizeNotes(p.notes.map(([step, degree, len, vel]) => make(rows[Math.min(degree, rows.length - 1)], step, len, vel))) };
+}

@@ -1,74 +1,87 @@
-import { DrumPattern, INSTRUMENTS, STEPS, makePattern } from './pattern';
-import { MAX_MIDI, MIN_MIDI, MelodyNote, SCALES, ScaleName, makePreset, noteToMidi } from './melody';
-import { CHANNEL_NAMES, Channels, MAX_FEEDBACK, MasterSettings, VOLUME_MAX_DB, VOLUME_MIN_DB, defaultChannels, defaultMaster, effectiveMuted, isDelayDivision, isReverbSize } from './mixer';
-import { DrumKitId, MelodyInstrumentId, isDrumKit, isMelodyInstrument } from './instruments';
+import { DrumPattern, INSTRUMENTS, STEPS } from './pattern';
+import { MAX_MIDI, MIN_MIDI, MelodyNote, SCALES, ScaleName, makePreset, makeTrackPreset, noteToMidi } from './melody';
+import { CHANNEL_NAMES, Channels, MAX_FEEDBACK, MasterSettings, VOLUME_MAX_DB, VOLUME_MIN_DB, EQ_MAX_DB, EQ_MIN_DB, defaultChannel, defaultChannels, defaultMaster, effectiveMuted, isDelayDivision, isReverbSize } from './mixer';
+import { DrumKitId, MELODIC_TRACKS, MelodicTrack, MelodyInstrumentId, TRACK_DEFAULT_INSTRUMENT, isDrumKit, isMelodyInstrument } from './instruments';
+import { ArpSettings, defaultArp, isArpMode, isArpOctaves, isArpRate } from './arp';
+import { MAX_BARS, MAX_PATTERNS, PatternData, Playlist, defaultPatternData, emptyDrumPattern, emptyPattern } from './song';
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 export const MAX_FILE_BYTES = 1_000_000;
-export const MAX_NOTES = 256;
+export const MAX_NOTES = 256; // per track, per pattern
+
+export type TrackInstruments = Record<MelodicTrack, MelodyInstrumentId>;
 
 export type BeatLabProject = {
-  schemaVersion: 1;
+  schemaVersion: 2;
   name: string;
   bpm: number;
-  stepsPerBar: 16;
-  bars: 1;
-  drums: DrumPattern;
-  melody: MelodyNote[];
-  channels: Channels;
-  master: MasterSettings;
-  melodyInstrument: MelodyInstrumentId;
+  patterns: PatternData[];
+  playlist: Playlist;
+  tracks: TrackInstruments;
+  arp: ArpSettings;
   drumKit: DrumKitId;
   melodyView: { key: number; scale: ScaleName };
+  channels: Channels;
+  master: MasterSettings;
 };
 
 export type ParseResult = { ok: true; project: BeatLabProject } | { ok: false; error: string };
 
-export function emptyDrums(): DrumPattern {
-  return { kick: Array(STEPS).fill(false), snare: Array(STEPS).fill(false), hat: Array(STEPS).fill(false), clap: Array(STEPS).fill(false) };
+export const emptyDrums = emptyDrumPattern;
+
+export function defaultTracks(): TrackInstruments {
+  return { melody: TRACK_DEFAULT_INSTRUMENT.melody, ambient: TRACK_DEFAULT_INSTRUMENT.ambient, arp: TRACK_DEFAULT_INSTRUMENT.arp };
 }
 
 export function defaultProject(): BeatLabProject {
   return {
-    schemaVersion: 1, name: 'Untitled', bpm: 120, stepsPerBar: 16, bars: 1,
-    drums: makePattern(), melody: makePreset('happy', 0).notes, channels: defaultChannels(),
-    master: defaultMaster(), melodyInstrument: 'electricPiano', drumKit: 'classic',
-    melodyView: { key: 0, scale: 'majorPent' }
+    schemaVersion: 2, name: 'Untitled', bpm: 120,
+    patterns: [defaultPatternData('Pattern 1', makePreset('happy', 0).notes)], playlist: [0],
+    tracks: defaultTracks(), arp: defaultArp(), drumKit: 'classic', melodyView: { key: 0, scale: 'majorPent' },
+    channels: defaultChannels(), master: defaultMaster()
   };
 }
 
 const on = (steps: number[]): boolean[] => Array.from({ length: STEPS }, (_, i) => steps.includes(i));
+const drumsOf = (kick: number[], snare: number[], hat: number[], clap: number[]): DrumPattern => ({ kick: on(kick), snare: on(snare), hat: on(hat), clap: on(clap) });
+const EIGHTHS = [0, 2, 4, 6, 8, 10, 12, 14];
+
+function single(name: string, p: PatternData, extra: Partial<BeatLabProject>): BeatLabProject {
+  return { ...defaultProject(), name, patterns: [p], playlist: [0], ...extra };
+}
 
 export const SAMPLE_PROJECTS: Record<string, () => BeatLabProject> = {
-  'Basic House Beat': () => ({
-    ...defaultProject(), name: 'Basic House Beat', bpm: 124,
-    drums: { kick: on([0, 4, 8, 12]), snare: on([]), hat: on([2, 6, 10, 14]), clap: on([4, 12]) },
-    melody: [], melodyView: { key: 0, scale: 'majorPent' }
-  }),
+  'Basic House Beat': () => single('Basic House Beat', { ...emptyPattern('Pattern 1'), drums: drumsOf([0, 4, 8, 12], [], [2, 6, 10, 14], [4, 12]) }, { bpm: 124 }),
   'Simple Melody': () => {
     const preset = makePreset('chill', 9);
-    return {
-      ...defaultProject(), name: 'Simple Melody', bpm: 100,
-      drums: { kick: on([0, 8]), snare: on([12]), hat: on([0, 2, 4, 6, 8, 10, 12, 14]), clap: on([]) },
-      melody: preset.notes, melodyInstrument: preset.instrument, melodyView: { key: 9, scale: preset.scale }
-    };
+    return single('Simple Melody', { ...emptyPattern('Pattern 1'), drums: drumsOf([0, 8], [12], EIGHTHS, []), melody: preset.notes },
+      { bpm: 100, tracks: { ...defaultTracks(), melody: preset.instrument }, melodyView: { key: 9, scale: preset.scale } });
   },
   'Epic Night': () => {
     const preset = makePreset('epic', 9);
-    return {
-      ...defaultProject(), name: 'Epic Night', bpm: 128, drumKit: 'tight',
-      drums: { kick: on([0, 4, 8, 12]), snare: on([4, 12]), hat: on([0, 2, 4, 6, 8, 10, 12, 14]), clap: on([4, 12]) },
-      melody: preset.notes, melodyInstrument: preset.instrument, melodyView: { key: 9, scale: preset.scale },
-      master: { ...defaultMaster(), reverbMix: 0.2, reverbSize: 'hall' as const }
-    };
+    return single('Epic Night', { ...emptyPattern('Pattern 1'), drums: drumsOf([0, 4, 8, 12], [4, 12], EIGHTHS, [4, 12]), melody: preset.notes },
+      { bpm: 128, drumKit: 'tight', tracks: { ...defaultTracks(), melody: preset.instrument }, melodyView: { key: 9, scale: preset.scale }, master: { ...defaultMaster(), reverbMix: 0.2 } });
   },
   'Dreamy 808': () => {
     const preset = makePreset('dreamy', 2);
+    return single('Dreamy 808', { ...emptyPattern('Pattern 1'), drums: drumsOf([0, 7, 10], [4, 12], EIGHTHS, [12]), melody: preset.notes },
+      { bpm: 84, drumKit: 'kit808', tracks: { ...defaultTracks(), melody: preset.instrument }, melodyView: { key: 2, scale: preset.scale }, master: { ...defaultMaster(), reverbMix: 0.3, reverbSize: 'cathedral' } });
+  },
+  // Four tracks + three patterns placed on an 8-bar playlist.
+  'Full Song': () => {
+    const key = 9; // A minor
+    const pad = makeTrackPreset('ambientAbyss', key);
+    const shimmer = makeTrackPreset('ambientShimmer', key);
+    const arpChord = makeTrackPreset('arpMinor', key);
+    const arpTwo = makeTrackPreset('arpChanges', key);
+    const tune = makePreset('sad', key);
+    const intro: PatternData = { ...emptyPattern('Intro'), ambient: pad.notes, arp: arpChord.notes };
+    const groove: PatternData = { name: 'Groove', drums: drumsOf([0, 4, 8, 12], [4, 12], EIGHTHS, [12]), melody: tune.notes, ambient: pad.notes, arp: arpTwo.notes };
+    const breakdown: PatternData = { ...emptyPattern('Breakdown'), ambient: shimmer.notes, melody: tune.notes };
     return {
-      ...defaultProject(), name: 'Dreamy 808', bpm: 84, drumKit: 'kit808',
-      drums: { kick: on([0, 7, 10]), snare: on([4, 12]), hat: on([0, 2, 4, 6, 8, 10, 12, 14]), clap: on([12]) },
-      melody: preset.notes, melodyInstrument: preset.instrument, melodyView: { key: 2, scale: preset.scale },
-      master: { ...defaultMaster(), reverbMix: 0.3, reverbSize: 'cathedral' as const }
+      ...defaultProject(), name: 'Full Song', bpm: 96, patterns: [intro, groove, breakdown], playlist: [0, 0, 1, 1, 1, 1, 2, 2],
+      tracks: { melody: 'electricPiano', ambient: pad.instrument, arp: arpChord.instrument }, melodyView: { key, scale: 'minor' },
+      master: { ...defaultMaster(), reverbMix: 0.18, compAmount: 0.3 }
     };
   }
 };
@@ -82,53 +95,150 @@ export function safeFileName(name: string): string {
   return cleaned || 'beatlab_project';
 }
 
+export function patternHasSound(project: BeatLabProject, p: PatternData): boolean {
+  const ch = project.channels;
+  return INSTRUMENTS.some(i => !effectiveMuted(ch, i) && p.drums[i].some(Boolean)) ||
+    MELODIC_TRACKS.some(t => !effectiveMuted(ch, t) && p[t].length > 0);
+}
+
+/** True when the song would make any sound (used to stop Play / Export from producing silence by accident). */
 export function hasAudibleContent(project: BeatLabProject): boolean {
-  const drums = INSTRUMENTS.some(i => !effectiveMuted(project.channels, i) && project.drums[i].some(Boolean));
-  return drums || (!effectiveMuted(project.channels, 'melody') && project.melody.length > 0);
+  return project.patterns.some(p => patternHasSound(project, p));
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+const own = (o: object, k: string) => Object.prototype.hasOwnProperty.call(o, k);
 
-/** Validates unknown data. Never throws; returns a readable error instead. */
-export function validateProject(data: unknown): ParseResult {
-  const fail = (error: string): ParseResult => ({ ok: false, error });
-  if (!isObj(data)) return fail('The file is not a BeatLab project (expected a JSON object).');
-  if (data.schemaVersion !== SCHEMA_VERSION) return fail(`Unsupported schemaVersion (${String(data.schemaVersion)}); this app reads version ${SCHEMA_VERSION}.`);
-  if (typeof data.name !== 'string' || data.name.length > 80) return fail('"name" must be text of at most 80 characters.');
-  if (!isNum(data.bpm) || data.bpm < 60 || data.bpm > 200) return fail('"bpm" must be a number between 60 and 200.');
-  if (data.stepsPerBar !== 16) return fail('"stepsPerBar" must be 16.');
-  if (data.bars !== 1) return fail('"bars" must be 1 in this version.');
+function validateNotes(raw: unknown, where: string): MelodyNote[] | string {
+  if (!Array.isArray(raw)) return `${where} must be a list of notes.`;
+  if (raw.length > MAX_NOTES) return `Too many notes in ${where} (max ${MAX_NOTES}).`;
+  const notes: MelodyNote[] = [];
+  for (let i = 0; i < raw.length; i++) {
+    const n: unknown = raw[i];
+    const w = `${where}[${i}]`;
+    if (!isObj(n)) return `${w} is not a note.`;
+    if (typeof n.id !== 'string') return `${w}.id must be text.`;
+    const midi = typeof n.pitch === 'string' ? noteToMidi(n.pitch) : null;
+    if (midi === null || midi < MIN_MIDI || midi > MAX_MIDI) return `${w}.pitch must be a note between C3 and C6.`;
+    if (!isNum(n.step) || !Number.isInteger(n.step) || n.step < 0 || n.step >= STEPS) return `${w}.step must be a whole number 0–${STEPS - 1}.`;
+    if (!isNum(n.lengthSteps) || !Number.isInteger(n.lengthSteps) || n.lengthSteps < 1 || n.step + n.lengthSteps > STEPS) return `${w}.lengthSteps must be a whole number ≥ 1 that fits inside the bar.`;
+    if (!isNum(n.velocity) || n.velocity < 0 || n.velocity > 1) return `${w}.velocity must be between 0 and 1.`;
+    notes.push({ id: n.id, pitch: n.pitch as string, step: n.step, lengthSteps: n.lengthSteps, velocity: n.velocity });
+  }
+  return notes;
+}
 
-  if (!isObj(data.drums)) return fail('"drums" is missing.');
+function validateDrums(raw: unknown, where: string): DrumPattern | string {
+  if (!isObj(raw)) return `${where} is missing.`;
   const drums = {} as DrumPattern;
   for (const name of INSTRUMENTS) {
-    const row = data.drums[name];
-    if (!Array.isArray(row) || row.length !== STEPS) return fail(`drums.${name} must have exactly ${STEPS} steps.`);
-    if (!row.every(v => typeof v === 'boolean')) return fail(`drums.${name} may only contain true/false.`);
+    const row = raw[name];
+    if (!Array.isArray(row) || row.length !== STEPS) return `${where}.${name} must have exactly ${STEPS} steps.`;
+    if (!row.every(v => typeof v === 'boolean')) return `${where}.${name} may only contain true/false.`;
     drums[name] = [...row] as boolean[];
   }
+  return drums;
+}
 
-  if (!Array.isArray(data.melody)) return fail('"melody" must be a list of notes.');
-  if (data.melody.length > MAX_NOTES) return fail(`Too many melody notes (max ${MAX_NOTES}).`);
-  const melody: MelodyNote[] = [];
-  for (let i = 0; i < data.melody.length; i++) {
-    const n: unknown = data.melody[i];
-    const where = `melody[${i}]`;
-    if (!isObj(n)) return fail(`${where} is not a note.`);
-    if (typeof n.id !== 'string') return fail(`${where}.id must be text.`);
-    const midi = typeof n.pitch === 'string' ? noteToMidi(n.pitch) : null;
-    if (midi === null || midi < MIN_MIDI || midi > MAX_MIDI) return fail(`${where}.pitch must be a note between C3 and C6.`);
-    if (!isNum(n.step) || !Number.isInteger(n.step) || n.step < 0 || n.step >= STEPS) return fail(`${where}.step must be a whole number 0–${STEPS - 1}.`);
-    if (!isNum(n.lengthSteps) || !Number.isInteger(n.lengthSteps) || n.lengthSteps < 1 || n.step + n.lengthSteps > STEPS) return fail(`${where}.lengthSteps must be a whole number ≥ 1 that fits inside the bar.`);
-    if (!isNum(n.velocity) || n.velocity < 0 || n.velocity > 1) return fail(`${where}.velocity must be between 0 and 1.`);
-    melody.push({ id: n.id, pitch: n.pitch as string, step: n.step, lengthSteps: n.lengthSteps, velocity: n.velocity });
+/** Version-1 files (one bar, one melody) become a single pattern in the new structure. */
+function upgradeV1(data: Record<string, unknown>): Record<string, unknown> {
+  return {
+    schemaVersion: SCHEMA_VERSION, name: data.name, bpm: data.bpm,
+    patterns: [{ name: 'Pattern 1', drums: data.drums, melody: data.melody, ambient: [], arp: [] }],
+    playlist: [0],
+    tracks: { melody: data.melodyInstrument === undefined ? 'softSynth' : data.melodyInstrument },
+    drumKit: data.drumKit, melodyView: data.melodyView, channels: data.channels, master: data.master, legacy: true
+  };
+}
+
+/** Validates unknown data. Never throws; returns a readable error instead. Old (version 1) files are upgraded. */
+export function validateProject(input: unknown): ParseResult {
+  const fail = (error: string): ParseResult => ({ ok: false, error });
+  if (!isObj(input)) return fail('The file is not a BeatLab project (expected a JSON object).');
+  let data = input;
+  if (input.schemaVersion === 1) {
+    if (input.stepsPerBar !== 16) return fail('"stepsPerBar" must be 16.');
+    if (input.bars !== 1) return fail('"bars" must be 1 in a version-1 file.');
+    data = upgradeV1(input);
+  } else if (input.schemaVersion !== SCHEMA_VERSION) {
+    return fail(`Unsupported schemaVersion (${String(input.schemaVersion)}); this app reads versions 1 and ${SCHEMA_VERSION}.`);
+  }
+  const legacy = data.legacy === true;
+  if (typeof data.name !== 'string' || data.name.length > 80) return fail('"name" must be text of at most 80 characters.');
+  if (!isNum(data.bpm) || data.bpm < 60 || data.bpm > 200) return fail('"bpm" must be a number between 60 and 200.');
+
+  // patterns
+  if (!Array.isArray(data.patterns) || data.patterns.length < 1) return fail('"patterns" must be a list with at least one pattern.');
+  if (data.patterns.length > MAX_PATTERNS) return fail(`Too many patterns (max ${MAX_PATTERNS}).`);
+  const patterns: PatternData[] = [];
+  for (let i = 0; i < data.patterns.length; i++) {
+    const p: unknown = data.patterns[i];
+    const where = `patterns[${i}]`;
+    if (!isObj(p)) return fail(`${where} is not a pattern.`);
+    if (typeof p.name !== 'string' || p.name.length > 60) return fail(`${where}.name must be text.`);
+    const drums = validateDrums(p.drums, legacy ? 'drums' : `${where}.drums`);
+    if (typeof drums === 'string') return fail(drums);
+    const lists: Record<MelodicTrack, MelodyNote[]> = { melody: [], ambient: [], arp: [] };
+    for (const t of MELODIC_TRACKS) {
+      const label = legacy ? t : `${where}.${t}`;
+      const notes = validateNotes(p[t], label);
+      if (typeof notes === 'string') return fail(notes);
+      lists[t] = notes;
+    }
+    patterns.push({ name: p.name, drums, ...lists });
   }
 
+  // playlist
+  if (!Array.isArray(data.playlist) || data.playlist.length < 1 || data.playlist.length > MAX_BARS) return fail(`"playlist" must have 1–${MAX_BARS} bars.`);
+  const playlist: Playlist = [];
+  for (let i = 0; i < data.playlist.length; i++) {
+    const s: unknown = data.playlist[i];
+    if (s === null) { playlist.push(null); continue; }
+    if (!isNum(s) || !Number.isInteger(s) || s < 0 || s >= patterns.length) return fail(`playlist[${i}] must be empty or the number of an existing pattern.`);
+    playlist.push(s);
+  }
+
+  // instruments
+  const tracks = defaultTracks();
+  if (data.tracks !== undefined) {
+    if (!isObj(data.tracks)) return fail('"tracks" must be an object.');
+    for (const t of MELODIC_TRACKS) {
+      const v = data.tracks[t];
+      if (v === undefined) continue;
+      if (!isMelodyInstrument(v)) return fail(`tracks.${t} is not a known instrument.`);
+      tracks[t] = v;
+    }
+  }
+
+  let arp = defaultArp();
+  if (data.arp !== undefined) {
+    const a = data.arp;
+    if (!isObj(a) || !isArpMode(a.mode) || !isArpRate(a.rate) || !isArpOctaves(a.octaves) || !isNum(a.gate) || a.gate < 0.2 || a.gate > 1) return fail('"arp" must have a valid mode, rate, octaves (1–3) and gate (0.2–1).');
+    arp = { mode: a.mode, rate: a.rate, octaves: a.octaves, gate: a.gate };
+  }
+
+  let drumKit: DrumKitId = 'classic';
+  if (data.drumKit !== undefined) {
+    if (!isDrumKit(data.drumKit)) return fail('"drumKit" is not a known drum kit.');
+    drumKit = data.drumKit;
+  }
+
+  let melodyView = { key: 0, scale: 'majorPent' as ScaleName };
+  if (data.melodyView !== undefined) {
+    const v = data.melodyView;
+    if (!isObj(v) || !isNum(v.key) || !Number.isInteger(v.key) || v.key < 0 || v.key > 11 || typeof v.scale !== 'string' || !own(SCALES, v.scale)) {
+      return fail('"melodyView" must contain a key (0–11) and a valid scale.');
+    }
+    melodyView = { key: v.key, scale: v.scale as ScaleName };
+  }
+
+  // mixer
   if (!isObj(data.channels)) return fail('"channels" is missing.');
   const channels = {} as Channels;
   for (const name of CHANNEL_NAMES) {
     const c = data.channels[name];
+    if (c === undefined && (name === 'ambient' || name === 'arp')) { channels[name] = defaultChannel(name); continue; } // files from before these tracks existed
     if (!isObj(c)) return fail(`channels.${name} is missing.`);
     if (!isNum(c.volumeDb) || c.volumeDb < VOLUME_MIN_DB || c.volumeDb > VOLUME_MAX_DB) return fail(`channels.${name}.volumeDb must be between ${VOLUME_MIN_DB} and ${VOLUME_MAX_DB}.`);
     if (typeof c.muted !== 'boolean') return fail(`channels.${name}.muted must be true or false.`);
@@ -148,30 +258,21 @@ export function validateProject(data: unknown): ParseResult {
     if (!isReverbSize(m.reverbSize)) return fail('master.reverbSize must be room, hall or cathedral.');
     if (!isDelayDivision(m.delayDivision)) return fail('master.delayDivision must be sixteenth, eighth, dottedEighth or quarter.');
     if (!isNum(m.delayFeedback) || m.delayFeedback < 0 || m.delayFeedback > MAX_FEEDBACK) return fail(`master.delayFeedback must be between 0 and ${MAX_FEEDBACK}.`);
-    master = { volumeDb: m.volumeDb, reverbMix: m.reverbMix, reverbSize: m.reverbSize, delayDivision: m.delayDivision, delayFeedback: m.delayFeedback };
+    const eq = (k: 'eqLow' | 'eqMid' | 'eqHigh'): number | string => {
+      const v = m[k];
+      if (v === undefined) return 0;
+      return isNum(v) && v >= EQ_MIN_DB && v <= EQ_MAX_DB ? v : `master.${k} must be between ${EQ_MIN_DB} and ${EQ_MAX_DB}.`;
+    };
+    const lo = eq('eqLow'), mid = eq('eqMid'), hi = eq('eqHigh');
+    for (const v of [lo, mid, hi]) if (typeof v === 'string') return fail(v);
+    if (m.compAmount !== undefined && (!isNum(m.compAmount) || m.compAmount < 0 || m.compAmount > 1)) return fail('master.compAmount must be between 0 and 1.');
+    master = {
+      volumeDb: m.volumeDb, reverbMix: m.reverbMix, reverbSize: m.reverbSize, delayDivision: m.delayDivision, delayFeedback: m.delayFeedback,
+      eqLow: lo as number, eqMid: mid as number, eqHigh: hi as number, compAmount: m.compAmount === undefined ? 0 : m.compAmount
+    };
   }
 
-  let melodyInstrument: MelodyInstrumentId = 'softSynth';
-  if (data.melodyInstrument !== undefined) {
-    if (!isMelodyInstrument(data.melodyInstrument)) return fail('"melodyInstrument" is not a known instrument.');
-    melodyInstrument = data.melodyInstrument;
-  }
-  let drumKit: DrumKitId = 'classic';
-  if (data.drumKit !== undefined) {
-    if (!isDrumKit(data.drumKit)) return fail('"drumKit" is not a known drum kit.');
-    drumKit = data.drumKit;
-  }
-
-  let melodyView = { key: 0, scale: 'majorPent' as ScaleName };
-  if (data.melodyView !== undefined) {
-    const v = data.melodyView;
-    if (!isObj(v) || !isNum(v.key) || !Number.isInteger(v.key) || v.key < 0 || v.key > 11 || typeof v.scale !== 'string' || !Object.prototype.hasOwnProperty.call(SCALES, v.scale)) {
-      return fail('"melodyView" must contain a key (0–11) and a valid scale.');
-    }
-    melodyView = { key: v.key, scale: v.scale as ScaleName };
-  }
-
-  return { ok: true, project: { schemaVersion: 1, name: data.name, bpm: Math.round(data.bpm), stepsPerBar: 16, bars: 1, drums, melody, channels, master, melodyInstrument, drumKit, melodyView } };
+  return { ok: true, project: { schemaVersion: 2, name: data.name, bpm: Math.round(data.bpm), patterns, playlist, tracks, arp, drumKit, melodyView, channels, master } };
 }
 
 export function parseProject(text: string): ParseResult {

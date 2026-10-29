@@ -1,13 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BeatLabEngine } from './engine';
-import { INSTRUMENTS, Instrument, clampBpm, toggleStep } from './pattern';
-import MelodyPanel from './MelodyPanel';
+import { Instrument, clampBpm, toggleStep } from './pattern';
+import DrumPanel from './DrumPanel';
 import MixerPanel from './MixerPanel';
+import PlaylistPanel from './PlaylistPanel';
 import ProjectBar from './ProjectBar';
-import { MelodyNote, ScaleName } from './melody';
-import { CHANNEL_LABELS, ChannelName, Channels, ChannelSettings, MasterSettings, patchChannel, patchMaster } from './mixer';
-import { DRUM_KITS, DRUM_KIT_IDS, DrumKitId, MelodyInstrumentId } from './instruments';
-import { BeatLabProject, MAX_FILE_BYTES, SAMPLE_PROJECTS, defaultProject, emptyDrums, hasAudibleContent, parseProject, safeFileName, serializeProject } from './project';
+import TrackPanel from './TrackPanel';
+import Visualizer from './Visualizer';
+import { MelodyNote, ScaleName, easyRoot, remapToScale, transposeNotes } from './melody';
+import { ChannelName, Channels, ChannelSettings, MasterSettings, patchChannel, patchMaster } from './mixer';
+import { DrumKitId, MELODIC_TRACKS, MelodicTrack, MelodyInstrumentId, TAB_LABELS, TAB_ORDER, TabId } from './instruments';
+import { ArpSettings } from './arp';
+import { Frame, PatternData, PlayMode, Playlist, addPattern, deletePattern, duplicatePattern, emptyDrumPattern, renamePattern, resizePlaylist, setSlot } from './song';
+import { BeatLabProject, MAX_FILE_BYTES, SAMPLE_PROJECTS, TrackInstruments, defaultProject, hasAudibleContent, parseProject, safeFileName, serializeProject } from './project';
 import { renderProjectToWav } from './exporter';
 import './main.css';
 
@@ -21,47 +26,59 @@ function download(blob: Blob, fileName: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
+const mapNotes = (patterns: PatternData[], fn: (notes: MelodyNote[]) => MelodyNote[]): PatternData[] =>
+  patterns.map(p => ({ ...p, melody: fn(p.melody), ambient: fn(p.ambient), arp: fn(p.arp) }));
+
 export default function App() {
   const initial = useMemo(defaultProject, []);
   const [name, setName] = useState(initial.name);
-  const [pattern, setPattern] = useState(initial.drums);
   const [bpm, setBpm] = useState(initial.bpm);
-  const [melody, setMelody] = useState<MelodyNote[]>(initial.melody);
-  const [channels, setChannels] = useState<Channels>(initial.channels);
-  const [master, setMaster] = useState<MasterSettings>(initial.master);
-  const [instrument, setInstrument] = useState<MelodyInstrumentId>(initial.melodyInstrument);
+  const [patterns, setPatterns] = useState<PatternData[]>(initial.patterns);
+  const [playlist, setPlaylist] = useState<Playlist>(initial.playlist);
+  const [current, setCurrent] = useState(0);
+  const [mode, setMode] = useState<PlayMode>('pattern');
+  const [tab, setTab] = useState<TabId>('melody');
+  const [tracks, setTracks] = useState<TrackInstruments>(initial.tracks);
+  const [arp, setArp] = useState<ArpSettings>(initial.arp);
   const [kit, setKit] = useState<DrumKitId>(initial.drumKit);
   const [keyPc, setKeyPc] = useState(initial.melodyView.key);
   const [scale, setScale] = useState<ScaleName>(initial.melodyView.scale);
+  const [channels, setChannels] = useState<Channels>(initial.channels);
+  const [master, setMaster] = useState<MasterSettings>(initial.master);
   const [playing, setPlaying] = useState(false);
-  const [step, setStep] = useState(-1);
+  const [frame, setFrame] = useState<Frame | null>(null);
   const [status, setStatus] = useState<Status>({ kind: 'info', text: 'Press PLAY (or Space) to start. Everything you change is heard live.' });
-  const [loops, setLoops] = useState(4);
+  const [loops, setLoops] = useState(1);
   const [exporting, setExporting] = useState(false);
   const [savedJson, setSavedJson] = useState(() => serializeProject(initial));
 
+  const cur = Math.min(current, patterns.length - 1);
+  const pattern = patterns[cur];
+
   const project: BeatLabProject = useMemo(() => ({
-    schemaVersion: 1, name, bpm, stepsPerBar: 16, bars: 1, drums: pattern, melody, channels, master, melodyInstrument: instrument, drumKit: kit, melodyView: { key: keyPc, scale }
-  }), [name, bpm, pattern, melody, channels, master, instrument, kit, keyPc, scale]);
+    schemaVersion: 2, name, bpm, patterns, playlist, tracks, arp, drumKit: kit, melodyView: { key: keyPc, scale }, channels, master
+  }), [name, bpm, patterns, playlist, tracks, arp, kit, keyPc, scale, channels, master]);
   const dirty = useMemo(() => serializeProject(project) !== savedJson, [project, savedJson]);
 
   const engine = useRef<BeatLabEngine | null>(null);
-  const latest = useRef({ pattern, bpm, playing });
-  latest.current = { pattern, bpm, playing };
+  const latest = useRef({ bpm, playing, song: { patterns, playlist, mode, current: cur } });
+  latest.current = { bpm, playing, song: { patterns, playlist, mode, current: cur } };
 
   useEffect(() => {
-    const instance = new BeatLabEngine(latest.current.pattern, setStep);
+    const instance = new BeatLabEngine(latest.current.song, setFrame);
     engine.current = instance;
     return () => { instance.dispose(); engine.current = null; };
   }, []);
-  useEffect(() => { engine.current?.setPattern(pattern); }, [pattern]);
+  useEffect(() => { engine.current?.setSong({ patterns, playlist, mode, current: cur }); }, [patterns, playlist, mode, cur]);
   useEffect(() => { engine.current?.setBpm(bpm); }, [bpm]);
-  useEffect(() => { engine.current?.setMelody(melody); }, [melody]);
+  useEffect(() => { engine.current?.setArp(arp); }, [arp]);
   useEffect(() => { engine.current?.setChannels(channels); }, [channels]);
   useEffect(() => { engine.current?.setMaster(master); }, [master]);
-  useEffect(() => { engine.current?.setMelodyInstrument(instrument); }, [instrument]);
+  useEffect(() => { MELODIC_TRACKS.forEach(t => engine.current?.setTrackInstrument(t, tracks[t])); }, [tracks]);
   useEffect(() => { engine.current?.setDrumKit(kit); }, [kit]);
   const getLevelDb = useCallback(() => engine.current?.getLevelDb() ?? -Infinity, []);
+  const getSpectrum = useCallback(() => engine.current?.getSpectrum() ?? null, []);
+  const getWaveform = useCallback(() => engine.current?.getWaveform() ?? null, []);
 
   // warn before closing the tab with unsaved work
   useEffect(() => {
@@ -75,7 +92,7 @@ export default function App() {
     try { await engine.current?.start(latest.current.bpm); setPlaying(true); setStatus({ kind: 'info', text: 'Playing.' }); }
     catch (e) { setStatus({ kind: 'error', text: e instanceof Error ? e.message : 'Audio could not start.' }); }
   }
-  function stop() { engine.current?.stop(); setPlaying(false); setStep(-1); setStatus(s => s.kind === 'error' ? s : { kind: 'info', text: 'Stopped.' }); }
+  function stop() { engine.current?.stop(); setPlaying(false); setFrame(null); setStatus(s => s.kind === 'error' ? s : { kind: 'info', text: 'Stopped.' }); }
 
   const toggleRef = useRef<() => void>(() => {});
   toggleRef.current = () => { if (latest.current.playing) stop(); else void play(); };
@@ -89,9 +106,8 @@ export default function App() {
   }, []);
 
   function apply(p: BeatLabProject) {
-    setName(p.name); setBpm(p.bpm); setPattern(p.drums); setMelody(p.melody); setChannels(p.channels);
-    setMaster(p.master); setInstrument(p.melodyInstrument); setKit(p.drumKit);
-    setKeyPc(p.melodyView.key); setScale(p.melodyView.scale);
+    setName(p.name); setBpm(p.bpm); setPatterns(p.patterns); setPlaylist(p.playlist); setCurrent(0); setTracks(p.tracks); setArp(p.arp);
+    setChannels(p.channels); setMaster(p.master); setKit(p.drumKit); setKeyPc(p.melodyView.key); setScale(p.melodyView.scale);
     setSavedJson(serializeProject(p));
   }
   function confirmDiscard(): boolean { return !dirty || window.confirm('You have unsaved changes. Discard them?'); }
@@ -122,34 +138,85 @@ export default function App() {
     setStatus({ kind: 'info', text: `Opened “${file.name}”.` });
   }
   async function exportWav() {
-    if (!hasAudibleContent(project)) { setStatus({ kind: 'error', text: 'Nothing to export: add some drum steps or melody notes (and un-mute their channels) first.' }); return; }
+    if (!hasAudibleContent(project)) { setStatus({ kind: 'error', text: 'Nothing to export: add some drum steps or notes (and un-mute their channels) first.' }); return; }
     if (latest.current.playing) stop();
     setExporting(true);
     setStatus({ kind: 'info', text: 'Rendering audio…' });
     try {
-      const result = await renderProjectToWav(project, loops);
+      const result = await renderProjectToWav(project, loops, { mode, pattern: cur });
       download(result.blob, `${safeFileName(name)}.wav`);
-      setStatus({ kind: 'info', text: `Exported ${safeFileName(name)}.wav — ${result.loops} loop${result.loops > 1 ? 's' : ''}, ${result.seconds.toFixed(1)} s, ${Math.round(result.blob.size / 1024)} KB, 44.1 kHz stereo 16-bit.` });
+      setStatus({ kind: 'info', text: `Exported ${safeFileName(name)}.wav — ${mode === 'song' ? 'song' : 'pattern'}, ${result.bars} bar${result.bars > 1 ? 's' : ''}, ${result.seconds.toFixed(1)} s, ${Math.round(result.blob.size / 1024)} KB, 44.1 kHz stereo 16-bit.` });
     } catch (e) {
       setStatus({ kind: 'error', text: `Export failed: ${e instanceof Error ? e.message : 'unknown error'}` });
     } finally { setExporting(false); }
   }
 
+  // ---- editing the selected pattern
+  const editCurrent = (fn: (p: PatternData) => PatternData) => setPatterns(ps => ps.map((p, i) => i === Math.min(current, ps.length - 1) ? fn(p) : p));
+  const setTrackNotes = (track: MelodicTrack) => (action: MelodyNote[] | ((prev: MelodyNote[]) => MelodyNote[])) =>
+    setPatterns(ps => ps.map((p, i) => i === Math.min(current, ps.length - 1) ? { ...p, [track]: typeof action === 'function' ? action(p[track]) : action } : p));
+  const trackSetters = { melody: setTrackNotes('melody'), ambient: setTrackNotes('ambient'), arp: setTrackNotes('arp') };
+
+  // key and scale are shared by all tracks and all patterns, so changing them moves the whole song together
+  const changeKey = (next: number) => { setPatterns(ps => mapNotes(ps, n => transposeNotes(n, easyRoot(next) - easyRoot(keyPc)))); setKeyPc(next); };
+  const changeScale = (next: ScaleName) => { setPatterns(ps => mapNotes(ps, n => remapToScale(n, keyPc, scale, next))); setScale(next); };
+
   const changeChannel = (n: ChannelName, patch: Partial<ChannelSettings>) => setChannels(c => patchChannel(c, n, patch));
   const changeMaster = (patch: Partial<MasterSettings>) => setMaster(m => patchMaster(m, patch));
-  const labels: Record<Instrument, string> = CHANNEL_LABELS as Record<Instrument, string>;
 
-  return <main className="shell">
-    <header><div><div className="eyebrow">INTERACTIVE MUSIC STUDIO</div><h1><span>BEAT</span>LAB<span className="dot">.</span></h1></div><div className="phase">PHASE 01–07 <span>• V0.5 TEST BUILD</span></div></header>
-    <section className="intro"><div className="eyebrow">YOUR FIRST GROOVE</div><h2>Make some noise.</h2><p>Drums. Melody. Mixer. Save it. Export it.</p></section>
-    <ProjectBar name={name} onName={setName} dirty={dirty} exporting={exporting} loops={loops} onLoops={setLoops}
+  // ---- patterns & playlist
+  function newPattern() {
+    const next = addPattern(patterns);
+    if (next === patterns) return;
+    setPatterns(next); setCurrent(next.length - 1);
+  }
+  function duplicate() {
+    const next = duplicatePattern(patterns, cur);
+    if (next === patterns) return;
+    setPatterns(next); setCurrent(next.length - 1);
+  }
+  function remove() {
+    if (patterns.length <= 1) return;
+    if (!window.confirm(`Delete “${pattern.name}”? Bars that use it become empty.`)) return;
+    const r = deletePattern(patterns, playlist, cur);
+    setPatterns(r.patterns); setPlaylist(r.playlist); setCurrent(Math.max(0, Math.min(cur, r.patterns.length - 1)));
+  }
+  const paint = (bar: number) => setPlaylist(pl => setSlot(pl, bar, pl[bar] === cur ? null : cur));
+
+  const playFrame = playing ? frame : null;
+  const stepHere = playFrame && playFrame.pattern === cur ? playFrame.step : -1;
+  const hasNotes = (t: TabId) => t === 'drums' ? Object.values(pattern.drums).some(r => r.some(Boolean)) : pattern[t].length > 0;
+  const mutedTab = (t: TabId) => t === 'drums' ? (['kick', 'snare', 'hat', 'clap'] as const).every(i => channels[i].muted) : channels[t].muted;
+  const bars = mode === 'song' ? playlist.length : 1;
+
+  return <main className="shell" style={{ ['--bar-s' as string]: `${240 / bpm}s` }}>
+    <header><div><div className="eyebrow">INTERACTIVE MUSIC STUDIO</div><h1><span>BEAT</span>LAB<span className="dot">.</span></h1></div><div className="phase">PHASE 01–09 <span>• V0.6 TEST BUILD</span></div></header>
+    <section className="intro"><div className="eyebrow">YOUR FIRST SONG</div><h2>Make some noise.</h2><p>Ambient. Drums. Melody. Arpeggio. Mix. Master. Arrange. Export.</p></section>
+    <ProjectBar name={name} onName={setName} dirty={dirty} exporting={exporting} loops={loops} unit={mode === 'song' ? 'song' : 'bar'} onLoops={setLoops}
       onNew={newProject} onOpenFile={openFile} onSave={save} onSample={loadSample} onExport={exportWav} />
     <section className="panel transport"><div className="panel-label">TRANSPORT <span>SPACE = PLAY / STOP</span></div><div className="transport-controls"><button className={playing ? 'stop' : 'play'} onClick={playing ? stop : play}>{playing ? '■ STOP' : '▶ PLAY'}</button><div className="bpm"><label htmlFor="bpm">TEMPO <b>{bpm} <small>BPM</small></b></label><input id="bpm" type="range" min="60" max="200" value={bpm} onChange={e => setBpm(clampBpm(Number(e.target.value)))} /></div><div className="indicator"><span className={playing ? 'pulse on' : 'pulse'} />{playing ? 'PLAYING' : 'STOPPED'}</div></div></section>
-    <section className="panel sequencer"><div className="panel-label">DRUM MACHINE <span>16-STEP SEQUENCER</span></div><div className="melody-controls"><label className="ctl">DRUM KIT<select value={kit} aria-label="Drum kit" onChange={e => setKit(e.target.value as DrumKitId)}>{DRUM_KIT_IDS.map(k => <option key={k} value={k}>{DRUM_KITS[k].label}</option>)}</select></label></div><div className="grid-wrap"><div className="step-numbers"><span /> {Array.from({ length: 16 }, (_, i) => <span key={i}>{String(i + 1).padStart(2, '0')}</span>)}</div>{INSTRUMENTS.map(inst => { const muted = channels[inst].muted; return <div className={'instrument-row' + (muted ? ' is-muted' : '')} key={inst}><div className="instrument-name"><span className={'inst-dot ' + inst} />{labels[inst]}<button className={'mute-btn' + (muted ? ' off' : '')} aria-pressed={!muted} aria-label={`${labels[inst]} ${muted ? 'off' : 'on'}`} title={muted ? 'Turn on' : 'Turn off'} onClick={() => changeChannel(inst, { muted: !muted })}>{muted ? 'OFF' : 'ON'}</button></div>{pattern[inst].map((on, i) => <button key={i} aria-label={`${inst} step ${i + 1}`} aria-pressed={on} className={`step ${on ? 'enabled ' + inst : ''} ${playing && step === i ? 'current' : ''} ${i % 4 === 0 ? 'beat' : ''}`} onClick={() => setPattern(p => toggleStep(p, inst, i))} />)}</div>; })}</div><div className="grid-footer"><span>CLICK STEPS TO EDIT THE PATTERN</span><button onClick={() => setPattern(emptyDrums())}>CLEAR ALL ↗</button></div></section>
-    <MelodyPanel notes={melody} onNotes={setMelody} enabled={!channels.melody.muted} onEnabled={on => changeChannel('melody', { muted: !on })}
-      keyPc={keyPc} scale={scale} onKeyChange={setKeyPc} onScaleChange={setScale} instrument={instrument} onInstrument={setInstrument} step={step} playing={playing} />
+    <Visualizer playing={playing} getSpectrum={getSpectrum} getWaveform={getWaveform} step={playFrame?.step ?? -1} bar={playFrame?.bar ?? 0} bars={bars} />
+
+    <div className="tabs" role="tablist" aria-label="Tracks">
+      {TAB_ORDER.map(t => <button key={t} role="tab" aria-selected={tab === t} className={'tab' + (tab === t ? ' sel' : '') + (mutedTab(t) ? ' muted' : '')} onClick={() => setTab(t)}>
+        <i className={'tab-dot' + (hasNotes(t) ? ' has' : '')} data-track={t} />{TAB_LABELS[t]}
+      </button>)}
+      <span className="tab-pattern">EDITING <b>{pattern.name}</b></span>
+    </div>
+
+    {tab === 'drums' && <DrumPanel pattern={pattern.drums} kit={kit} channels={channels} playingStep={stepHere} onKit={setKit}
+      onToggle={(inst: Instrument, i: number) => editCurrent(p => ({ ...p, drums: toggleStep(p.drums, inst, i) }))}
+      onMute={(inst, muted) => changeChannel(inst, { muted })} onClear={() => editCurrent(p => ({ ...p, drums: emptyDrumPattern() }))} />}
+    {tab !== 'drums' && <TrackPanel key={tab} track={tab} notes={pattern[tab]} onNotes={trackSetters[tab]} enabled={!channels[tab].muted}
+      onEnabled={on => changeChannel(tab, { muted: !on })} keyPc={keyPc} scale={scale} onKeyChange={changeKey} onScaleChange={changeScale}
+      instrument={tracks[tab]} onInstrument={(id: MelodyInstrumentId) => setTracks(t => ({ ...t, [tab]: id }))}
+      arp={arp} onArp={patch => setArp(a => ({ ...a, ...patch }))} playingStep={stepHere} />}
+
+    <PlaylistPanel patterns={patterns} playlist={playlist} current={cur} mode={mode} playing={playing} playBar={playFrame?.bar ?? -1} playPattern={playFrame?.pattern ?? null}
+      onSelect={setCurrent} onNew={newPattern} onDuplicate={duplicate} onDelete={remove} onRename={n => setPatterns(ps => renamePattern(ps, cur, n))}
+      onSlot={paint} onBars={n => setPlaylist(pl => resizePlaylist(pl, n))} onClearBars={() => setPlaylist(pl => pl.map(() => null))} onMode={setMode} />
     <MixerPanel channels={channels} master={master} onChannel={changeChannel} onMaster={changeMaster} getLevelDb={getLevelDb} playing={playing} />
     <div role={status.kind === 'error' ? 'alert' : 'status'} className={'status ' + status.kind}>{status.text}</div>
-    <footer><span>BEATLAB / V0.5 TEST BUILD</span><span>BUILT WITH REACT + TONE.JS</span><span>PHASES 1–7 · AUDIO UNVERIFIED BY EAR</span></footer>
+    <footer><span>BEATLAB / V0.6 TEST BUILD</span><span>BUILT WITH REACT + TONE.JS</span><span>AUDIO UNVERIFIED BY EAR</span></footer>
   </main>;
 }
