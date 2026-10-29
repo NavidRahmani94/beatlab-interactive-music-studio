@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useInView } from './useInView';
 import { BeatPulse, VIZ_LABEL, VIZ_MODES, VizMode, attackRelease, bandsOf, dbToUnit, isVizMode } from './vizMath';
 
 const MODE_KEY = 'beatlab.viz.v1';
@@ -9,14 +10,18 @@ type Props = {
   playing: boolean;
   getSpectrum: () => Float32Array | null;
   getWaveform: () => Float32Array | null;
+  lite?: boolean;     // LITE: fewer frames per second
   step: number;       // 0..31, -1 when stopped
   bar: number;        // slot shown in the label
   bars: number;
 };
 
 /** Live picture of what is playing: frequency bars + waveform + a beat bar. Drawn straight onto a canvas (no React re-renders). */
-export default function Visualizer({ playing, getSpectrum, getWaveform, step, bar, bars }: Props) {
+export default function Visualizer({ playing, getSpectrum, getWaveform, step, bar, bars, lite }: Props) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const seen = useInView(ref);
+  const seenRef = useRef(seen); seenRef.current = seen;
+  const liteRef = useRef(!!lite); liteRef.current = !!lite;
   const stepRef = useRef(step);
   stepRef.current = step;
   const [mode, setMode] = useState<VizMode>(loadMode);
@@ -32,8 +37,12 @@ export default function Visualizer({ playing, getSpectrum, getWaveform, step, ba
     const smooth: number[] = [];
     const beat = new BeatPulse(); const parts: Particle[] = []; let glow = 0; let t0 = performance.now(); let phase = 0;
     const calm = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const draw = () => {
-      const dpr = window.devicePixelRatio || 1;
+    let last = 0;
+    const draw = (ts = 0) => {
+      // not on screen: draw nothing. Otherwise about 30 frames a second (15 in LITE mode): half the cost, still smooth for a meter
+      if (!seenRef.current || ts - last < (liteRef.current ? 60 : 30)) { raf = requestAnimationFrame(draw); return; }
+      last = ts;
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
       const w = canvas.clientWidth, h = canvas.clientHeight;
       if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) { canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr); }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);

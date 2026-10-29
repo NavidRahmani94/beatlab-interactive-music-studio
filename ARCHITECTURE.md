@@ -67,3 +67,6 @@ project.ts ── one BeatLabProject (schemaVersion 2). validateProject on Open 
 
 ## v0.17 additions
 `keyboardPiano.ts` (pure key mapping, octave, step cursor). App: keyboard listeners feed the same `onMidi` path as a real MIDI keyboard; `previewNote` for the note names; `stepCursor` for step entry. `toneFix.ts`: Tone context with latencyHint playback + lookAhead 0.15, and a timer-based dispose of finished one-shot sources.
+
+## v0.17.1
+`PianoRoll` Row is memoised on a per-row signature; playhead class set imperatively; `useInView` pauses HeroArt/Visualizer when off screen; LITE flag in localStorage `beatlab.lite.v1`.

@@ -296,3 +296,13 @@ body,.panel,button,select,input{transition:background-color .15s,color .15s,bord
 .keys-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:12px 24px}
 .keys-bar .octave{display:inline-flex;align-items:center;gap:6px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;color:var(--muted)}
 .auto-btn.on{background:var(--accent);color:var(--onaccent)}
+
+/* v0.17.1 performance */
+.hero-art{contain:paint layout}
+.hero-art.still *,.hero-art.still{animation-play-state:paused!important}
+.hero-art.still .note{display:none}
+.theme-btn.on{background:var(--accent);color:var(--onaccent)}
+/* rows far outside the visible part of the roll are not painted (the advanced roll has ~2000 cells) */
+.roll-wrap .mrow:not(.mhead):not(.vel-lane){content-visibility:auto}
+.roll-wrap.advanced .mrow:not(.mhead):not(.vel-lane){contain-intrinsic-size:auto 23px}
+.roll-wrap.easy .mrow:not(.mhead):not(.vel-lane){contain-intrinsic-size:auto 41px}

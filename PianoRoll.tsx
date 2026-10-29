@@ -1,4 +1,4 @@
-import { Dispatch, KeyboardEvent, PointerEvent, SetStateAction, useEffect, useMemo, useRef } from 'react';
+import { Dispatch, KeyboardEvent, PointerEvent, SetStateAction, memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   DEFAULT_VELOCITY, MAX_MIDI, MIN_MIDI, MelodyNote, ScaleName, inScale, midiToNote, noteToMidi, noteAt, resizeNote, scaleRows, setStepVelocity, stepVelocity, toggleNote
 } from './melody';
@@ -28,6 +28,26 @@ type Drag =
   | { kind: 'create'; id: string; startStep: number; moved: boolean }
   | { kind: 'existing'; id: string; noteStep: number; startStep: number; moved: boolean };
 
+type CellInfo = { start: boolean; end: boolean; v: number };
+type RowProps = {
+  midi: number; name: string; inKey: boolean; isRoot: boolean; advanced: boolean; cursor: number; sig: string; row: (CellInfo | undefined)[];
+  onPreview?: (midi: number, down: boolean) => void; onKey: (midi: number, step: number, detail: number) => void;
+};
+/** One row of the roll. Memoised on what it shows (the signature of its cells), so changing pattern or note only redraws the rows that really changed. */
+const Row = memo(function Row({ midi, name, inKey, isRoot, advanced, cursor, row, onPreview, onKey }: RowProps) {
+  return <div className={'mrow' + (name.includes('#') ? ' black' : '') + (inKey ? ' inkey' : '') + (isRoot ? ' root' : '')}>
+    <span className={'mlabel' + (onPreview ? ' key' : '')} role={onPreview ? 'button' : undefined} aria-label={onPreview ? `Hear ${name}` : undefined} title={onPreview ? `Click to hear ${name}` : undefined}
+      onPointerDown={onPreview ? e => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); onPreview(midi, true); } : undefined}
+      onPointerUp={onPreview ? () => onPreview(midi, false) : undefined} onPointerCancel={onPreview ? () => onPreview(midi, false) : undefined}>{name}</span>
+    {row.map((cell, s) => {
+      const cls = 'mcell' + (cell ? ' on' + (cell.start ? ' start' : '') + (cell.end ? ' end' : '') : '') + (s % 4 === 0 ? ' beat' : '') + (s === 16 ? ' bar2' : '') +
+        (s === cursor ? ' stepcur' : '') + (advanced && !inKey ? ' out' : '');
+      return <button key={s} data-midi={midi} data-step={s} className={cls} style={cell ? { ['--v' as string]: cell.v } : undefined}
+        aria-label={`${name} step ${s + 1}`} aria-pressed={!!cell} onClick={e => onKey(midi, s, e.detail)} />;
+    })}
+  </div>;
+}, (a, b) => a.sig === b.sig && a.cursor === b.cursor && a.advanced === b.advanced && a.inKey === b.inKey && a.isRoot === b.isRoot && a.midi === b.midi && a.onPreview === b.onPreview && a.onKey === b.onKey);
+
 /**
  * Piano roll. CLICK an empty cell = new note (default length). DRAG sideways from an empty cell = a note of any length.
  * DRAG sideways from a cell of an existing note = stretch / shrink it. CLICK an existing note = remove it.
@@ -37,21 +57,37 @@ export default function PianoRoll({ notes, onNotes, advanced, keyPc, scale, defa
   const drag = useRef<Drag | null>(null);
   const laneDragging = useRef(false);
   useFollowPlayhead(rollRef, playingStep);
+  // The playhead is moved on the DOM directly: re-rendering ~2000 cells every sixteenth note was the main cause of small hiccups
+  useEffect(() => {
+    const el = rollRef.current; if (!el) return;
+    el.querySelectorAll('.mcell.current').forEach(c => c.classList.remove('current'));
+    if (playingStep >= 0) el.querySelectorAll(`.mcell[data-step="${playingStep}"]`).forEach(c => c.classList.add('current'));
+  });
+  const previewRef = useRef(onPreview); previewRef.current = onPreview;
+  const stablePreview = useMemo(() => (onPreview ? (m: number, d: boolean) => previewRef.current?.(m, d) : undefined), [!!onPreview]); // eslint-disable-line react-hooks/exhaustive-deps
+  const notesRef = useRef(onNotes); notesRef.current = onNotes; const defRef = useRef({ defaultLength, velocity }); defRef.current = { defaultLength, velocity };
+  const onKey = useCallback((midi: number, step: number, detail: number) => {
+    if (detail !== 0) return;
+    notesRef.current(prev => toggleNote(prev, midi, step, defRef.current.defaultLength, defRef.current.velocity));
+  }, []);
 
   const rows = useMemo(() => advanced
     ? Array.from({ length: MAX_MIDI - MIN_MIDI + 1 }, (_, i) => MAX_MIDI - i)
     : scaleRows(keyPc, scale).slice().reverse(), [advanced, keyPc, scale]);
 
-  // "midi:step" -> { first / last cell of a note?, velocity }
-  const cells = useMemo(() => {
-    const map = new Map<string, { start: boolean; end: boolean; v: number }>();
+  // per row: the 32 cells and a short signature of them (so unchanged rows are not redrawn)
+  const rowData = useMemo(() => {
+    const map = new Map<number, { row: (CellInfo | undefined)[]; sig: string }>();
     notes.forEach(n => {
       const midi = noteToMidi(n.pitch);
       if (midi === null) return;
-      for (let s = n.step; s < n.step + n.lengthSteps; s++) map.set(`${midi}:${s}`, { start: s === n.step, end: s === n.step + n.lengthSteps - 1, v: n.velocity });
+      let r = map.get(midi); if (!r) { r = { row: Array(STEPS).fill(undefined), sig: '' }; map.set(midi, r); }
+      for (let s = n.step; s < n.step + n.lengthSteps && s < STEPS; s++) r.row[s] = { start: s === n.step, end: s === n.step + n.lengthSteps - 1, v: n.velocity };
     });
+    map.forEach(r => { r.sig = r.row.map(c => (c ? `${c.start ? 1 : 0}${c.end ? 1 : 0}${c.v.toFixed(2)}` : '-')).join(','); });
     return map;
   }, [notes]);
+  const emptyRow = useMemo<(CellInfo | undefined)[]>(() => Array(STEPS).fill(undefined), []);
 
   const hidden = advanced ? 0 : notes.filter(n => !rows.includes(noteToMidi(n.pitch) ?? -1)).length;
 
@@ -118,12 +154,6 @@ export default function PianoRoll({ notes, onNotes, advanced, keyPc, scale, defa
     if (d && d.kind === 'tap') { onNotes(prev => toggleNote(prev, d.midi, d.step, defaultLength, velocity)); return; }
     if (d && d.kind === 'existing' && !d.moved) onNotes(prev => prev.filter(n => n.id !== d.id)); // plain click removes
   }
-  // keyboard / assistive technology: a click without pointer events toggles a note
-  function keyClick(midi: number, step: number, detail: number) {
-    if (detail !== 0) return;
-    onNotes(prev => toggleNote(prev, midi, step, defaultLength, velocity));
-  }
-
   // ---- velocity lane (one bar per step; edits every note that starts on that step)
   function laneSet(e: PointerEvent<HTMLDivElement>) {
     const cell = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-vstep]') as HTMLElement | null;
@@ -144,21 +174,9 @@ export default function PianoRoll({ notes, onNotes, advanced, keyPc, scale, defa
       <div className={'roll' + (touchDraw ? ' draw' : '')} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={() => { drag.current = null; }}>
         <div className="mrow mhead"><span />{Array.from({ length: STEPS }, (_, i) => <span key={i} className={(i === 16 ? 'bar2' : '') + (i === cursor ? ' stepcur' : '')}>{i + 1}</span>)}</div>
         {rows.map(midi => {
-          const name = midiToNote(midi);
-          const inKey = inScale(midi, keyPc, scale);
-          const isRoot = ((midi - keyPc) % 12 + 12) % 12 === 0;
-          return <div key={midi} className={'mrow' + (name.includes('#') ? ' black' : '') + (inKey ? ' inkey' : '') + (isRoot ? ' root' : '')}>
-            <span className={'mlabel' + (onPreview ? ' key' : '')} role={onPreview ? 'button' : undefined} aria-label={onPreview ? `Hear ${name}` : undefined} title={onPreview ? `Click to hear ${name}` : undefined}
-              onPointerDown={onPreview ? e => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); onPreview(midi, true); } : undefined}
-              onPointerUp={onPreview ? () => onPreview(midi, false) : undefined} onPointerCancel={onPreview ? () => onPreview(midi, false) : undefined}>{name}</span>
-            {Array.from({ length: STEPS }, (_, s) => {
-              const cell = cells.get(`${midi}:${s}`);
-              const cls = 'mcell' + (cell ? ' on' + (cell.start ? ' start' : '') + (cell.end ? ' end' : '') : '') + (s % 4 === 0 ? ' beat' : '') + (s === 16 ? ' bar2' : '') +
-                (playingStep === s ? ' current' : '') + (s === cursor ? ' stepcur' : '') + (advanced && !inKey ? ' out' : '');
-              return <button key={s} data-midi={midi} data-step={s} className={cls} style={cell ? { ['--v' as string]: cell.v } : undefined}
-                aria-label={`${name} step ${s + 1}`} aria-pressed={!!cell} onClick={e => keyClick(midi, s, e.detail)} />;
-            })}
-          </div>;
+          const d = rowData.get(midi);
+          return <Row key={midi} midi={midi} name={midiToNote(midi)} inKey={inScale(midi, keyPc, scale)} isRoot={((midi - keyPc) % 12 + 12) % 12 === 0} advanced={advanced} cursor={cursor}
+            sig={d ? d.sig : ''} row={d ? d.row : emptyRow} onPreview={stablePreview} onKey={onKey} />;
         })}
         <div className="mrow vel-lane" title="Drag up/down to set velocity (loudness) of the notes on each step"
           onPointerDown={e => { e.stopPropagation(); e.currentTarget.setPointerCapture(e.pointerId); laneDragging.current = true; laneSet(e); }}

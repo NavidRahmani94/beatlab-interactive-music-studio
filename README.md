@@ -115,3 +115,8 @@ The hi-hat (Tone.MetalSynth, 12 FM oscillators per hit) used about 60% of the au
 - KEYBOARD PIANO (always visible above the tabs): the computer keyboard plays the open tab — A W S E D F T G Y H U J K = C to C, Z / X change octave. On DRUMS, A S D F are kick, snare, hat, clap. Typing in text boxes never plays.
 - REC works with the computer keyboard and with a MIDI keyboard: while the song plays notes go where the playhead is; while stopped it is step entry (notes go to the highlighted step, then the cursor moves; ← → move it).
 - Audio: the context now uses a larger buffer and look-ahead (latencyHint playback) so short main-thread hiccups no longer crackle; finished oscillators are freed with a timer instead of requestIdleCallback.
+
+## v0.17.1 — fewer hiccups while playing
+- The piano roll redraws only rows that changed, the playhead is moved directly on the DOM, and rows outside the visible part are not painted (content-visibility). In the advanced roll the main-thread busy time during playback dropped from about 13.5 s to 7 s per 15 s in our (software-rendered, headless) benchmark.
+- The header animation and the visualiser pause when off screen; the visualiser draws about 30 fps (15 in LITE mode).
+- New 🍃 LITE button in the header: stops the decorative animation and halves the visualiser rate (remembered).
