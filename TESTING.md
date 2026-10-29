@@ -64,3 +64,9 @@ keyboardPiano.test.ts (268 unit tests in total), e2e-v17.cjs (note-name click ma
 
 ## v0.17.1
 cost.cjs (dev benchmark using CDP Performance.getMetrics). All e2e scripts v10-v17 pass.
+
+## v0.17.2
+Benchmarks used while developing: leak2/leak4 (alive native node counts), sched2 (scheduler intervals, 5x CPU throttle), health.cjs. e2e-v09 theme test now selects the button by aria-label.
+
+## v0.18 tests
+timeline.test.ts (273 unit tests in total), e2e-v18.cjs (jump while stopped, play from there, jump back while playing, Home, STOP resets, pattern mode).

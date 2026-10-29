@@ -23,6 +23,25 @@ export function applyToneFix(): void {
     if (this.onended === noop) return;
     this.onended(this);
     this.onended = noop;
-    if (!this.context.isOffline) setTimeout(() => { try { this.dispose(); } catch { /* already gone */ } }, 30);
+    if (!this.context.isOffline) setTimeout(() => {
+      // The long-lived frequency / detune signals of the oscillator stay connected to every finished node, and every new connection
+      // walks all of them (cycle detection): the graph and the cost of each new note grow while the song plays. Cut the link first.
+      const owner = this.__owner;
+      if (owner) {
+        try { owner.frequency.disconnect(this.frequency); } catch { /* not connected */ }
+        try { owner.detune.disconnect(this.detune); } catch { /* not connected */ }
+        this.__owner = undefined;
+      }
+      try { this.dispose(); } catch { /* already gone */ }
+    }, 30);
+  };
+  // remember which Tone.Oscillator owns each one-shot node
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const osc = Tone.Oscillator.prototype as any;
+  const start = osc._start;
+  osc._start = function (this: any, time: unknown) {
+    const before = this._oscillator;
+    start.call(this, time);
+    if (this._oscillator && this._oscillator !== before) this._oscillator.__owner = this;
   };
 }

@@ -70,3 +70,9 @@ project.ts ── one BeatLabProject (schemaVersion 2). validateProject on Open 
 
 ## v0.17.1
 `PianoRoll` Row is memoised on a per-row signature; playhead class set imperatively; `useInView` pauses HeroArt/Visualizer when off screen; LITE flag in localStorage `beatlab.lite.v1`.
+
+## v0.17.2
+`toneFix.ts` also records the owning Tone.Oscillator of each one-shot node and cuts the frequency/detune link when it ends. `pinVoices` in rig.ts. `Engine.getHealth()` counts steps whose callback ran after their own start time (raw context clock).
+
+## v0.18 additions
+`timeline.ts` (pure seconds/steps maths), `Timeline.tsx` (playhead moved on the DOM by requestAnimationFrame), `engine.seek(step)` (sets the tick counter; `startTick` for PLAY). Startup project now has sections too.

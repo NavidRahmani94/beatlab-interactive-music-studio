@@ -19,10 +19,10 @@ const { chromium } = require('playwright');
       else { const tr = pr.tracks.find(x => x.id === what); const notes = pr.patterns[1].notes[what] || pr.patterns[0].notes[what] || []; rig.triggerStep(i % 32, t, { name: 'x', drums: { kick: Array(32).fill(false), snare: Array(32).fill(false), hat: Array(32).fill(false), clap: Array(32).fill(false) }, notes: { [what]: [{ step: i % 32, pitch: 'C4', lengthSteps: 1, velocity: 0.8 }] } }, i, 0.125); }
       await new Promise(r => setTimeout(r, 40));
     }
-    await new Promise(r => setTimeout(r, 3000));
+    await new Promise(r => setTimeout(r, 8000));
   }, what);
   console.log('tracks', await p.evaluate(() => window.__pr.tracks.map(t => t.id + ':' + t.kind + ':' + t.instrument).join(' ')));
-  for (const w of ['base', 'kick', ...(await p.evaluate(() => window.__pr.tracks.map(t => t.id)))]) {
+  for (const w of ['base', 'kick', 'snare', 'hat', 'clap', ...(await p.evaluate(() => window.__pr.tracks.map(t => t.id)))]) {
     const before = await count('OscillatorNode'); const gb = await count('GainNode');
     if (w !== 'base') await hit(w);
     console.log(w.padEnd(8), 'osc +' + ((await count('OscillatorNode')) - before), 'gain +' + ((await count('GainNode')) - gb));

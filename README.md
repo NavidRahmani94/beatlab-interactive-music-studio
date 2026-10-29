@@ -120,3 +120,13 @@ The hi-hat (Tone.MetalSynth, 12 FM oscillators per hit) used about 60% of the au
 - The piano roll redraws only rows that changed, the playhead is moved directly on the DOM, and rows outside the visible part are not painted (content-visibility). In the advanced roll the main-thread busy time during playback dropped from about 13.5 s to 7 s per 15 s in our (software-rendered, headless) benchmark.
 - The header animation and the visualiser pause when off screen; the visualiser draws about 30 fps (15 in LITE mode).
 - New 🍃 LITE button in the header: stops the decorative animation and halves the visualiser rate (remembered).
+
+## v0.17.2 — audio node leak fixes + timing readout
+- Finished notes no longer stay connected to the oscillators frequency/detune signals (the audio library walks all of them on every new connection, so each new note got a little more expensive). Alive oscillators after a minute: about 5x fewer.
+- Tone.PolySynth voices are built once and kept (no per-note voice creation, no one-per-second voice disposal): no more voice-building stalls when notes start.
+- The visualiser header shows TIMING OK or how many steps started late and the worst delay. If it says OK and you still hear a hiccup, the browser kept up and the cause is outside the page (CPU load from other programs, audio device).
+
+## New in v0.18 — Timeline
+- A timeline in the TRANSPORT panel (under the tempo) shows the whole track in seconds: ruler (0:05, 0:10 …), the section names and a coloured block per slot.
+- Click or drag to jump anywhere, while stopped (PLAY starts from there) or while playing. Keys: ← → = 1 second, Shift = 1 slot, Home = start. ⏮ goes back to the start.
+- In PATTERN mode it shows the one pattern that loops. STOP returns to 0:00. The clock follows the tempo.

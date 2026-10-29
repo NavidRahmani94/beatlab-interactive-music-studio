@@ -274,7 +274,7 @@ export function chiptuneDemo(): BeatLabProject {
 }
 
 /** The song that is loaded when the app starts (NEW still gives a simple project). */
-export function startupProject(): BeatLabProject { return hipHopDemo(); }
+export function startupProject(): BeatLabProject { const p = hipHopDemo(); return { ...p, sections: autoSections(p.patterns, p.playlist) }; }
 
 export const SAMPLE_PROJECTS_EXTRA: Record<string, () => BeatLabProject> = {
   'Hip Hop Demo': hipHopDemo, 'Lo-Fi Chill': lofiDemo, 'House 124': houseDemo, 'Trap 140': trapDemo, 'Persian Mood': persianDemo, 'Synthwave 108': synthwaveDemo, 'Chiptune 150': chiptuneDemo

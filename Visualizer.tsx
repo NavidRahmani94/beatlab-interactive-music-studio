@@ -10,6 +10,7 @@ type Props = {
   playing: boolean;
   getSpectrum: () => Float32Array | null;
   getWaveform: () => Float32Array | null;
+  getHealth?: () => { late: number; maxLateMs: number; steps: number };
   lite?: boolean;     // LITE: fewer frames per second
   step: number;       // 0..31, -1 when stopped
   bar: number;        // slot shown in the label
@@ -17,7 +18,13 @@ type Props = {
 };
 
 /** Live picture of what is playing: frequency bars + waveform + a beat bar. Drawn straight onto a canvas (no React re-renders). */
-export default function Visualizer({ playing, getSpectrum, getWaveform, step, bar, bars, lite }: Props) {
+export default function Visualizer({ playing, getSpectrum, getWaveform, step, bar, bars, lite, getHealth }: Props) {
+  const [health, setHealth] = useState('');
+  useEffect(() => {
+    if (!playing || !getHealth) { setHealth(''); return; }
+    const id = window.setInterval(() => { const h = getHealth(); setHealth(h.late === 0 ? 'TIMING OK' : `TIMING: ${h.late} LATE STEP${h.late > 1 ? 'S' : ''} (WORST ${h.maxLateMs} MS)`); }, 1000);
+    return () => window.clearInterval(id);
+  }, [playing, getHealth]);
   const ref = useRef<HTMLCanvasElement>(null);
   const seen = useInView(ref);
   const seenRef = useRef(seen); seenRef.current = seen;
@@ -161,7 +168,7 @@ export default function Visualizer({ playing, getSpectrum, getWaveform, step, ba
   }, [playing, getSpectrum, getWaveform]);
 
   return <section className="panel viz" aria-label="Playback visualiser">
-    <div className="panel-label">VISUALISER <span>{playing ? `SLOT ${bar + 1} / ${bars} · STEP ${step + 1}` : 'PRESS PLAY'}</span>
+    <div className="panel-label">VISUALISER <span>{playing ? `SLOT ${bar + 1} / ${bars} · STEP ${step + 1}${health ? ' · ' + health : ''}` : 'PRESS PLAY'}</span>
       <span className="seg viz-modes" role="group" aria-label="Visual style">{VIZ_MODES.map(v => <button key={v} aria-pressed={mode === v} className={mode === v ? 'on' : ''} onClick={() => pick(v)}>{VIZ_LABEL[v]}</button>)}</span></div>
     <canvas ref={ref} className="viz-canvas" role="img" aria-label="Live spectrum and waveform" />
   </section>;

@@ -14,10 +14,10 @@ const ok = (n, c, d = '') => { results.push(c); console.log((c ? 'PASS ' : 'FAIL
   // ---- theme
   const first = await theme(); ok('theme is set on load', first === 'dark' || first === 'light', first);
   await p.click('button[aria-label="Colour theme"]'); const t1 = await theme();
-  ok('theme button -> DARK', t1 === 'dark' && /DARK/.test(await p.textContent('.theme-btn')), t1);
+  ok('theme button -> DARK', t1 === 'dark' && /DARK/.test(await p.textContent('button[aria-label="Colour theme"]')), t1);
   await p.screenshot({ path: path.join(OUT, 'dark.png') });
   await p.click('button[aria-label="Colour theme"]'); const t2 = await theme();
-  ok('theme button -> LIGHT', t2 === 'light' && /LIGHT/.test(await p.textContent('.theme-btn')), t2);
+  ok('theme button -> LIGHT', t2 === 'light' && /LIGHT/.test(await p.textContent('button[aria-label="Colour theme"]')), t2);
   const bg = await p.evaluate(() => getComputedStyle(document.documentElement).backgroundColor);
   ok('light theme has a light page background', /^rgb\((2[0-9]{2}|1[89][0-9])/.test(bg), bg);
   await p.screenshot({ path: path.join(OUT, 'light.png') });

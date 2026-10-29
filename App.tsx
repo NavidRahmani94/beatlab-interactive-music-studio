@@ -9,6 +9,7 @@ import ProjectBar from './ProjectBar';
 import TrackPanel from './TrackPanel';
 import SynthPanel from './SynthPanel';
 import Visualizer from './Visualizer';
+import Timeline from './Timeline';
 import HeroArt from './HeroArt';
 import MidiPanel from './MidiPanel';
 import { MidiConnection, MidiDevice, midiSupported, openMidi } from './midiInput';
@@ -22,7 +23,7 @@ import { MelodyNote, ScaleName, easyRoot, midiToNote, remapToScale, transposeNot
 import { ChannelName, Channels, ChannelSettings, MasterSettings, patchChannel, patchMaster, syncChannels } from './mixer';
 import { DrumKitId, MelodyInstrumentId } from './instruments';
 import { ArpSettings } from './arp';
-import { MAX_PATTERNS, emptyPattern } from './song';
+import { MAX_PATTERNS, emptyPattern, frameAt } from './song';
 import { Frame, PatternData, PlayMode, Playlist, addPattern, deletePattern, dropTrackNotes, duplicatePattern, emptyDrumPattern, notesFor, renamePattern, resizePlaylist, setSlot, withNotes } from './song';
 import { BeatLabProject, MAX_FILE_BYTES, SAMPLE_PROJECTS, defaultProject, hasAudibleContent, startupProject, parseProject, safeFileName, serializeProject } from './project';
 import { SynthPatch, SynthSlot, customId, customRef, isCustomRef } from './synth';
@@ -118,6 +119,7 @@ export default function App() {
   useEffect(() => { engine.current?.setTracks(tracks); }, [tracks]);
   useEffect(() => { engine.current?.setDrumKit(kit); }, [kit]);
   useEffect(() => { engine.current?.setGroove(groove); }, [groove]);
+  const getHealth = useCallback(() => engine.current?.getHealth() ?? { late: 0, maxLateMs: 0, steps: 0 }, []);
   const keysDown = useCallback((patch: SynthPatch, note: string) => { void engine.current?.auditionDown(patch, note); }, []);
   const keysUp = useCallback((patch: SynthPatch, note: string) => { engine.current?.auditionUp(patch, note); }, []);
   const keysStop = useCallback(() => { engine.current?.auditionStop(); }, []);
@@ -145,7 +147,13 @@ export default function App() {
     try { await engine.current?.start(latest.current.bpm); setPlaying(true); setStatus({ kind: 'info', text: 'Playing.' }); }
     catch (e) { setStatus({ kind: 'error', text: e instanceof Error ? e.message : 'Audio could not start.' }); }
   }
-  function stop() { engine.current?.stop(); setRec(false); setPlaying(false); setFrame(null); setStatus(s => s.kind === 'error' ? s : { kind: 'info', text: 'Stopped.' }); }
+  function seek(step: number) {
+    engine.current?.seek(step);
+    setStartStep(step);
+    if (latest.current.playing) frameRef.current = { frame: frameAt(step, latest.current.song.playlist, latest.current.song.mode, latest.current.song.current), at: performance.now() };
+  }
+  const getPlayhead = useCallback(() => (frameRef.current ? { songStep: frameRef.current.frame.songStep, at: frameRef.current.at } : null), []);
+  function stop() { engine.current?.stop(); setStartStep(0); setRec(false); setPlaying(false); setFrame(null); setStatus(s => s.kind === 'error' ? s : { kind: 'info', text: 'Stopped.' }); }
 
   const toggleRef = useRef<() => void>(() => {});
   toggleRef.current = () => { if (latest.current.playing) stop(); else void play(); };
@@ -259,6 +267,7 @@ export default function App() {
   // ---- MIDI keyboard: play the open tab, and (while the song plays) record into it
   const [midi, setMidi] = useState<{ connected: boolean; devices: MidiDevice[]; deviceId: string; message: string }>({ connected: false, devices: [], deviceId: 'all', message: midiSupported() ? 'Not connected.' : '' });
   const [rec, setRec] = useState(false);
+  const [startStep, setStartStep] = useState(0);
   const [keysOn, setKeysOn] = useState(true);
   const [lite, setLite] = useState(loadLite);
   const [octave, setOctave] = useState(DEFAULT_OCTAVE);
@@ -501,7 +510,7 @@ export default function App() {
   const bars = mode === 'song' ? playlist.length : 1;
 
   return <main className="shell" style={{ ['--bar-s' as string]: `${(STEPS * 15) / bpm}s` }}>
-    <header><div><div className="eyebrow">INTERACTIVE MUSIC STUDIO</div><h1><span>BEAT</span>LAB<span className="dot">.</span></h1></div><div className="head-right"><button className={'theme-btn' + (lite ? ' on' : '')} aria-pressed={lite} aria-label="Lite mode" title="Lite mode: stops the decorative animation and draws the visualiser less often. Helps slow computers and phones." onClick={() => { setLite(l => { saveLite(!l); return !l; }); }}>{lite ? '🍃 LITE ON' : '🍃 LITE'}</button><button className="theme-btn" aria-label="Colour theme" title="Switch between automatic, dark and light" onClick={() => setTheme(nextTheme(theme))}>{THEME_LABEL[theme]}</button><div className="phase">PHASE 01–10 <span>• V0.17.1 TEST BUILD</span></div></div></header>
+    <header><div><div className="eyebrow">INTERACTIVE MUSIC STUDIO</div><h1><span>BEAT</span>LAB<span className="dot">.</span></h1></div><div className="head-right"><button className={'theme-btn' + (lite ? ' on' : '')} aria-pressed={lite} aria-label="Lite mode" title="Lite mode: stops the decorative animation and draws the visualiser less often. Helps slow computers and phones." onClick={() => { setLite(l => { saveLite(!l); return !l; }); }}>{lite ? '🍃 LITE ON' : '🍃 LITE'}</button><button className="theme-btn" aria-label="Colour theme" title="Switch between automatic, dark and light" onClick={() => setTheme(nextTheme(theme))}>{THEME_LABEL[theme]}</button><div className="phase">PHASE 01–10 <span>• V0.18 TEST BUILD</span></div></div></header>
     <section className="intro hero"><div className="hero-text"><div className="eyebrow">YOUR FIRST SONG</div><h2>Make some noise.</h2><p>Ambient. Drums. Melody. Arpeggio. Mix. Master. Arrange. Export WAV / MP3.</p></div><HeroArt playing={playing} bpm={bpm} lite={lite} /></section>
     {pendingRestore && <div className="restore-banner" role="alert">
       <span>Unsaved work from {new Date(pendingRestore.savedAt).toLocaleString()} was found on this device.</span>
@@ -509,8 +518,9 @@ export default function App() {
     </div>}
     <ProjectBar name={name} onName={setName} dirty={dirty} exporting={exporting} loops={loops} unit={mode === 'song' ? 'song' : 'pattern'} onLoops={setLoops} format={format} onFormat={setFormat}
       onNew={newProject} onOpenFile={openFile} onSave={save} onSample={loadSample} onExport={exportWav} />
-    <section className="panel transport"><div className="panel-label">TRANSPORT <span>SPACE = PLAY / STOP</span></div><div className="transport-controls"><button className={playing ? 'stop' : 'play'} onClick={playing ? stop : play}>{playing ? '■ STOP' : '▶ PLAY'}</button><div className="bpm"><label htmlFor="bpm">TEMPO <b>{bpm} <small>BPM</small></b></label><input id="bpm" type="range" min="60" max="200" value={bpm} onChange={e => setBpm(clampBpm(Number(e.target.value)))} /></div><div className="undo-redo" role="group" aria-label="History"><button aria-label="Undo" title="Undo (Ctrl+Z)" disabled={histInfo.undo === 0} onClick={() => stepHistory('undo')}>↶ UNDO</button><button aria-label="Redo" title="Redo (Ctrl+Shift+Z)" disabled={histInfo.redo === 0} onClick={() => stepHistory('redo')}>↷ REDO</button></div><div className="indicator"><span className={playing ? 'pulse on' : 'pulse'} />{playing ? 'PLAYING' : 'STOPPED'}</div></div></section>
-    <Visualizer lite={lite} playing={playing} getSpectrum={getSpectrum} getWaveform={getWaveform} step={playFrame?.step ?? -1} bar={playFrame?.bar ?? 0} bars={bars} />
+    <section className="panel transport"><div className="panel-label">TRANSPORT <span>SPACE = PLAY / STOP</span></div><div className="transport-controls"><button className={playing ? 'stop' : 'play'} onClick={playing ? stop : play}>{playing ? '■ STOP' : '▶ PLAY'}</button><div className="bpm"><label htmlFor="bpm">TEMPO <b>{bpm} <small>BPM</small></b></label><input id="bpm" type="range" min="60" max="200" value={bpm} onChange={e => setBpm(clampBpm(Number(e.target.value)))} /></div><div className="undo-redo" role="group" aria-label="History"><button aria-label="Undo" title="Undo (Ctrl+Z)" disabled={histInfo.undo === 0} onClick={() => stepHistory('undo')}>↶ UNDO</button><button aria-label="Redo" title="Redo (Ctrl+Shift+Z)" disabled={histInfo.redo === 0} onClick={() => stepHistory('redo')}>↷ REDO</button></div><div className="indicator"><span className={playing ? 'pulse on' : 'pulse'} />{playing ? 'PLAYING' : 'STOPPED'}</div></div>
+      <Timeline mode={mode} playlist={playlist} sections={sections} current={cur} bpm={bpm} playing={playing} startStep={startStep} getPlayhead={getPlayhead} onSeek={seek} /></section>
+    <Visualizer lite={lite} getHealth={getHealth} playing={playing} getSpectrum={getSpectrum} getWaveform={getWaveform} step={playFrame?.step ?? -1} bar={playFrame?.bar ?? 0} bars={bars} />
 
     <MidiPanel supported={midiSupported()} connected={midi.connected} devices={midi.devices} deviceId={midi.deviceId} message={midi.message} rec={rec} playing={playing} target={midiTarget}
       exportUnit={mode === 'pattern' ? pattern.name : 'song'} onConnect={connectMidi} onDevice={id => { conn.current?.select(id); setMidi(s => ({ ...s, deviceId: id })); }}
@@ -557,6 +567,6 @@ export default function App() {
       onInsertSlot={i => { setPlaylist(pl => insertSlot(pl, i)); }} onRemoveSlot={i => { setPlaylist(pl => removeSlot(pl, i)); setSections(s => clampSections(s, Math.max(1, playlist.length - 1))); }} onClearBars={() => setPlaylist(pl => pl.map(() => null))} onMode={setMode} />
     <MixerPanel tracks={tracks} channels={channels} master={master} onChannel={changeChannel} onMaster={changeMaster} getLevelDb={getLevelDb} playing={playing} />
     <div role={status.kind === 'error' ? 'alert' : 'status'} className={'status ' + status.kind}>{status.text}</div>
-    <footer><span>BEATLAB / V0.17.1 TEST BUILD</span><span>BUILT WITH REACT + TONE.JS</span><span>AUDIO UNVERIFIED BY EAR</span></footer>
+    <footer><span>BEATLAB / V0.18 TEST BUILD</span><span>BUILT WITH REACT + TONE.JS</span><span>AUDIO UNVERIFIED BY EAR</span></footer>
   </main>;
 }

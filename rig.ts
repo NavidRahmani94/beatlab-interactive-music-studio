@@ -174,6 +174,22 @@ export function notesStartingAt(notes: MelodyNote[], step: number): MelodyNote[]
  */
 applyToneFix();
 
+/**
+ * Tone.PolySynth builds a new voice (dozens of audio nodes) whenever it has none free, and every second throws idle voices away again.
+ * Doing that while music plays costs main-thread time exactly when notes start (small stalls), and each thrown-away voice leaves audio nodes behind.
+ * So the voices are built once, up front, and kept.
+ */
+function pinVoices(synth: NoteSynth, count: number): void {
+  if (!(synth instanceof Tone.PolySynth)) return;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const p = synth as any;
+    p.context.clearInterval(p._gcTimeout);
+    const made = Array.from({ length: count }, () => p._getNextAvailableVoice());
+    made.forEach(v => p._makeVoiceAvailable(v));
+  } catch { /* the stock behaviour still works */ }
+}
+
 export class Rig {
   private masterIn: Tone.Gain;
   private eq: Tone.EQ3;
@@ -297,6 +313,7 @@ export class Rig {
     }
     const m = buildMelody(ref);
     m.synth.volume.value = m.volume;
+    pinVoices(m.synth, def.kind === 'ambient' ? 6 : 4);
     if (m.filter) { m.synth.connect(m.filter); m.filter.connect(out); } else m.synth.connect(out);
     return { sig: this.signature(wanted), synth: m.synth, filter: m.filter, shift: m.shift };
   }

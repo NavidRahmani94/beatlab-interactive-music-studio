@@ -26,6 +26,9 @@ export class BeatLabEngine {
   private active = false;
   private generation = 0;
   private tick = 0;
+  private startTick = 0;   // where PLAY begins (set by the timeline)
+  private late = 0;        // steps whose callback ran after their own start time (the browser was too busy: an audible stutter)
+  private maxLateMs = 0;
 
   constructor(song: SongState, onFrame: (frame: Frame) => void) {
     this.song = song;
@@ -43,6 +46,8 @@ export class BeatLabEngine {
   getLevelDb(): number { return this.rig ? this.rig.getLevelDb() : -Infinity; }
   getSpectrum(): Float32Array | null { return this.rig ? this.rig.getSpectrum() : null; }
   getWaveform(): Float32Array | null { return this.rig ? this.rig.getWaveform() : null; }
+  /** Timing health since PLAY: how many steps started late, and the worst delay. */
+  getHealth(): { late: number; maxLateMs: number; steps: number } { return { late: this.late, maxLateMs: Math.round(this.maxLateMs), steps: this.tick }; }
   isPlaying(): boolean { return this.active; }
   setBpm(bpm: number): void {
     this.bpm = clampBpm(bpm);
@@ -90,8 +95,10 @@ export class BeatLabEngine {
     transport.position = '0:0:0';
     this.setBpm(bpm);
     transport.loop = false;
-    this.tick = 0;
+    this.tick = this.startTick; this.late = 0; this.maxLateMs = 0;
     this.eventId = transport.scheduleRepeat((time) => {
+      const lateMs = (Tone.getContext().rawContext.currentTime - time) * 1000;   // raw clock: Tone.now() already includes the look-ahead
+      if (lateMs > 1) { this.late++; this.maxLateMs = Math.max(this.maxLateMs, lateMs); }
       const tick = this.tick++;
       const { patterns, playlist, mode, current } = this.song;
       const frame = frameAt(tick, playlist, mode, current);
@@ -102,7 +109,14 @@ export class BeatLabEngine {
     this.active = true;
     transport.start();
   }
+  /** Jump to a step: while playing the song continues from there, while stopped PLAY will begin there. */
+  seek(step: number): void {
+    const t = Math.max(0, Math.floor(step));
+    this.startTick = t;
+    if (this.active) { this.tick = t; this.rig?.releaseAll(); }
+  }
   stop(): void {
+    this.startTick = 0;
     ++this.generation;
     this.active = false;
     const transport = Tone.getTransport();

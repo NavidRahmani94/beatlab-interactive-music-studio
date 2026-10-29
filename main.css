@@ -306,3 +306,22 @@ body,.panel,button,select,input{transition:background-color .15s,color .15s,bord
 .roll-wrap .mrow:not(.mhead):not(.vel-lane){content-visibility:auto}
 .roll-wrap.advanced .mrow:not(.mhead):not(.vel-lane){contain-intrinsic-size:auto 23px}
 .roll-wrap.easy .mrow:not(.mhead):not(.vel-lane){contain-intrinsic-size:auto 41px}
+
+/* v0.18 timeline */
+.timeline{padding:6px 24px 22px}
+.tl-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.2px;color:var(--muted);margin-bottom:8px}
+.tl-label{color:var(--text)}
+.tl-clock{font-size:12px;color:var(--text2)}.tl-clock b{color:var(--text);font-weight:500;display:inline-block;min-width:54px}
+.tl-btn{height:24px;min-width:30px;border-radius:5px;border:1px solid var(--line2);background:var(--raised);color:var(--text2)}
+.tl-hint{margin-left:auto}
+.tl-track{position:relative;height:74px;border:1px solid var(--line);border-radius:8px;background:var(--bg2);cursor:pointer;touch-action:none;overflow:hidden;user-select:none;-webkit-user-select:none}
+.tl-track:focus-visible{outline:2px solid var(--strong);outline-offset:2px}
+.tl-ruler{position:absolute;left:0;right:0;top:0;height:20px;border-bottom:1px solid var(--line)}
+.tl-mark{position:absolute;top:0;height:100%;font-size:9px;color:var(--muted);padding-left:4px;white-space:nowrap}
+.tl-mark i{position:absolute;left:0;top:0;bottom:0;border-left:1px solid var(--line2)}
+.tl-sections{position:absolute;left:0;right:0;top:20px;height:16px}
+.tl-section{position:absolute;top:0;height:100%;box-sizing:border-box;border-left:2px solid var(--sec);background:color-mix(in srgb,var(--sec) 16%,transparent);font-size:9px;letter-spacing:.8px;text-transform:uppercase;color:var(--sec);padding:2px 5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tl-slots{position:absolute;left:0;right:0;bottom:0;height:36px;display:flex}
+.tl-slot{flex:1;border-left:1px solid var(--bg2);background:color-mix(in srgb,var(--c,var(--line)) 55%,transparent)}
+.tl-slot.empty{background:var(--surface2);opacity:.5}
+.tl-head-line{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--strong);box-shadow:0 0 8px var(--strong);pointer-events:none;left:0}
