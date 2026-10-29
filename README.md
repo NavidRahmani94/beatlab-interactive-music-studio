@@ -106,3 +106,6 @@ Open **🎹 CHORD BUILDER** on any note track. The seven chords of your key are 
 ## New in v0.16 — Interactive Visuals
 - Four styles in the VISUALISER panel: BARS, RINGS, PARTICLES, AURORA (the choice is remembered).
 - They react to bass, mid and treble energy, overall loudness and a beat pulse detected from the bass. Reduced-motion users get no particle bursts.
+
+## v0.16.1 — performance fix
+The hi-hat (Tone.MetalSynth, 12 FM oscillators per hit) used about 60% of the audio load in our benchmark. It is now rendered once per drum kit into a buffer (same sound, correlation 0.99) and only played back. Render time of the demo dropped from 1.45x to about 0.4x of real time on the test machine.

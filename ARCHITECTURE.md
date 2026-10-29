@@ -61,3 +61,6 @@ project.ts ── one BeatLabProject (schemaVersion 2). validateProject on Open 
 
 ## v0.16 additions
 `vizMath.ts` is pure (band energies from the FFT, loudness, `BeatPulse` onset detector). `Visualizer.tsx` draws all styles on one canvas with requestAnimationFrame; no React re-renders per frame.
+
+## v0.16.1
+`Rig.buildHat` renders one hat hit per kit in a private OfflineContext (synchronously switching the global Tone context, like patchSynth). Falls back to the MetalSynth until the buffer exists.

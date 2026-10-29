@@ -55,3 +55,6 @@ arrangement.test.ts, sections in project.test.ts (256 unit tests), e2e-v15.cjs (
 
 ## v0.16 tests
 vizMath.test.ts (263 unit tests in total), e2e-v16.cjs (all styles draw, choice remembered, ~59 fps headless).
+
+## v0.16.1
+Benchmark (bench.cjs, dev only): hat-only render 19.7 s -> 4.4 s for 25.9 s of audio. 263 unit tests, e2e v14 and v16 pass.

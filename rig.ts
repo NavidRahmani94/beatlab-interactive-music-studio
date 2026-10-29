@@ -198,6 +198,11 @@ export class Rig {
   private muted: Record<ChannelName, boolean> = {};
   private channels: Channels = {};
   private bpm = 120;
+  // The hi-hat (a Tone.MetalSynth: 12 FM oscillators per hit) was by far the most expensive voice: it is rendered ONCE per kit into a buffer and then only played back.
+  private hatOut!: Tone.Volume;
+  private hatBuf: Tone.ToneAudioBuffer | null = null;
+  private hatReady: Promise<void> = Promise.resolve();
+  private hatGen = 0;
   private master: MasterSettings = defaultMaster();
 
   constructor() {
@@ -234,6 +239,7 @@ export class Rig {
     this.kick.volume.value = -7;
     this.snare.volume.value = -13;
     this.hat.volume.value = -12;
+    this.hatOut = new Tone.Volume(-12).connect(this.strips.hat.vol);
     this.clap.volume.value = -11;
 
     this.auditionOut = new Tone.Volume(0).connect(this.masterIn);
@@ -335,7 +341,7 @@ export class Rig {
   auditionStop(): void { this.audition?.synth.releaseAll(); }
 
   /** Resolves when the reverb impulse responses have been generated. */
-  async ready(): Promise<void> { await Promise.all([this.sendReverb.ready, this.masterReverb.ready]); }
+  async ready(): Promise<void> { await Promise.all([this.sendReverb.ready, this.masterReverb.ready, this.hatReady]); }
 
   setChannels(channels: Channels): void {
     this.channels = channels;
@@ -378,9 +384,27 @@ export class Rig {
     this.kick.set(kit.kick);
     this.snare.set(kit.snare);
     this.hat.set(kit.hat);
+    this.buildHat(kit);
     this.clap.set(kit.clap);
     this.kitDur = kit.dur;
     this.kickNote = kit.kickNote ?? 'C1';
+  }
+
+  /** Renders one hi-hat hit of this kit with the real MetalSynth (same sound as before), synchronously inside a private offline context. */
+  private buildHat(kit: (typeof KITS)[DrumKitId]): void {
+    const gen = ++this.hatGen;
+    this.hatBuf = null;                                  // until the buffer exists the MetalSynth plays (same sound, just heavier)
+    const dur = kit.dur.hat + Number(kit.hat.envelope?.release ?? 0.3) + Number(kit.hat.envelope?.decay ?? 0.1) + 0.1;
+    const previous = Tone.getContext();
+    const sr = previous.sampleRate;
+    const ctx = new Tone.OfflineContext(1, Math.max(0.2, dur), sr);
+    try {
+      Tone.setContext(ctx);
+      const h = new Tone.MetalSynth(kit.hat).toDestination();
+      h.frequency.value = HAT_HZ;
+      h.triggerAttackRelease(HAT_HZ, kit.dur.hat, 0, 1);
+    } finally { Tone.setContext(previous); }
+    this.hatReady = ctx.render().then(buf => { if (gen === this.hatGen) this.hatBuf = new Tone.ToneAudioBuffer(buf); }).catch(() => { /* keep the MetalSynth */ });
   }
 
   /** Master output level in dB (for the meter). */
@@ -431,7 +455,10 @@ export class Rig {
     if (inst === 'kick') this.kick.triggerAttackRelease(this.kickNote, d.kick, t, velocity);
     else if (inst === 'snare') this.snare.triggerAttackRelease(d.snare, t, velocity);
     // the first argument of a Tone.MetalSynth is its pitch (260 Hz, as set in the constructor); the old call put the duration there, which made the hats nearly silent
-    else if (inst === 'hat') this.hat.triggerAttackRelease(HAT_HZ, d.hat, t, velocity);
+    else if (inst === 'hat') {
+      if (this.hatBuf) { const src = new Tone.ToneBufferSource({ context: this.hatOut.context, url: this.hatBuf, onended: () => src.dispose() }); src.connect(this.hatOut); src.start(t, 0, undefined, velocity); }
+      else this.hat.triggerAttackRelease(HAT_HZ, d.hat, t, velocity);
+    }
     else this.clap.triggerAttackRelease(d.clap, t, velocity);
   }
 
@@ -460,7 +487,7 @@ export class Rig {
     this.releaseAll();
     this.tracks.forEach(t => this.disposeVoice(t.voice));
     this.tracks.clear();
-    [this.kick, this.snare, this.hat, this.clap, this.sendReverb, this.delay, this.eq, this.comp, this.masterReverb, this.masterVol, this.limiter, this.meter, this.spectrum, this.wave, this.masterIn].forEach(n => n.dispose());
+    [this.kick, this.snare, this.hat, this.hatOut, this.clap, this.sendReverb, this.delay, this.eq, this.comp, this.masterReverb, this.masterVol, this.limiter, this.meter, this.spectrum, this.wave, this.masterIn].forEach(n => n.dispose());
     this.audition?.synth.dispose();
     this.auditionOut.dispose();
     Object.keys(this.strips).forEach(name => this.disposeStrip(name));
