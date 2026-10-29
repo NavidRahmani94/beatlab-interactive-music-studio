@@ -1,10 +1,10 @@
-/** Encodes float samples (-1..1) as a standard 16-bit PCM stereo/mono WAV file. */
-export function encodeWav(channels: Float32Array[], sampleRate: number): ArrayBuffer {
+/** Encodes float samples (-1..1) as a standard 16-bit (default) or 24-bit PCM stereo/mono WAV file. */
+export function encodeWav(channels: Float32Array[], sampleRate: number, bits: 16 | 24 = 16): ArrayBuffer {
   if (channels.length < 1 || channels.length > 2) throw new Error('WAV export supports mono or stereo only.');
   const frames = channels[0].length;
   if (channels.some(c => c.length !== frames)) throw new Error('Channel lengths differ.');
   const numChannels = channels.length;
-  const bytesPerSample = 2;
+  const bytesPerSample = bits / 8;
   const dataSize = frames * numChannels * bytesPerSample;
   const buffer = new ArrayBuffer(44 + dataSize);
   const view = new DataView(buffer);
@@ -20,7 +20,7 @@ export function encodeWav(channels: Float32Array[], sampleRate: number): ArrayBu
   view.setUint32(24, sampleRate, true);
   view.setUint32(28, sampleRate * numChannels * bytesPerSample, true); // byte rate
   view.setUint16(32, numChannels * bytesPerSample, true);         // block align
-  view.setUint16(34, 16, true);                                   // bits per sample
+  view.setUint16(34, bits, true);                                 // bits per sample
   writeText(36, 'data');
   view.setUint32(40, dataSize, true);
 
@@ -28,8 +28,13 @@ export function encodeWav(channels: Float32Array[], sampleRate: number): ArrayBu
   for (let i = 0; i < frames; i++) {
     for (let c = 0; c < numChannels; c++) {
       const s = Math.max(-1, Math.min(1, channels[c][i]));
-      view.setInt16(offset, s < 0 ? Math.round(s * 0x8000) : Math.round(s * 0x7fff), true);
-      offset += 2;
+      if (bits === 16) {
+        view.setInt16(offset, s < 0 ? Math.round(s * 0x8000) : Math.round(s * 0x7fff), true);
+      } else {
+        const v = s < 0 ? Math.round(s * 0x800000) : Math.round(s * 0x7fffff);
+        view.setUint8(offset, v & 0xff); view.setUint8(offset + 1, (v >> 8) & 0xff); view.setUint8(offset + 2, (v >> 16) & 0xff);
+      }
+      offset += bytesPerSample;
     }
   }
   return buffer;

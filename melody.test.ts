@@ -43,7 +43,7 @@ describe('toggleNote', () => {
     expect(toggleNote(a, 60, 5, 2)).toHaveLength(0); // clicking a covered cell removes it
   });
   it('clips length at the end of the bar', () => {
-    expect(toggleNote([], 60, 14, 8)[0].lengthSteps).toBe(2);
+    expect(toggleNote([], 60, 30, 8)[0].lengthSteps).toBe(2);
   });
   it('a new long note replaces a later same-pitch note it runs into, not other pitches', () => {
     let n = toggleNote([], 60, 4, 2);   // C4 at 4..5
@@ -61,7 +61,7 @@ describe('toggleNote', () => {
   it('rejects invalid input', () => {
     const n = toggleNote([], 60, 0, 1);
     expect(toggleNote(n, 10, 0, 1)).toBe(n);
-    expect(toggleNote(n, 60, 16, 1)).toBe(n);
+    expect(toggleNote(n, 60, 32, 1)).toBe(n);
     expect(toggleNote(n, 60, -1, 1)).toBe(n);
   });
   it('noteAt finds covered cells', () => {
@@ -107,12 +107,12 @@ describe('moods (presets)', () => {
       for (let pc = 0; pc < 12; pc++) {
         const { scale, notes, instrument } = makePreset(name, pc);
         expect(instrument).toBe(PRESETS[name].instrument);
-        expect(notes).toHaveLength(PRESETS[name].notes.length);
+        expect(notes).toHaveLength(PRESETS[name].notes.length * 2); // the 16-step phrase plays twice in the 32-step pattern
         expect(normalizeNotes(notes)).toEqual(notes);
         const rows = scaleRows(pc, scale);
         notes.forEach(n => {
           expect(rows).toContain(noteToMidi(n.pitch));
-          expect(n.step + n.lengthSteps).toBeLessThanOrEqual(16);
+          expect(n.step + n.lengthSteps).toBeLessThanOrEqual(32);
           expect(n.velocity).toBeGreaterThan(0);
         });
       }
@@ -154,7 +154,7 @@ describe('auto melody', () => {
           const rows = scaleRows(pc, scale);
           expect(notes.length).toBeGreaterThanOrEqual(3);
           expect(normalizeNotes(notes)).toEqual(notes);
-          notes.forEach(n => { expect(rows).toContain(noteToMidi(n.pitch)); expect(n.step + n.lengthSteps).toBeLessThanOrEqual(16); });
+          notes.forEach(n => { expect(rows).toContain(noteToMidi(n.pitch)); expect(n.step + n.lengthSteps).toBeLessThanOrEqual(32); });
           expect(noteToMidi(notes[notes.length - 1].pitch)).toBe(rows[0]); // resolves on the root
           expect(notes[0].step).toBe(0);
         }
@@ -200,7 +200,7 @@ describe('stretching notes', () => {
     expect(r[0]).toMatchObject({ pitch: 'C4', step: 2, lengthSteps: 6, velocity: n[0].velocity });
   });
   it('cannot pass the end of the bar', () => {
-    const n = toggleNote([], 60, 12, 1);
+    const n = toggleNote([], 60, 28, 1);
     expect(resizeNote(n, n[0].id, 10)[0].lengthSteps).toBe(4);
   });
   it('cannot run into the next note of the same pitch, but ignores other pitches', () => {
@@ -228,10 +228,10 @@ describe('ambient and arpeggio ready-made patterns', () => {
     for (let pc = 0; pc < 12; pc++) {
       const { scale, notes, instrument } = makeTrackPreset(name, pc);
       expect(isMelodyInstrument(instrument)).toBe(true);
-      expect(notes).toHaveLength(TRACK_PRESETS[name].notes.length);
+      expect(notes).toHaveLength(TRACK_PRESETS[name].notes.length * 2);
       expect(normalizeNotes(notes)).toEqual(notes);
       const rows = scaleRows(pc, scale);
-      notes.forEach(n => { expect(rows).toContain(noteToMidi(n.pitch)); expect(n.step + n.lengthSteps).toBeLessThanOrEqual(16); });
+      notes.forEach(n => { expect(rows).toContain(noteToMidi(n.pitch)); expect(n.step + n.lengthSteps).toBeLessThanOrEqual(32); });
     }
   }));
   it('ambient notes are long', () => {

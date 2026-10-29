@@ -1,14 +1,14 @@
 import { DrumPattern, STEPS, makePattern } from './pattern';
 import { MelodyNote } from './melody';
 
-// A PATTERN is one bar (16 steps) of all four tracks. The PLAYLIST places patterns on bars, so a song can be any length.
+// A PATTERN is 32 steps (2 bars) of all four tracks. The PLAYLIST places patterns in slots, so a song can be any length.
 export type PatternData = { name: string; drums: DrumPattern; melody: MelodyNote[]; ambient: MelodyNote[]; arp: MelodyNote[] };
-/** One slot per bar: the index of a pattern, or null for a silent bar. */
+/** One slot per pattern-length (32 steps): the index of a pattern, or null for a silent slot. */
 export type Playlist = (number | null)[];
 export type PlayMode = 'pattern' | 'song';
 
 export const MAX_PATTERNS = 16;
-export const MAX_BARS = 32;
+export const MAX_BARS = 64; // playlist slots (each slot = one 32-step pattern)
 export const MIN_BARS = 1;
 export const MAX_PATTERN_NAME = 24;
 

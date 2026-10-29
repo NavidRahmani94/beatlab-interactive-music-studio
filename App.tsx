@@ -13,7 +13,8 @@ import { DrumKitId, MELODIC_TRACKS, MelodicTrack, MelodyInstrumentId, TAB_LABELS
 import { ArpSettings } from './arp';
 import { Frame, PatternData, PlayMode, Playlist, addPattern, deletePattern, duplicatePattern, emptyDrumPattern, renamePattern, resizePlaylist, setSlot } from './song';
 import { BeatLabProject, MAX_FILE_BYTES, SAMPLE_PROJECTS, TrackInstruments, defaultProject, hasAudibleContent, startupProject, parseProject, safeFileName, serializeProject } from './project';
-import { renderProjectToWav } from './exporter';
+import { ExportFormat, renderProjectToWav } from './exporter';
+import { STEPS } from './pattern';
 import './main.css';
 
 type Status = { kind: 'info' | 'error'; text: string };
@@ -49,6 +50,7 @@ export default function App() {
   const [frame, setFrame] = useState<Frame | null>(null);
   const [status, setStatus] = useState<Status>({ kind: 'info', text: 'Press PLAY (or Space) to start. Everything you change is heard live.' });
   const [loops, setLoops] = useState(1);
+  const [format, setFormat] = useState<ExportFormat>('wav16');
   const [exporting, setExporting] = useState(false);
   const [savedJson, setSavedJson] = useState(() => serializeProject(initial));
 
@@ -56,7 +58,7 @@ export default function App() {
   const pattern = patterns[cur];
 
   const project: BeatLabProject = useMemo(() => ({
-    schemaVersion: 2, name, bpm, patterns, playlist, tracks, arp, drumKit: kit, melodyView: { key: keyPc, scale }, channels, master
+    schemaVersion: 3, name, bpm, patterns, playlist, tracks, arp, drumKit: kit, melodyView: { key: keyPc, scale }, channels, master
   }), [name, bpm, patterns, playlist, tracks, arp, kit, keyPc, scale, channels, master]);
   const dirty = useMemo(() => serializeProject(project) !== savedJson, [project, savedJson]);
 
@@ -143,9 +145,9 @@ export default function App() {
     setExporting(true);
     setStatus({ kind: 'info', text: 'Rendering audio…' });
     try {
-      const result = await renderProjectToWav(project, loops, { mode, pattern: cur });
-      download(result.blob, `${safeFileName(name)}.wav`);
-      setStatus({ kind: 'info', text: `Exported ${safeFileName(name)}.wav — ${mode === 'song' ? 'song' : 'pattern'}, ${result.bars} bar${result.bars > 1 ? 's' : ''}, ${result.seconds.toFixed(1)} s, ${Math.round(result.blob.size / 1024)} KB, 44.1 kHz stereo 16-bit.` });
+      const result = await renderProjectToWav(project, loops, { mode, pattern: cur, format });
+      download(result.blob, `${safeFileName(name)}.${result.ext}`);
+      setStatus({ kind: 'info', text: `Exported ${safeFileName(name)}.${result.ext} — ${mode === 'song' ? 'song' : 'pattern'}, ${result.bars} slot${result.bars > 1 ? 's' : ''}, ${result.seconds.toFixed(1)} s, ${Math.round(result.blob.size / 1024)} KB, ${result.detail}.` });
     } catch (e) {
       setStatus({ kind: 'error', text: `Export failed: ${e instanceof Error ? e.message : 'unknown error'}` });
     } finally { setExporting(false); }
@@ -208,10 +210,10 @@ export default function App() {
   const mutedTab = (t: TabId) => t === 'drums' ? (['kick', 'snare', 'hat', 'clap'] as const).every(i => channels[i].muted) : channels[t].muted;
   const bars = mode === 'song' ? playlist.length : 1;
 
-  return <main className="shell" style={{ ['--bar-s' as string]: `${240 / bpm}s` }}>
-    <header><div><div className="eyebrow">INTERACTIVE MUSIC STUDIO</div><h1><span>BEAT</span>LAB<span className="dot">.</span></h1></div><div className="phase">PHASE 01–09 <span>• V0.6 TEST BUILD</span></div></header>
-    <section className="intro"><div className="eyebrow">YOUR FIRST SONG</div><h2>Make some noise.</h2><p>Ambient. Drums. Melody. Arpeggio. Mix. Master. Arrange. Export.</p></section>
-    <ProjectBar name={name} onName={setName} dirty={dirty} exporting={exporting} loops={loops} unit={mode === 'song' ? 'song' : 'bar'} onLoops={setLoops}
+  return <main className="shell" style={{ ['--bar-s' as string]: `${(STEPS * 15) / bpm}s` }}>
+    <header><div><div className="eyebrow">INTERACTIVE MUSIC STUDIO</div><h1><span>BEAT</span>LAB<span className="dot">.</span></h1></div><div className="phase">PHASE 01–09 <span>• V0.8 TEST BUILD</span></div></header>
+    <section className="intro"><div className="eyebrow">YOUR FIRST SONG</div><h2>Make some noise.</h2><p>Ambient. Drums. Melody. Arpeggio. Mix. Master. Arrange. Export WAV / MP3.</p></section>
+    <ProjectBar name={name} onName={setName} dirty={dirty} exporting={exporting} loops={loops} unit={mode === 'song' ? 'song' : 'pattern'} onLoops={setLoops} format={format} onFormat={setFormat}
       onNew={newProject} onOpenFile={openFile} onSave={save} onSample={loadSample} onExport={exportWav} />
     <section className="panel transport"><div className="panel-label">TRANSPORT <span>SPACE = PLAY / STOP</span></div><div className="transport-controls"><button className={playing ? 'stop' : 'play'} onClick={playing ? stop : play}>{playing ? '■ STOP' : '▶ PLAY'}</button><div className="bpm"><label htmlFor="bpm">TEMPO <b>{bpm} <small>BPM</small></b></label><input id="bpm" type="range" min="60" max="200" value={bpm} onChange={e => setBpm(clampBpm(Number(e.target.value)))} /></div><div className="indicator"><span className={playing ? 'pulse on' : 'pulse'} />{playing ? 'PLAYING' : 'STOPPED'}</div></div></section>
     <Visualizer playing={playing} getSpectrum={getSpectrum} getWaveform={getWaveform} step={playFrame?.step ?? -1} bar={playFrame?.bar ?? 0} bars={bars} />
@@ -242,6 +244,6 @@ export default function App() {
       onSlot={paint} onBars={n => setPlaylist(pl => resizePlaylist(pl, n))} onClearBars={() => setPlaylist(pl => pl.map(() => null))} onMode={setMode} />
     <MixerPanel channels={channels} master={master} onChannel={changeChannel} onMaster={changeMaster} getLevelDb={getLevelDb} playing={playing} />
     <div role={status.kind === 'error' ? 'alert' : 'status'} className={'status ' + status.kind}>{status.text}</div>
-    <footer><span>BEATLAB / V0.6 TEST BUILD</span><span>BUILT WITH REACT + TONE.JS</span><span>AUDIO UNVERIFIED BY EAR</span></footer>
+    <footer><span>BEATLAB / V0.8 TEST BUILD</span><span>BUILT WITH REACT + TONE.JS</span><span>AUDIO UNVERIFIED BY EAR</span></footer>
   </main>;
 }

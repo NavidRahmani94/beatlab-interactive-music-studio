@@ -53,19 +53,19 @@ describe('invalid projects are rejected with a clear message', () => {
   it('bpm', () => { bad(p => { p.bpm = 300; }, /bpm/); bad(p => { p.bpm = 'fast'; }, /bpm/); bad(p => { p.bpm = null; }, /bpm/); });
   it('name', () => bad(p => { p.name = 5; }, /name/));
   it('drum row length / type', () => {
-    bad(p => { p.patterns[0].drums.kick = p.patterns[0].drums.kick.slice(1); }, /drums\.kick.*16/);
+    bad(p => { p.patterns[0].drums.kick = p.patterns[0].drums.kick.slice(1); }, /drums\.kick.*32/);
     bad(p => { p.patterns[0].drums.snare[0] = 1; }, /drums\.snare/);
     bad(p => { delete p.patterns[0].drums.clap; }, /drums\.clap/);
   });
   it('melody notes', () => {
-    bad(p => { p.patterns[0].melody = [{ id: 'a', pitch: 'C4', step: 16, lengthSteps: 1, velocity: 0.5 }]; }, /step/);
-    bad(p => { p.patterns[0].melody = [{ id: 'a', pitch: 'C4', step: 15, lengthSteps: 2, velocity: 0.5 }]; }, /lengthSteps/);
+    bad(p => { p.patterns[0].melody = [{ id: 'a', pitch: 'C4', step: 32, lengthSteps: 1, velocity: 0.5 }]; }, /step/);
+    bad(p => { p.patterns[0].melody = [{ id: 'a', pitch: 'C4', step: 31, lengthSteps: 2, velocity: 0.5 }]; }, /lengthSteps/);
     bad(p => { p.patterns[0].melody = [{ id: 'a', pitch: 'C4', step: 0, lengthSteps: 0, velocity: 0.5 }]; }, /lengthSteps/);
     bad(p => { p.patterns[0].melody = [{ id: 'a', pitch: 'C4', step: 0, lengthSteps: 1, velocity: 2 }]; }, /velocity/);
     bad(p => { p.patterns[0].melody = [{ id: 'a', pitch: 'X9', step: 0, lengthSteps: 1, velocity: 0.5 }]; }, /pitch/);
     bad(p => { p.patterns[0].melody = [{ id: 'a', pitch: 'C1', step: 0, lengthSteps: 1, velocity: 0.5 }]; }, /pitch/);
     bad(p => { p.patterns[0].melody = 'nope'; }, /melody/);
-    bad(p => { p.patterns[0].arp = [{ id: 'a', pitch: 'C4', step: 0, lengthSteps: 20, velocity: 0.5 }]; }, /arp\[0\]\.lengthSteps/);
+    bad(p => { p.patterns[0].arp = [{ id: 'a', pitch: 'C4', step: 0, lengthSteps: 33, velocity: 0.5 }]; }, /arp\[0\]\.lengthSteps/);
     bad(p => { p.patterns[0].melody = [42]; }, /melody\[0\]/);
     bad(p => { p.patterns[0].melody = Array.from({ length: MAX_NOTES + 1 }, () => ({})); }, /Too many/);
   });
@@ -179,7 +179,7 @@ describe('patterns, playlist and the new tracks', () => {
     bad(p => { p.playlist = [5]; }, /playlist\[0\]/);
     bad(p => { p.playlist = [-1]; }, /playlist\[0\]/);
     bad(p => { p.playlist = [0.5]; }, /playlist\[0\]/);
-    bad(p => { p.playlist = Array(33).fill(0); }, /playlist/);
+    bad(p => { p.playlist = Array(65).fill(0); }, /playlist/);
     bad(p => { p.patterns = []; }, /patterns/);
     bad(p => { p.patterns = Array(17).fill(clone(p.patterns[0])); }, /Too many patterns/);
   });
@@ -204,17 +204,19 @@ describe('patterns, playlist and the new tracks', () => {
   it('old version-1 files are upgraded to one pattern', () => {
     const old: any = {
       schemaVersion: 1, name: 'Old', bpm: 110, stepsPerBar: 16, bars: 1,
-      drums: defaultProject().patterns[0].drums, melody: makePreset('sad', 9).notes,
+      drums: Object.fromEntries(Object.entries(defaultProject().patterns[0].drums).map(([k, v]: any) => [k, v.slice(0, 16)])), melody: makePreset('sad', 9).notes.filter(n => n.step < 16),
       channels: Object.fromEntries(CHANNEL_KEYS.slice(0, 5).map(k => [k, { volumeDb: 0, muted: false, reverbSend: 0, delaySend: 0 }])),
       melodyInstrument: 'bell', melodyView: { key: 9, scale: 'minor' }
     };
     const r = validateProject(old);
     expect(r.ok).toBe(true);
     if (r.ok) {
-      expect(r.project.schemaVersion).toBe(2);
+      expect(r.project.schemaVersion).toBe(3);
       expect(r.project.patterns).toHaveLength(1);
       expect(r.project.playlist).toEqual([0]);
-      expect(r.project.patterns[0].melody).toEqual(old.melody);
+      expect(r.project.patterns[0].melody).toHaveLength(old.melody.length * 2);   // the 16-step phrase plays twice in 32 steps
+      expect(r.project.patterns[0].melody.slice(0, old.melody.length)).toEqual(old.melody);
+      expect(r.project.patterns[0].drums.kick).toEqual([...old.drums.kick, ...old.drums.kick]);
       expect(r.project.tracks.melody).toBe('bell');
       expect(r.project.channels.ambient).toBeDefined();
       expect(r.project.channels.arp).toBeDefined();

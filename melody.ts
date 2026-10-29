@@ -1,4 +1,4 @@
-import { STEPS } from './pattern';
+import { LEGACY_STEPS, STEPS } from './pattern';
 import { MelodyInstrumentId } from './instruments';
 
 // One data model for BOTH Easy and Advanced melody views.
@@ -161,10 +161,17 @@ export const PRESETS: Record<PresetName, Preset> = {
 };
 export const PRESET_NAMES = Object.keys(PRESETS) as PresetName[];
 
+/** Ready-made phrases are written for 16 steps; in a 32-step pattern they play twice. */
+function tile16<T extends [number, number, number, number]>(notes: T[]): T[] {
+  const out: T[] = [];
+  for (let offset = 0; offset < STEPS; offset += LEGACY_STEPS) notes.forEach(n => out.push([n[0] + offset, n[1], n[2], n[3]] as T));
+  return out;
+}
+
 export function makePreset(name: PresetName, keyPc: number): { scale: ScaleName; instrument: MelodyInstrumentId; notes: MelodyNote[] } {
   const p = PRESETS[name];
   const rows = scaleRows(keyPc, p.scale);
-  return { scale: p.scale, instrument: p.instrument, notes: normalizeNotes(p.notes.map(([step, degree, len, vel]) => make(rows[degree], step, len, vel))) };
+  return { scale: p.scale, instrument: p.instrument, notes: normalizeNotes(tile16(p.notes).map(([step, degree, len, vel]) => make(rows[degree], step, len, vel))) };
 }
 
 // ---------- automatic melody ----------
@@ -249,5 +256,5 @@ export const presetsForTrack = (track: 'ambient' | 'arp'): TrackPresetName[] => 
 export function makeTrackPreset(name: TrackPresetName, keyPc: number): { scale: ScaleName; instrument: MelodyInstrumentId; notes: MelodyNote[] } {
   const p = TRACK_PRESETS[name];
   const rows = scaleRows(keyPc, p.scale);
-  return { scale: p.scale, instrument: p.instrument, notes: normalizeNotes(p.notes.map(([step, degree, len, vel]) => make(rows[Math.min(degree, rows.length - 1)], step, len, vel))) };
+  return { scale: p.scale, instrument: p.instrument, notes: normalizeNotes(tile16(p.notes).map(([step, degree, len, vel]) => make(rows[Math.min(degree, rows.length - 1)], step, len, vel))) };
 }

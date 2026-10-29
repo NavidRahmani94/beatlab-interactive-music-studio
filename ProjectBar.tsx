@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { SAMPLE_PROJECTS } from './project';
+import { EXPORT_FORMATS, ExportFormat, isExportFormat } from './exporter';
 
 type Props = {
   name: string;
@@ -8,6 +9,8 @@ type Props = {
   exporting: boolean;
   loops: number;
   unit: string;
+  format: ExportFormat;
+  onFormat: (format: ExportFormat) => void;
   onLoops: (loops: number) => void;
   onNew: () => void;
   onOpenFile: (file: File) => void;
@@ -42,7 +45,12 @@ export default function ProjectBar(p: Props) {
           {[1, 2, 4, 8].map(n => <option key={n} value={n}>{n} {p.unit}{n > 1 ? 's' : ''}</option>)}
         </select>
       </label>
-      <button className="export-btn" disabled={p.exporting} onClick={p.onExport}>{p.exporting ? 'RENDERING…' : '⬇ EXPORT WAV'}</button>
+ <label className="ctl">FORMAT
+        <select value={p.format} aria-label="Export format" onChange={e => { if (isExportFormat(e.target.value)) p.onFormat(e.target.value); }}>
+          {(Object.keys(EXPORT_FORMATS) as ExportFormat[]).map(f => <option key={f} value={f}>{EXPORT_FORMATS[f].label}</option>)}
+        </select>
+      </label>
+      <button className="export-btn" disabled={p.exporting} onClick={p.onExport}>{p.exporting ? 'RENDERING…' : `⬇ EXPORT ${EXPORT_FORMATS[p.format].ext.toUpperCase()}`}</button>
     </div>
   </section>;
 }

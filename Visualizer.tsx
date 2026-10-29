@@ -4,8 +4,8 @@ type Props = {
   playing: boolean;
   getSpectrum: () => Float32Array | null;
   getWaveform: () => Float32Array | null;
-  step: number;       // 0..15, -1 when stopped
-  bar: number;        // bar shown in the label
+  step: number;       // 0..31, -1 when stopped
+  bar: number;        // slot shown in the label
   bars: number;
 };
 
@@ -33,9 +33,9 @@ export default function Visualizer({ playing, getSpectrum, getWaveform, step, ba
       const accent2 = style.getPropertyValue('--viz-b').trim() || '#7cf0c2';
       const grid = style.getPropertyValue('--viz-grid').trim() || '#272b37';
 
-      // beat bar: 16 small cells, current step lit
-      const cellW = w / 16;
-      for (let i = 0; i < 16; i++) {
+      // beat bar: 32 small cells, current step lit
+      const cellW = w / 32;
+      for (let i = 0; i < 32; i++) {
         ctx.fillStyle = playing && stepRef.current === i ? accent : grid;
         ctx.globalAlpha = playing && stepRef.current === i ? 1 : i % 4 === 0 ? 0.9 : 0.5;
         ctx.fillRect(i * cellW + 2, h - 8, cellW - 4, 5);
@@ -80,7 +80,7 @@ export default function Visualizer({ playing, getSpectrum, getWaveform, step, ba
   }, [playing, getSpectrum, getWaveform]);
 
   return <section className="panel viz" aria-label="Playback visualiser">
-    <div className="panel-label">VISUALISER <span>{playing ? `BAR ${bar + 1} / ${bars} · STEP ${step + 1}` : 'PRESS PLAY'}</span></div>
+    <div className="panel-label">VISUALISER <span>{playing ? `SLOT ${bar + 1} / ${bars} · STEP ${step + 1}` : 'PRESS PLAY'}</span></div>
     <canvas ref={ref} className="viz-canvas" role="img" aria-label="Live spectrum and waveform" />
   </section>;
 }

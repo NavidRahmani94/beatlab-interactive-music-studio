@@ -30,8 +30,8 @@ const NAMES: Record<MelodicTrack, string> = { melody: 'Melody', ambient: 'Ambien
 const ACCENT: Record<MelodicTrack, string> = { melody: '#7cf0c2', ambient: '#9db4ff', arp: '#ffb86b' };
 const LENGTHS: Record<MelodicTrack, [string, number][]> = {
   melody: [['1', 1], ['2', 2], ['4', 4], ['8', 8]],
-  ambient: [['4', 4], ['8', 8], ['16', 16]],
-  arp: [['4', 4], ['8', 8], ['16', 16]]
+  ambient: [['4', 4], ['8', 8], ['16', 16], ['32', 32]],
+  arp: [['4', 4], ['8', 8], ['16', 16], ['32', 32]]
 };
 
 /** One tab for a melodic track: ambient, melody or arpeggio. They share the piano roll, key and scale. */
@@ -40,6 +40,8 @@ export default function TrackPanel(p: Props) {
   const [advanced, setAdvanced] = useState(false);
   const [length, setLength] = useState(TRACK_DEFAULT_LENGTH[track]);
   const [velocity, setVelocity] = useState(DEFAULT_VELOCITY);
+  const touchDevice = typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  const [touchDraw, setTouchDraw] = useState(false);
   const [mood, setMood] = useState<PresetName>('happy');
   const name = NAMES[track];
 
@@ -128,8 +130,13 @@ export default function TrackPanel(p: Props) {
       <button className="mute-btn" style={{ marginLeft: 0 }} aria-label={`${name} ${p.enabled ? 'on' : 'off'}`} aria-pressed={p.enabled}
         onClick={() => p.onEnabled(!p.enabled)}>{p.enabled ? 'ON' : 'OFF'}</button>
     </div>
+    {touchDevice && <div className="touch-mode" role="group" aria-label="Touch mode">
+      <span>FINGER:</span>
+      <button className={!touchDraw ? 'sel' : ''} aria-pressed={!touchDraw} onClick={() => setTouchDraw(false)}>↔ SCROLL (tap = note)</button>
+      <button className={touchDraw ? 'sel' : ''} aria-pressed={touchDraw} onClick={() => setTouchDraw(true)}>✏ DRAW (drag = long note)</button>
+    </div>}
     <PianoRoll notes={p.notes} onNotes={p.onNotes} advanced={advanced} keyPc={p.keyPc} scale={p.scale} defaultLength={length} velocity={velocity}
-      enabled={p.enabled} playingStep={p.playingStep} accent={ACCENT[track]} />
+      enabled={p.enabled} playingStep={p.playingStep} accent={ACCENT[track]} touchDraw={touchDraw} />
     <div className="grid-footer">
       <span>CLICK = NEW NOTE · DRAG SIDEWAYS = ANY LENGTH · DRAG A NOTE'S END TO STRETCH · CLICK A NOTE TO REMOVE IT</span>
       <button onClick={() => p.onNotes([])}>CLEAR {name.toUpperCase()} ↗</button>

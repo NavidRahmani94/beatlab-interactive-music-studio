@@ -59,6 +59,7 @@ describe('playlist', () => {
     expect(resizePlaylist([0, 0, 0, 0], 2)).toEqual([0, 0]);
     expect(resizePlaylist([0], 0)).toHaveLength(1);
     expect(resizePlaylist([0], 999)).toHaveLength(MAX_BARS);
+    expect(MAX_BARS).toBe(64);
     expect(resizePlaylist([0], NaN)).toHaveLength(1);
   });
   it('usedBars ignores trailing empty bars', () => {
@@ -72,17 +73,17 @@ describe('frameAt (where playback is)', () => {
   const pl = [0, 1, null, 2];
   it('pattern mode loops one bar of the chosen pattern', () => {
     expect(frameAt(0, pl, 'pattern', 1)).toEqual({ bar: 0, step: 0, pattern: 1, songStep: 0 });
-    expect(frameAt(37, pl, 'pattern', 1)).toMatchObject({ bar: 0, step: 5, pattern: 1 });
+    expect(frameAt(37, pl, 'pattern', 1)).toMatchObject({ bar: 0, step: 5, pattern: 1 }); // 32 steps per pattern;
   });
   it('song mode walks the playlist and loops at the end', () => {
     expect(frameAt(0, pl, 'song', 0)).toMatchObject({ bar: 0, step: 0, pattern: 0 });
-    expect(frameAt(16, pl, 'song', 0)).toMatchObject({ bar: 1, step: 0, pattern: 1 });
-    expect(frameAt(33, pl, 'song', 0)).toMatchObject({ bar: 2, step: 1, pattern: null });
-    expect(frameAt(63, pl, 'song', 0)).toMatchObject({ bar: 3, step: 15, pattern: 2, songStep: 63 });
-    expect(frameAt(64, pl, 'song', 0)).toMatchObject({ bar: 0, step: 0, pattern: 0 });
+    expect(frameAt(32, pl, 'song', 0)).toMatchObject({ bar: 1, step: 0, pattern: 1 });
+    expect(frameAt(65, pl, 'song', 0)).toMatchObject({ bar: 2, step: 1, pattern: null });
+    expect(frameAt(127, pl, 'song', 0)).toMatchObject({ bar: 3, step: 31, pattern: 2, songStep: 127 });
+    expect(frameAt(128, pl, 'song', 0)).toMatchObject({ bar: 0, step: 0, pattern: 0 });
   });
   it('handles odd input', () => {
     expect(frameAt(-5, pl, 'song', 0)).toMatchObject({ bar: 0, step: 0 });
-    expect(frameAt(20, [], 'song', 3)).toMatchObject({ pattern: 3, step: 4 });
+    expect(frameAt(20, [], 'song', 3)).toMatchObject({ pattern: 3, step: 20 });
   });
 });

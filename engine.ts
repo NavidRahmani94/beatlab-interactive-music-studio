@@ -1,5 +1,5 @@
 import * as Tone from 'tone';
-import { STEPS, clampBpm } from './pattern';
+import { clampBpm } from './pattern';
 import { Channels, MasterSettings, defaultChannels, defaultMaster } from './mixer';
 import { DrumKitId, MelodicTrack, MelodyInstrumentId, TRACK_DEFAULT_INSTRUMENT } from './instruments';
 import { ArpSettings, defaultArp } from './arp';
@@ -77,7 +77,7 @@ export class BeatLabEngine {
       const { patterns, playlist, mode, current } = this.song;
       const frame = frameAt(tick, playlist, mode, current);
       const pattern = frame.pattern === null ? null : patterns[frame.pattern] ?? null;
-      this.rig?.triggerStep(frame.step, time, pattern, this.arp, tick, 60 / transport.bpm.value / STEPS * 4);
+      this.rig?.triggerStep(frame.step, time, pattern, this.arp, tick, 60 / transport.bpm.value / 4);
       Tone.getDraw().schedule(() => { if (this.active) this.frameCallback(frame); }, time);
     }, '16n', 0);
     this.active = true;
