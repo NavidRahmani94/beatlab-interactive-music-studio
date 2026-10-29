@@ -13,6 +13,8 @@ type Props = {
   onNotes: Dispatch<SetStateAction<MelodyNote[]>>;
   enabled: boolean;
   onEnabled: (enabled: boolean) => void;
+  solo: boolean;
+  onSolo: (solo: boolean) => void;
   keyPc: number;
   scale: ScaleName;
   onKeyChange: (keyPc: number) => void;
@@ -121,7 +123,9 @@ export default function TrackPanel(p: Props) {
       <label className="ctl">NEW NOTE VELOCITY
         <span className="fader"><input type="range" min={5} max={100} value={Math.round(velocity * 100)} aria-label="New note velocity" onChange={e => setVelocity(Number(e.target.value) / 100)} /><b>{Math.round(velocity * 100)}</b></span>
       </label>
-      <button className="mute-btn" style={{ marginLeft: 'auto' }} aria-label={`${name} ${p.enabled ? 'on' : 'off'}`} aria-pressed={p.enabled}
+      <button className={'mute-btn solo' + (p.solo ? ' sel' : '')} style={{ marginLeft: 'auto' }} aria-pressed={p.solo} aria-label={`Solo only ${name}`}
+        title={p.solo ? 'Hear everything again' : 'Hear only this track (all others are muted)'} onClick={() => p.onSolo(!p.solo)}>SOLO</button>
+      <button className="mute-btn" style={{ marginLeft: 0 }} aria-label={`${name} ${p.enabled ? 'on' : 'off'}`} aria-pressed={p.enabled}
         onClick={() => p.onEnabled(!p.enabled)}>{p.enabled ? 'ON' : 'OFF'}</button>
     </div>
     <PianoRoll notes={p.notes} onNotes={p.onNotes} advanced={advanced} keyPc={p.keyPc} scale={p.scale} defaultLength={length} velocity={velocity}

@@ -217,6 +217,8 @@ export default function App() {
     <Visualizer playing={playing} getSpectrum={getSpectrum} getWaveform={getWaveform} step={playFrame?.step ?? -1} bar={playFrame?.bar ?? 0} bars={bars} />
 
     <div className="tabs" role="tablist" aria-label="Tracks">
+      <button className={'mini-play' + (playing ? ' on' : '')} aria-label={playing ? 'Stop (quick)' : 'Play (quick)'} title="Play / stop from here (Space also works)" onClick={playing ? stop : play}>{playing ? '■' : '▶'}</button>
+      <button className={'mini-play pat' + (playing && mode === 'pattern' ? ' on' : '')} aria-label={`Play only ${pattern.name} (quick)`} title="Loop only the pattern you are editing" onClick={() => audition(cur)}>{playing && mode === 'pattern' ? '■' : '▶'} THIS PATTERN</button>
       {TAB_ORDER.map(t => <button key={t} role="tab" aria-selected={tab === t} className={'tab' + (tab === t ? ' sel' : '') + (mutedTab(t) ? ' muted' : '')} onClick={() => setTab(t)}>
         <i className={'tab-dot' + (hasNotes(t) ? ' has' : '')} data-track={t} />{TAB_LABELS[t]}
       </button>)}
@@ -227,9 +229,11 @@ export default function App() {
 
     {tab === 'drums' && <DrumPanel pattern={pattern.drums} kit={kit} channels={channels} playingStep={stepHere} onKit={setKit}
       onToggle={(inst: Instrument, i: number) => editCurrent(p => ({ ...p, drums: toggleStep(p.drums, inst, i) }))}
-      onMute={(inst, muted) => changeChannel(inst, { muted })} onClear={() => editCurrent(p => ({ ...p, drums: emptyDrumPattern() }))} />}
+      onMute={(inst, muted) => changeChannel(inst, { muted })} onSolo={(inst, solo) => changeChannel(inst, { solo })}
+      onAllMute={muted => setChannels(c => (['kick', 'snare', 'hat', 'clap'] as const).reduce((acc, n) => patchChannel(acc, n, { muted }), c))}
+      onAllSolo={solo => setChannels(c => (['kick', 'snare', 'hat', 'clap'] as const).reduce((acc, n) => patchChannel(acc, n, { solo }), c))} onClear={() => editCurrent(p => ({ ...p, drums: emptyDrumPattern() }))} />}
     {tab !== 'drums' && <TrackPanel key={tab} track={tab} notes={pattern[tab]} onNotes={trackSetters[tab]} enabled={!channels[tab].muted}
-      onEnabled={on => changeChannel(tab, { muted: !on })} keyPc={keyPc} scale={scale} onKeyChange={changeKey} onScaleChange={changeScale}
+      onEnabled={on => changeChannel(tab, { muted: !on })} solo={channels[tab].solo} onSolo={solo => changeChannel(tab, { solo })} keyPc={keyPc} scale={scale} onKeyChange={changeKey} onScaleChange={changeScale}
       instrument={tracks[tab]} onInstrument={(id: MelodyInstrumentId) => setTracks(t => ({ ...t, [tab]: id }))}
       arp={arp} onArp={patch => setArp(a => ({ ...a, ...patch }))} playingStep={stepHere} />}
 
