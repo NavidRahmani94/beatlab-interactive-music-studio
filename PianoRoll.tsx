@@ -1,6 +1,6 @@
-import { Dispatch, KeyboardEvent, PointerEvent, SetStateAction, memo, useCallback, useEffect, useMemo, useRef } from 'react';
+import { Dispatch, KeyboardEvent, PointerEvent, SetStateAction, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  DEFAULT_VELOCITY, MAX_MIDI, MIN_MIDI, MelodyNote, ScaleName, inScale, midiToNote, noteToMidi, noteAt, resizeNote, scaleRows, setStepVelocity, stepVelocity, toggleNote
+  MAX_MIDI, MIN_MIDI, MelodyNote, ScaleName, inScale, midiToNote, noteToMidi, noteAt, notesAtStep, resizeNote, scaleRows, setNoteVelocity, setStepVelocity, toggleNote
 } from './melody';
 import { STEPS } from './pattern';
 import { useFollowPlayhead } from './useFollow';
@@ -154,19 +154,39 @@ export default function PianoRoll({ notes, onNotes, advanced, keyPc, scale, defa
     if (d && d.kind === 'tap') { onNotes(prev => toggleNote(prev, d.midi, d.step, defaultLength, velocity)); return; }
     if (d && d.kind === 'existing' && !d.moved) onNotes(prev => prev.filter(n => n.id !== d.id)); // plain click removes
   }
-  // ---- velocity lane (one bar per step; edits every note that starts on that step)
-  function laneSet(e: PointerEvent<HTMLDivElement>) {
-    const cell = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-vstep]') as HTMLElement | null;
-    if (!cell) return;
-    const s = Number(cell.dataset.vstep);
+  // ---- velocity lane: one bar per NOTE (the notes of a chord side by side, lowest on the left); drag a bar to change only that note, hold Shift to change the whole step
+  const laneDrag = useRef<{ id: string; step: number } | null>(null);
+  const [velInfo, setVelInfo] = useState('');
+  const barAt = (clientX: number, clientY: number): { id: string; step: number; v: number; label: string } | null => {
+    const cell = (document.elementFromPoint(clientX, clientY) as HTMLElement | null)?.closest('[data-vstep]') as HTMLElement | null
+      ?? (laneDrag.current ? (rollRef.current?.querySelector(`[data-vstep="${laneDrag.current.step}"]`) as HTMLElement | null) : null);
+    if (!cell) return null;
+    const step = Number(cell.dataset.vstep);
     const r = cell.getBoundingClientRect();
-    onNotes(prev => setStepVelocity(prev, s, 1 - (e.clientY - r.top) / r.height));
+    const list = notesAtStep(notes, step);
+    if (!list.length) return null;
+    const idx = Math.max(0, Math.min(list.length - 1, Math.floor(((clientX - r.left) / Math.max(1, r.width)) * list.length)));
+    return { id: list[idx].id, step, v: 1 - (clientY - r.top) / r.height, label: list[idx].pitch };
+  };
+  function laneSet(e: PointerEvent<HTMLDivElement>, first: boolean) {
+    const hit = barAt(e.clientX, e.clientY);
+    if (first) laneDrag.current = hit ? { id: hit.id, step: hit.step } : null;
+    const drag = laneDrag.current;
+    if (!drag) return;
+    const cell = rollRef.current?.querySelector(`[data-vstep="${drag.step}"]`) as HTMLElement | null;
+    if (!cell) return;
+    const r = cell.getBoundingClientRect();
+    const v = 1 - (e.clientY - r.top) / r.height;
+    if (e.shiftKey) onNotes(prev => setStepVelocity(prev, drag.step, v));
+    else onNotes(prev => setNoteVelocity(prev, drag.id, v));
+    const name = notes.find(n => n.id === drag.id)?.pitch ?? '';
+    setVelInfo(`${e.shiftKey ? 'STEP ' + (drag.step + 1) + ' (ALL NOTES)' : name} · ${Math.round(Math.max(0.05, Math.min(1, v)) * 100)}`);
   }
-  function laneKey(e: KeyboardEvent<HTMLDivElement>, s: number) {
+  function laneKey(e: KeyboardEvent<HTMLDivElement>, id: string, v: number) {
     const d = e.key === 'ArrowUp' || e.key === 'ArrowRight' ? 0.05 : e.key === 'ArrowDown' || e.key === 'ArrowLeft' ? -0.05 : 0;
     if (!d) return;
     e.preventDefault();
-    onNotes(prev => setStepVelocity(prev, s, (stepVelocity(prev, s) ?? DEFAULT_VELOCITY) + d));
+    onNotes(prev => setNoteVelocity(prev, id, v + d));
   }
 
   return <>
@@ -178,17 +198,19 @@ export default function PianoRoll({ notes, onNotes, advanced, keyPc, scale, defa
           return <Row key={midi} midi={midi} name={midiToNote(midi)} inKey={inScale(midi, keyPc, scale)} isRoot={((midi - keyPc) % 12 + 12) % 12 === 0} advanced={advanced} cursor={cursor}
             sig={d ? d.sig : ''} row={d ? d.row : emptyRow} onPreview={stablePreview} onKey={onKey} />;
         })}
-        <div className="mrow vel-lane" title="Drag up/down to set velocity (loudness) of the notes on each step"
-          onPointerDown={e => { e.stopPropagation(); e.currentTarget.setPointerCapture(e.pointerId); laneDragging.current = true; laneSet(e); }}
-          onPointerMove={e => { if (laneDragging.current) laneSet(e); }}
-          onPointerUp={() => { laneDragging.current = false; }} onPointerCancel={() => { laneDragging.current = false; }}>
-          <span className="mlabel">VELOCITY</span>
+        <div className="mrow vel-lane" title="Drag a bar up/down to set the velocity (loudness) of that note. The notes of a chord are side by side. Shift = the whole step."
+          onPointerDown={e => { e.stopPropagation(); e.currentTarget.setPointerCapture(e.pointerId); laneDragging.current = true; laneSet(e, true); }}
+          onPointerMove={e => { if (laneDragging.current) laneSet(e, false); }}
+          onPointerUp={() => { laneDragging.current = false; laneDrag.current = null; }} onPointerCancel={() => { laneDragging.current = false; laneDrag.current = null; }}>
+          <span className="mlabel">VELOCITY{velInfo && <small className="vel-readout">{velInfo}</small>}</span>
           {Array.from({ length: STEPS }, (_, s) => {
-            const v = stepVelocity(notes, s);
-            return <div key={s} data-vstep={s} className={'vel-cell' + (v === undefined ? ' empty' : '') + (s % 4 === 0 ? ' beat' : '')} role="slider" tabIndex={v === undefined ? -1 : 0}
-              aria-label={`Velocity step ${s + 1}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round((v ?? 0) * 100)} onKeyDown={e => laneKey(e, s)}>
-              <div className="vel-bar" style={{ height: `${(v ?? 0) * 100}%` }} />
-              {v !== undefined && <span className="vel-num">{Math.round(v * 100)}</span>}
+            const list = notesAtStep(notes, s);
+            return <div key={s} data-vstep={s} className={'vel-cell' + (list.length === 0 ? ' empty' : '') + (list.length > 1 ? ' chord' : '') + (s % 4 === 0 ? ' beat' : '')}>
+              {list.map(n => <div key={n.id} className="vel-note" role="slider" tabIndex={0} title={`${n.pitch} · ${Math.round(n.velocity * 100)}`} aria-label={`Velocity ${n.pitch} step ${s + 1}`}
+                aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(n.velocity * 100)} onKeyDown={e => laneKey(e, n.id, n.velocity)}>
+                <div className="vel-bar" style={{ height: `${n.velocity * 100}%` }} />
+                {list.length === 1 && <span className="vel-num">{Math.round(n.velocity * 100)}</span>}
+              </div>)}
             </div>;
           })}
         </div>

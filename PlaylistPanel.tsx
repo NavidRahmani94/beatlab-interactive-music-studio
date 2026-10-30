@@ -96,7 +96,6 @@ export default function PlaylistPanel(p: Props) {
             title={slot === null ? `Slot ${bar + 1}: click to place “${p.patterns[p.current]?.name}”` : `Slot ${bar + 1}: ${p.patterns[slot]?.name} (click again with the same pattern selected to clear)`}
             onClick={() => { setCursor(bar); p.onSlot(bar); }}>
             {sec && <small className="sec-tag">{sec.name}</small>}<b>{bar + 1}</b><span>{slot === null ? '—' : p.patterns[slot]?.name}</span>
-            {active && <em className="progress" />}
           </button>;
         })}
       </div>

@@ -92,6 +92,18 @@ export function stepVelocity(notes: MelodyNote[], step: number): number | undefi
   return v.length ? Math.max(...v) : undefined;
 }
 
+/** The notes that start on a step, lowest pitch first (a chord on one step = several notes). */
+export function notesAtStep(notes: MelodyNote[], step: number): MelodyNote[] {
+  return notes.filter(n => n.step === step).sort((a, b) => midiOf(a) - midiOf(b));
+}
+
+/** Sets the velocity of ONE note (by id): the notes of a chord are adjusted separately. */
+export function setNoteVelocity(notes: MelodyNote[], id: string, velocity: number): MelodyNote[] {
+  if (!notes.some(n => n.id === id)) return notes;
+  const v = clampVelocity(velocity);
+  return notes.map(n => n.id === id ? { ...n, velocity: v } : n);
+}
+
 /** Sets the velocity of every note that starts on this step (the velocity lane under the piano roll). */
 export function setStepVelocity(notes: MelodyNote[], step: number, velocity: number): MelodyNote[] {
   if (!notes.some(n => n.step === step)) return notes;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  MAX_MIDI, MIN_MIDI, PRESETS, PRESET_NAMES, SCALES, ScaleName, easyRoot, inScale, makePreset, generateMelody, setStepVelocity, stepVelocity, clampVelocity,
+  MAX_MIDI, MIN_MIDI, PRESETS, notesAtStep, setNoteVelocity, PRESET_NAMES, SCALES, ScaleName, easyRoot, inScale, makePreset, generateMelody, setStepVelocity, stepVelocity, clampVelocity,
   midiToNote, noteAt, resizeNote, makeTrackPreset, presetsForTrack, TRACK_PRESETS, TRACK_PRESET_NAMES, noteToMidi, normalizeNotes, scaleRows, snapNotesToScale, toggleNote, transposeNotes, remapToScale
 } from './melody';
 import { isMelodyInstrument } from './instruments';
@@ -236,5 +236,19 @@ describe('ambient and arpeggio ready-made patterns', () => {
   }));
   it('ambient notes are long', () => {
     presetsForTrack('ambient').forEach(n => makeTrackPreset(n, 0).notes.forEach(x => expect(x.lengthSteps).toBeGreaterThanOrEqual(8)));
+  });
+});
+
+describe('per-note velocity (chords)', () => {
+  const chord = () => ['C4', 'E4', 'G4'].map((p, i) => ({ id: `n${60 + [0, 4, 7][i]}_0`, pitch: p, step: 0, lengthSteps: 4, velocity: 0.8 }));
+  it('notesAtStep lists the notes of a step lowest first', () => {
+    const n = chord().reverse();
+    expect(notesAtStep(n, 0).map(x => x.pitch)).toEqual(['C4', 'E4', 'G4']); expect(notesAtStep(n, 1)).toEqual([]);
+  });
+  it('setNoteVelocity changes one note and leaves its neighbours', () => {
+    const n = chord(); const m = setNoteVelocity(n, 'n64_0', 0.3);
+    expect(m.map(x => x.velocity)).toEqual([0.8, 0.3, 0.8]); expect(n[1].velocity).toBe(0.8);
+    expect(setNoteVelocity(n, 'nope', 0.1)).toBe(n);
+    expect(setNoteVelocity(n, 'n64_0', 9).find(x => x.id === 'n64_0')!.velocity).toBe(1);
   });
 });

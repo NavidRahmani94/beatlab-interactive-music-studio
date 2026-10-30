@@ -39,15 +39,19 @@ export default function Timeline({ mode, playlist, sections, current, bpm, playi
 
   // playhead + clock
   useEffect(() => {
-    let raf = 0;
-    const tick = () => {
+    let raf = 0; let last = -1; let lastText = '';
+    const tick = (ts: number) => {
+      raf = requestAnimationFrame(tick);
+      if (ts - last < 33) return;                 // about 30 frames a second is plenty for a playhead
+      last = ts;
       const L = live.current;
       let pos = L.startStep;
       if (L.playing) { const h = L.getPlayhead(); if (h) pos = positionSteps(h.songStep, performance.now() - h.at, L.bpm); }
       pos = Math.max(0, Math.min(L.total, pos));
-      if (headRef.current) headRef.current.style.left = `${(pos / L.total) * 100}%`;
-      if (timeRef.current) timeRef.current.textContent = formatTime(stepsToSeconds(pos, L.bpm), 1);
-      raf = requestAnimationFrame(tick);
+      // transform (not left) so the browser does not lay the page out again for every frame
+      if (headRef.current) headRef.current.style.transform = `translateX(${(pos / L.total) * (trackRef.current?.clientWidth ?? 0)}px)`;
+      const text = formatTime(stepsToSeconds(pos, L.bpm), 1);
+      if (timeRef.current && text !== lastText) { timeRef.current.textContent = text; lastText = text; }
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);

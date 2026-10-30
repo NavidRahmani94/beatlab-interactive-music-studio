@@ -75,7 +75,8 @@ export function chordNotes(midis: number[], step: number, length: number, style:
   const end = Math.min(STEPS, step + Math.max(1, Math.round(length)));
   const out: MelodyNote[] = [];
   if (style === 'block') {
-    midis.forEach(m => out.push(note(m, step, end - step, velocity)));
+    // a played chord is never perfectly even: the lowest note leads and each higher note is a little softer (every note can be changed later)
+    midis.forEach((m, i) => out.push(note(m, step, end - step, velocity * (1 - 0.06 * i))));
   } else if (style === 'strum') {
     midis.forEach((m, i) => { const s = step + i; if (s < end) out.push(note(m, s, end - s, velocity)); });
   } else {

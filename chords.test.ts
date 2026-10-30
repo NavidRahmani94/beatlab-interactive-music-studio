@@ -82,3 +82,14 @@ describe('suggestions and progressions', () => {
     expect(roots).toEqual([0, 7, 9, 5]);
   });
 });
+
+describe('chord velocity shaping', () => {
+  it('a block chord has the lowest note loudest and each higher note a little softer', () => {
+    const n = chordNotes([48, 52, 55, 59], 0, 8, 'block', 0.8);
+    const v = n.map(x => x.velocity);
+    expect(v[0]).toBe(0.8); expect(v[1]).toBeLessThan(v[0]); expect(v[3]).toBeLessThan(v[2]); expect(Math.min(...v)).toBeGreaterThan(0.5);
+  });
+  it('strum and arp keep an even velocity', () => {
+    expect(new Set(chordNotes([48, 52, 55], 0, 8, 'strum', 0.8).map(x => x.velocity)).size).toBe(1);
+  });
+});

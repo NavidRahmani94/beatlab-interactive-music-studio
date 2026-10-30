@@ -130,3 +130,10 @@ The hi-hat (Tone.MetalSynth, 12 FM oscillators per hit) used about 60% of the au
 - A timeline in the TRANSPORT panel (under the tempo) shows the whole track in seconds: ruler (0:05, 0:10 …), the section names and a coloured block per slot.
 - Click or drag to jump anywhere, while stopped (PLAY starts from there) or while playing. Keys: ← → = 1 second, Shift = 1 slot, Home = start. ⏮ goes back to the start.
 - In PATTERN mode it shows the one pattern that loops. STOP returns to 0:00. The clock follows the tempo.
+
+## v0.18.1
+Less drawing work while playing: the per-slot progress animation in the playlist is gone (the timeline shows the position), and the timeline moves its playhead with a transform at about 30 fps and only rewrites its clock when the text changes. Layout work during playback dropped by about 40% in our benchmark.
+
+## v0.18.2 — velocity per note
+- The velocity lane now has one bar per NOTE. The notes of a chord stand side by side on their step (lowest on the left); drag a bar to change only that note. Hold Shift to change the whole step (the old behaviour). Arrow keys adjust a focused bar; the label shows the note and value while dragging.
+- A block chord from the chord builder is no longer perfectly even: the lowest note is loudest and each higher note is a little softer (6% steps). Every note can be changed afterwards.

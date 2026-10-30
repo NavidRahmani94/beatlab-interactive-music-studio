@@ -70,3 +70,6 @@ Benchmarks used while developing: leak2/leak4 (alive native node counts), sched2
 
 ## v0.18 tests
 timeline.test.ts (273 unit tests in total), e2e-v18.cjs (jump while stopped, play from there, jump back while playing, Home, STOP resets, pattern mode).
+
+## v0.18.2 tests
+melody.test.ts (notesAtStep, setNoteVelocity), chords.test.ts (velocity shaping), e2e-v182.cjs (3 bars per triad, drag one, Shift, arrows, advanced). 277 unit tests.

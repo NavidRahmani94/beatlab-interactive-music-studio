@@ -47,8 +47,6 @@ body,.panel,button,select,input{transition:background-color .15s,color .15s,bord
 .slot span{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .slot.empty{background:var(--surface2);border:1px dashed var(--line);color:var(--muted)}
 .slot.playing{outline:2px solid var(--strong);outline-offset:1px}
-.slot .progress{position:absolute;left:0;bottom:0;height:3px;background:var(--strong);animation:slotfill var(--bar-s,2s) linear infinite;width:100%;transform-origin:left}
-@keyframes slotfill{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 .seg button:disabled{opacity:.4;cursor:not-allowed}
 .mix-group{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.4px;color:var(--accent-text);margin:6px 0 10px;padding-top:10px;border-top:1px solid var(--raised);min-width:860px}
 .mix-group:first-of-type{border-top:0;padding-top:0}
@@ -324,4 +322,11 @@ body,.panel,button,select,input{transition:background-color .15s,color .15s,bord
 .tl-slots{position:absolute;left:0;right:0;bottom:0;height:36px;display:flex}
 .tl-slot{flex:1;border-left:1px solid var(--bg2);background:color-mix(in srgb,var(--c,var(--line)) 55%,transparent)}
 .tl-slot.empty{background:var(--surface2);opacity:.5}
-.tl-head-line{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--strong);box-shadow:0 0 8px var(--strong);pointer-events:none;left:0}
+.tl-head-line{will-change:transform;position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--strong);box-shadow:0 0 8px var(--strong);pointer-events:none;left:0}
+
+/* v0.18.2 per-note velocity bars (chords side by side) */
+.vel-cell{display:flex;align-items:stretch;gap:1px}
+.vel-note{position:relative;flex:1;min-width:0;height:100%;outline-offset:-1px}
+.vel-note:focus-visible{outline:2px solid var(--strong)}
+.vel-cell.chord .vel-note + .vel-note{border-left:1px solid var(--surface)}
+.vel-readout{display:block;font-size:8px;letter-spacing:.5px;color:var(--accent-text);white-space:nowrap}
