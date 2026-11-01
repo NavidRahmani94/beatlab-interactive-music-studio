@@ -51,6 +51,7 @@ function make(midi: number, step: number, lengthSteps: number, velocity = DEFAUL
   return { id: `n${midi}_${step}`, pitch: midiToNote(midi), step, lengthSteps, velocity: clampVelocity(velocity) };
 }
 
+const keepSlide = (from: MelodyNote, to: MelodyNote): MelodyNote => from.slide ? { ...to, slide: true } : to;
 function midiOf(n: MelodyNote): number { return noteToMidi(n.pitch) ?? -1; }
 
 /** Sorts, clips lengths to the bar, drops invalid notes and overlapping notes of the same pitch. */
@@ -65,7 +66,7 @@ export function normalizeNotes(notes: MelodyNote[]): MelodyNote[] {
     if (n.step < (lastEnd.get(midi) ?? 0)) continue;
     const len = Math.min(Math.round(n.lengthSteps), STEPS - n.step);
     lastEnd.set(midi, n.step + len);
-    out.push(make(midi, n.step, len, n.velocity));
+    out.push(n.slide ? { ...make(midi, n.step, len, n.velocity), slide: true } : make(midi, n.step, len, n.velocity));   // keep the slide flag
   }
   return out;
 }
@@ -120,7 +121,7 @@ function wrap(midi: number): number {
 }
 
 export function transposeNotes(notes: MelodyNote[], semitones: number): MelodyNote[] {
-  return normalizeNotes(notes.map(n => make(wrap(midiOf(n) + semitones), n.step, n.lengthSteps, n.velocity)));
+  return normalizeNotes(notes.map(n => keepSlide(n, make(wrap(midiOf(n) + semitones), n.step, n.lengthSteps, n.velocity))));
 }
 
 /** Moves every note to the nearest note of the scale (ties go down) so it always sounds in key. */
@@ -132,7 +133,7 @@ export function snapNotesToScale(notes: MelodyNote[], keyPc: number, scale: Scal
     }
     return midi;
   };
-  return normalizeNotes(notes.map(n => make(wrap(snap(midiOf(n))), n.step, n.lengthSteps, n.velocity)));
+  return normalizeNotes(notes.map(n => keepSlide(n, make(wrap(snap(midiOf(n))), n.step, n.lengthSteps, n.velocity))));
 }
 
 /**
@@ -152,7 +153,7 @@ export function remapToScale(notes: MelodyNote[], keyPc: number, from: ScaleName
     fromIv.forEach((iv, i) => { const d = Math.abs(iv - pc); if (d < best) { best = d; degree = i; } });
     if (12 - pc < best) { degree = 0; octave += 1; }
     const midi = keyPc + octave * 12 + toIv[Math.min(degree, toIv.length - 1)];
-    return make(wrap(midi), n.step, n.lengthSteps, n.velocity);
+    return keepSlide(n, make(wrap(midi), n.step, n.lengthSteps, n.velocity));
   }));
 }
 

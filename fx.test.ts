@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FX_IDS, MAX_FX, addFx, fxSignature, moveFx, patchFx, removeFx, validateFx } from './fx';
-import { MelodyNote, isSlideTarget, slideCents, slidePath, slideTarget, toggleSlide } from './melody';
+import { toggleNote, transposeNotes, MelodyNote, isSlideTarget, slideCents, slidePath, slideTarget, toggleSlide } from './melody';
 import { defaultProject, parseProject, serializeProject } from './project';
 
 describe('insert effects', () => {
@@ -70,6 +70,12 @@ describe('slide notes', () => {
     const sp = slidePath(notes, notes[0])!;
     expect(sp.skip).toEqual(['b', 'c']); expect(sp.endStep).toBe(6);
     expect(sp.path.map(k => k.cents)).toEqual([0, 400, 400, 0]);
+  });
+  it('adding, removing, transposing notes keeps the slide flag of the other notes', () => {
+    let notes = toggleNote([], 60, 0, 2); notes = toggleNote(notes, 64, 2, 2); notes = toggleSlide(notes, notes[1].id);
+    notes = toggleNote(notes, 67, 6, 2); expect(notes.find(x => x.pitch === 'E4')?.slide).toBe(true);
+    notes = toggleNote(notes, 67, 6, 2); expect(notes.find(x => x.pitch === 'E4')?.slide).toBe(true);
+    expect(transposeNotes(notes, 2).find(x => x.pitch === 'F#4')?.slide).toBe(true);
   });
   it('a slide note with nothing to bend is played as a normal note; slide notes have no path of their own', () => {
     const lone = [n('a', 'C4', 0, true)]; expect(isSlideTarget(lone, lone[0])).toBe(false); expect(slidePath(lone, lone[0])).toBeNull();
