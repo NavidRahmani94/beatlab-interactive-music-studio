@@ -1,11 +1,4 @@
 const { chromium } = require('playwright');
-(async () => {
-  const b = await chromium.launch();
-  for (const [w, h, n] of [[1280, 1000, 'desk'], [390, 800, 'phone']]) {
-    const p = await (await b.newContext({ viewport: { width: w, height: h } })).newPage();
-    await p.goto('http://localhost:4173/'); await p.waitForTimeout(1200);
-    await p.locator('.timeline').scrollIntoViewIfNeeded(); await p.locator('.transport').screenshot({ path: `/tmp/tl_${n}.png` });
-    const over = await p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth); console.log(n, 'horizontal overflow', over);
-  }
-  await b.close();
-})();
+(async () => { const b = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] }); const p = await b.newPage({ viewport: { width: 1280, height: 900 } });
+ await p.goto(process.argv[2]); await p.waitForTimeout(1500); await p.getByRole('button', { name: /^play/i }).first().click(); await p.waitForTimeout(3000);
+ await p.locator('.mixer').scrollIntoViewIfNeeded(); await p.locator('.mixer').screenshot({ path: '../mixer_lvl.png' }); await b.close(); })();

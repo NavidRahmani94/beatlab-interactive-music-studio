@@ -14,13 +14,15 @@ type Props = {
   onChannel: (name: ChannelName, patch: Partial<ChannelSettings>) => void;
   onMaster: (patch: Partial<MasterSettings>) => void;
   getLevelDb: () => number;
+  getChannelLevels: (name: string) => [number, number];
   playing: boolean;
 };
 
 const fmtDb = (v: number) => `${v > 0 ? '+' : ''}${v} dB`;
 const fmtPan = (p: number) => (Math.abs(p) < 0.02 ? 'C' : p < 0 ? `L${Math.round(-p * 100)}` : `R${Math.round(p * 100)}`);
 
-export default function MixerPanel({ channels, tracks, master, onChannel, onMaster, getLevelDb, playing }: Props) {
+export default function MixerPanel({ channels, tracks, master, onChannel, onMaster, getLevelDb, getChannelLevels, playing }: Props) {
+  const mixRef = useRef<HTMLDivElement>(null);
   const meterRef = useRef<HTMLDivElement>(null);
   const peakRef = useRef<HTMLSpanElement>(null);
   const [fxOpen, setFxOpen] = useState<Record<string, boolean>>({});
@@ -41,10 +43,30 @@ export default function MixerPanel({ channels, tracks, master, onChannel, onMast
     return () => cancelAnimationFrame(raf);
   }, [playing, getLevelDb]);
 
+  // animate the L / R signal meters of every channel (straight on the DOM, no React re-render)
+  useEffect(() => {
+    const peaks = new Map<string, number>(); let raf = 0;
+    const tick = () => {
+      mixRef.current?.querySelectorAll<HTMLElement>('.lvl[data-ch]').forEach(el => {
+        const name = el.dataset.ch as string; const lv = playing ? getChannelLevels(name) : [-Infinity, -Infinity];
+        [0, 1].forEach(i => {
+          const db = Number.isFinite(lv[i]) ? Math.max(-60, lv[i]) : -60; const key = name + i;
+          const pk = Math.max(db, (peaks.get(key) ?? -60) - 0.5); peaks.set(key, pk);
+          const fill = el.querySelector<HTMLElement>(`.lvl-bar.b${i} i`); const peak = el.querySelector<HTMLElement>(`.lvl-bar.b${i} u`);
+          if (fill) fill.style.width = `${((db + 60) / 60) * 100}%`;
+          if (peak) peak.style.left = `${((pk + 60) / 60) * 100}%`;
+        });
+      });
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [playing, getChannelLevels]);
+
   return <section className="panel mixer">
     <div className="panel-label">MIXER <span>{4 + tracks.length} CHANNELS → ONE MASTER (EQ · COMPRESSOR · REVERB · DELAY)</span></div>
-    <div className="mixer-body">
-      <div className="mix-row mix-head"><span /><span>M / S</span><span>PAN</span><span>VOLUME</span><span>REVERB SEND</span><span>DELAY SEND</span></div>
+    <div className="mixer-body" ref={mixRef}>
+      <div className="mix-row mix-head"><span /><span>M / S</span><span>PAN</span><span>VOLUME</span><span>REVERB SEND</span><span>DELAY SEND</span><span>SIGNAL L / R</span></div>
       {channelGroups(tracks).flatMap(g => g.channels.map((name, idx) => ({ name, group: idx === 0 ? g.label : null, kind: g.kind }))).map(({ name, group, kind }) => {
         const c = channels[name] ?? defaultChannel(name, kind === 'drums' ? undefined : kind);
         const label = channelLabel(name, tracks);
@@ -62,6 +84,10 @@ export default function MixerPanel({ channels, tracks, master, onChannel, onMast
             onChange={e => onChannel(name, { reverbSend: Number(e.target.value) / 100 })} /><b>{Math.round(c.reverbSend * 100)}%</b></label>
           <label className="fader"><input type="range" min={0} max={100} step={1} value={Math.round(c.delaySend * 100)} aria-label={`${label} delay send`}
             onChange={e => onChannel(name, { delaySend: Number(e.target.value) / 100 })} /><b>{Math.round(c.delaySend * 100)}%</b></label>
+          <div className="lvl" data-ch={name} role="img" aria-label={`${label} signal level, left and right`}>
+            <div className="lvl-bar b0"><em>L</em><span><i /><u /></span></div>
+            <div className="lvl-bar b1"><em>R</em><span><i /><u /></span></div>
+          </div>
         </div>
           {fxOpen[name] && <div className="mix-fx" role="group" aria-label={`${label} effects`}>
             {(c.fx ?? []).length === 0 && <div className="fx-empty">No effects yet. Add one below (up to {MAX_FX}). They run in order, top to bottom, before pan and the reverb / delay sends.</div>}

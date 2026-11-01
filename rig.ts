@@ -15,7 +15,7 @@ import { Groove, defaultGroove, drumHits, stepDrift, swingDelay } from './groove
 import { PatternData, notesFor } from './song';
 
 type FxNode = { input: Tone.ToneAudioNode; output: Tone.ToneAudioNode; set(amount: number): void; dispose(): void };
-type Strip = { vol: Tone.Volume; pan: Tone.Panner; reverbSend: Tone.Gain; delaySend: Tone.Gain; fxSig: string; fx: { id: string; node: FxNode }[] };
+type Strip = { vol: Tone.Volume; pan: Tone.Panner; split: Tone.Split; meterL: Tone.Meter; meterR: Tone.Meter; reverbSend: Tone.Gain; delaySend: Tone.Gain; fxSig: string; fx: { id: string; node: FxNode }[] };
 
 /** One insert effect. `amount` (0..1) is how much of it you hear; 0 sounds like the dry signal. */
 /**
@@ -344,7 +344,10 @@ export class Rig {
     reverbSend.connect(this.sendReverb);
     pan.connect(delaySend);
     delaySend.connect(this.delay);
-    const strip: Strip = { vol, pan, reverbSend, delaySend, fxSig: '', fx: [] };
+    // level meters of the left and right side of the channel (after pan), for the mixer
+    const split = new Tone.Split(2); const meterL = new Tone.Meter({ smoothing: 0.7 }); const meterR = new Tone.Meter({ smoothing: 0.7 });
+    pan.connect(split); split.connect(meterL, 0); split.connect(meterR, 1);
+    const strip: Strip = { vol, pan, split, meterL, meterR, reverbSend, delaySend, fxSig: '', fx: [] };
     this.strips[name] = strip;
     this.muted[name] = false;
     return strip;
@@ -353,7 +356,7 @@ export class Rig {
     const s = this.strips[name];
     if (!s) return;
     s.fx.forEach(f => f.node.dispose());
-    s.vol.dispose(); s.pan.dispose(); s.reverbSend.dispose(); s.delaySend.dispose();
+    s.vol.dispose(); s.pan.dispose(); s.split.dispose(); s.meterL.dispose(); s.meterR.dispose(); s.reverbSend.dispose(); s.delaySend.dispose();
     delete this.strips[name];
     delete this.muted[name];
   }
@@ -535,6 +538,12 @@ export class Rig {
     this.hatReady = ctx.render().then(buf => { if (gen === this.hatGen) this.hatBuf = new Tone.ToneAudioBuffer(buf); }).catch(() => { /* keep the MetalSynth */ });
   }
 
+  /** Left and right level of one mixer channel in dB (-Infinity = silent), for the channel meters. */
+  getChannelLevels(name: string): [number, number] {
+    const s = this.strips[name as ChannelName]; if (!s) return [-Infinity, -Infinity];
+    const one = (m: Tone.Meter) => { const v = m.getValue(); return Array.isArray(v) ? (v as number[])[0] : (v as number); };
+    return [one(s.meterL), one(s.meterR)];
+  }
   /** Master output level in dB (for the meter). */
   getLevelDb(): number {
     const v = this.meter.getValue();
