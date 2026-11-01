@@ -7,6 +7,7 @@ import {
 import { ARP_MODES, ARP_RATES, ArpMode, ArpRate, ArpSettings, clampGate } from './arp';
 import { MELODY_INSTRUMENTS, instrumentGroups, MelodyInstrumentId } from './instruments';
 import { KIND_DEFAULT_LENGTH, MAX_TRACK_NAME, TRACK_KINDS, TrackDef, TrackKind } from './tracks';
+import { MAX_MIDI, MIN_MIDI, easyRoot, midiToNote, noteToMidi, transposeNotes } from './melody';
 import PianoRoll from './PianoRoll';
 import ChordBuilder from './ChordBuilder';
 
@@ -41,11 +42,15 @@ const LENGTHS: Record<TrackKind, [string, number][]> = {
 };
 
 /** One tab for a track of any kind (melody, ambient, arpeggio, synth). They share the piano roll, key and scale. */
+/** True when every note can move by `semis` without leaving the C2–C7 range (a note is never wrapped around). */
+const canShift = (notes: MelodyNote[], semis: number): boolean => notes.length > 0 && notes.every(n => { const m = noteToMidi(n.pitch); return m !== null && m + semis >= MIN_MIDI && m + semis <= MAX_MIDI; });
+
 export default function TrackPanel(p: Props) {
   const { track } = p;
   const kind = track.kind;
   const arp: ArpSettings = track.arp;
   const [advanced, setAdvanced] = useState(false);
+  const [oct, setOct] = useState(0);   // EASY mode: which octave the piano roll shows (-2 … +1 from the middle octave)
   const [length, setLength] = useState(KIND_DEFAULT_LENGTH[kind]);
   const [velocity, setVelocity] = useState(DEFAULT_VELOCITY);
   const touchDevice = typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
@@ -69,7 +74,7 @@ export default function TrackPanel(p: Props) {
   const auto = () => p.onNotes(generateMelody(p.keyPc, p.scale, mood, Math.floor(Math.random() * 4294967296)));
 
   return <section className="panel melody" aria-label={`${name} track`}>
-    <div className="panel-label">{name.toUpperCase()} <span>{TRACK_KINDS[kind].label.toUpperCase()} TRACK · {TRACK_KINDS[kind].hint} · {advanced ? 'ADVANCED · PIANO ROLL C3–C6' : 'EASY · EVERY NOTE FITS THE KEY'}</span></div>
+    <div className="panel-label">{name.toUpperCase()} <span>{TRACK_KINDS[kind].label.toUpperCase()} TRACK · {TRACK_KINDS[kind].hint} · {advanced ? 'ADVANCED · PIANO ROLL C2–C7' : 'EASY · EVERY NOTE FITS THE KEY'}</span></div>
     <div className="melody-controls track-head">
       <label className="ctl">TRACK NAME
         <input className="name-input short" aria-label="Track name" value={name} maxLength={MAX_TRACK_NAME} onChange={e => p.onRename(e.target.value)}
@@ -81,6 +86,19 @@ export default function TrackPanel(p: Props) {
       <div className="seg" role="group" aria-label={`${name} mode`}>
         <button aria-pressed={!advanced} className={!advanced ? 'sel' : ''} onClick={() => setAdvanced(false)}>EASY</button>
         <button aria-pressed={advanced} className={advanced ? 'sel' : ''} onClick={() => setAdvanced(true)}>ADVANCED</button>
+      </div>
+      {!advanced && <div className="ctl oct-ctl">OCTAVE
+        <div className="seg" role="group" aria-label={`${name} octave`}>
+          <button aria-label={`${name} octave down`} disabled={oct <= -2} onClick={() => setOct(o => Math.max(-2, o - 1))}>−</button>
+          <button disabled aria-label={`${name} shown octave`} title="The octave the EASY piano roll shows (notes in other octaves keep playing)">{midiToNote(easyRoot(p.keyPc) + 12 * oct)}–{midiToNote(easyRoot(p.keyPc) + 12 * oct + 12)}</button>
+          <button aria-label={`${name} octave up`} disabled={oct >= 1} onClick={() => setOct(o => Math.min(1, o + 1))}>+</button>
+        </div>
+      </div>}
+      <div className="ctl oct-ctl">MOVE ALL NOTES
+        <div className="seg" role="group" aria-label={`${name} move notes by an octave`}>
+          <button aria-label={`${name} notes one octave down`} title="Move every note of this track one octave down" disabled={!canShift(p.notes, -12)} onClick={() => p.onNotes(prev => transposeNotes(prev, -12))}>▼ OCT</button>
+          <button aria-label={`${name} notes one octave up`} title="Move every note of this track one octave up" disabled={!canShift(p.notes, 12)} onClick={() => p.onNotes(prev => transposeNotes(prev, 12))}>▲ OCT</button>
+        </div>
       </div>
       <label className="ctl">INSTRUMENT
         <select value={track.instrument} aria-label={`${name} instrument`} onChange={e => p.onInstrument(e.target.value as MelodyInstrumentId)}>
@@ -154,7 +172,7 @@ export default function TrackPanel(p: Props) {
       <button className={!touchDraw ? 'sel' : ''} aria-pressed={!touchDraw} onClick={() => setTouchDraw(false)}>↔ SCROLL (tap = note)</button>
       <button className={touchDraw ? 'sel' : ''} aria-pressed={touchDraw} onClick={() => setTouchDraw(true)}>✏ DRAW (drag = long note)</button>
     </div>}
-    <PianoRoll slide={track.kind !== 'arp'} notes={p.notes} onNotes={p.onNotes} advanced={advanced} keyPc={p.keyPc} scale={p.scale} defaultLength={length} velocity={velocity}
+    <PianoRoll slide={track.kind !== 'arp'} notes={p.notes} onNotes={p.onNotes} advanced={advanced} octave={oct} keyPc={p.keyPc} scale={p.scale} defaultLength={length} velocity={velocity}
       enabled={p.enabled} playingStep={p.playingStep} accent={p.accent} touchDraw={touchDraw} onPreview={p.onPreview} cursor={p.cursor} />
     <div className="grid-footer">
       <span>CLICK = NEW NOTE · DRAG SIDEWAYS = ANY LENGTH · DRAG A NOTE'S END TO STRETCH · CLICK A NOTE TO REMOVE IT</span>

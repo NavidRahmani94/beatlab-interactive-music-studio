@@ -5,8 +5,8 @@ import { MelodyInstrumentId } from './instruments';
 export type MelodyNote = { id: string; pitch: string; step: number; lengthSteps: number; velocity: number; slide?: boolean };
 
 export const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
-export const MIN_MIDI = 48; // C3
-export const MAX_MIDI = 84; // C6
+export const MIN_MIDI = 36; // C2
+export const MAX_MIDI = 96; // C7
 export const DEFAULT_VELOCITY = 0.8;
 export const MIN_VELOCITY = 0.05;
 

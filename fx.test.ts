@@ -83,3 +83,11 @@ describe('slide notes', () => {
     const far = [n('a', 'C4', 0), n('b', 'E4', 5, true)]; expect(isSlideTarget(far, far[1])).toBe(false);   // gap: nothing sounding
   });
 });
+
+describe('octave range', () => {
+  it('notes can be anywhere from C2 to C7 and transposing by an octave moves them (not wraps) inside that range', async () => {
+    const { MIN_MIDI, MAX_MIDI, transposeNotes: tr, toggleNote: tg } = await import('./melody');
+    expect(MIN_MIDI).toBe(36); expect(MAX_MIDI).toBe(96);
+    const a = tg([], 60, 0, 2); expect(tr(a, 12)[0].pitch).toBe('C5'); expect(tr(a, -24)[0].pitch).toBe('C2');
+  });
+});

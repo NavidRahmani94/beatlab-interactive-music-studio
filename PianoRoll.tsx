@@ -18,6 +18,7 @@ type Props = {
   accent: string;           // CSS colour of this track
   onPreview?: (midi: number, down: boolean) => void; // press / release a note name to hear it
   cursor?: number;          // step-entry position (highlighted column), -1 = none
+  octave?: number;          // EASY mode: shifts the shown octave by this many octaves
   slide?: boolean;          // show the SLIDE lane (not for arpeggio tracks, whose notes are chords)
   touchDraw: boolean;       // touch screens: true = dragging draws/stretches notes, false = dragging scrolls (a tap still adds/removes)
 };
@@ -53,7 +54,7 @@ const Row = memo(function Row({ midi, name, inKey, isRoot, advanced, cursor, row
  * Piano roll. CLICK an empty cell = new note (default length). DRAG sideways from an empty cell = a note of any length.
  * DRAG sideways from a cell of an existing note = stretch / shrink it. CLICK an existing note = remove it.
  */
-export default function PianoRoll({ slide = true, notes, onNotes, advanced, keyPc, scale, defaultLength, velocity, enabled, playingStep, accent, touchDraw, onPreview, cursor = -1 }: Props) {
+export default function PianoRoll({ octave = 0, slide = true, notes, onNotes, advanced, keyPc, scale, defaultLength, velocity, enabled, playingStep, accent, touchDraw, onPreview, cursor = -1 }: Props) {
   const rollRef = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);
   const laneDragging = useRef(false);
@@ -74,7 +75,7 @@ export default function PianoRoll({ slide = true, notes, onNotes, advanced, keyP
 
   const rows = useMemo(() => advanced
     ? Array.from({ length: MAX_MIDI - MIN_MIDI + 1 }, (_, i) => MAX_MIDI - i)
-    : scaleRows(keyPc, scale).slice().reverse(), [advanced, keyPc, scale]);
+    : scaleRows(keyPc, scale).map(m => m + 12 * octave).filter(m => m >= MIN_MIDI && m <= MAX_MIDI).reverse(), [advanced, keyPc, scale, octave]);
 
   // per row: the 32 cells and a short signature of them (so unchanged rows are not redrawn)
   const rowData = useMemo(() => {

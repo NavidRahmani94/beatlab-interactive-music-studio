@@ -81,7 +81,7 @@ describe('importing notes onto the grid', () => {
   const n = (midi: number, startTick: number, durationTicks: number) => ({ midi, startTick, durationTicks, velocity: 0.8, channel: 0 });
   it('snaps to 16ths, folds into range, drops notes outside the bar', () => {
     const g = notesToGrid([n(60, 118, 130), n(30, 240, 100), n(100, 480, 120), n(62, 32 * 120 + 5, 120)], PPQ, 0);
-    expect(g.map(x => [x.pitch, x.step, x.lengthSteps])).toEqual([['C4', 1, 1], ['F#3', 2, 1], ['E5', 4, 1]]);
+    expect(g.map(x => [x.pitch, x.step, x.lengthSteps])).toEqual([['C4', 1, 1], ['F#2', 2, 1], ['E6', 4, 1]]);
     expect(notesToGrid([n(62, 32 * 120 + 5, 120)], PPQ, 1)).toHaveLength(1);
   });
   it('works with files that use another resolution', () => {

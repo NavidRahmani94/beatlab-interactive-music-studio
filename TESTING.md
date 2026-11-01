@@ -148,3 +148,9 @@ Audit script (not shipped): every built-in sound rendered offline on 7 notes; be
 ## v0.18.20 — AUDIO CLOCK in the system monitor is averaged (no more false "STRAINED")
 - A user screenshot showed AUDIO HEALTH "STRAINED" at AUDIO CLOCK 96.2 % with 0 late steps, 3 ms page lag and 131 fps: that is not a real overload. Browsers move the audio clock in chunks, so a single 1-second reading can be a few percent low. The clock is now the average of the last ~8 s (needs 3 readings, so "…" for the first seconds); BORDERLINE below 97 %, STRAINED below 90 % (before: 99.5 / 97). A real starvation (like the 73 % seen earlier) still shows.
 - Not known: whether the earlier 73 % reading was a real glitch of the user's computer. The engine itself was measured in the sandbox only.
+
+## v0.18.21 — octaves in EASY mode
+- EASY piano roll: new **OCTAVE − / +** selector in each track (shows which octave of the key you write in: from 2 octaves below the middle one to 1 above). Notes in other octaves keep playing; the "N NOTES OUTSIDE THIS VIEW STILL PLAY" hint tells you.
+- New **MOVE ALL NOTES ▼ OCT / ▲ OCT**: moves every note of the track by an octave (disabled when a note would leave the range; notes are never wrapped around).
+- Note range widened from C3–C6 to **C2–C7** (MIN_MIDI 36, MAX_MIDI 96). Older saved projects load unchanged. ADVANCED shows the full range. The MIDI import folds notes into the new range (test updated).
+- Checked: 303 unit tests, `e2e-v1821.cjs` in a real browser (rows move by 12, the hint, the moved note appears in the octave above, selector hidden in ADVANCED). Not checked: by ear. The CHORD BUILDER still places chords in its own register (it switches to ADVANCED if they fall outside the EASY view).

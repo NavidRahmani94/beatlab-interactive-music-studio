@@ -325,7 +325,7 @@ function validateNotes(raw: unknown, where: string): MelodyNote[] | string {
     if (!isObj(n)) return `${w} is not a note.`;
     if (typeof n.id !== 'string') return `${w}.id must be text.`;
     const midi = typeof n.pitch === 'string' ? noteToMidi(n.pitch) : null;
-    if (midi === null || midi < MIN_MIDI || midi > MAX_MIDI) return `${w}.pitch must be a note between C3 and C6.`;
+    if (midi === null || midi < MIN_MIDI || midi > MAX_MIDI) return `${w}.pitch must be a note between C2 and C7.`;
     if (!isNum(n.step) || !Number.isInteger(n.step) || n.step < 0 || n.step >= STEPS) return `${w}.step must be a whole number 0–${STEPS - 1}.`;
     if (!isNum(n.lengthSteps) || !Number.isInteger(n.lengthSteps) || n.lengthSteps < 1 || n.step + n.lengthSteps > STEPS) return `${w}.lengthSteps must be a whole number ≥ 1 that fits inside the bar.`;
     if (!isNum(n.velocity) || n.velocity < 0 || n.velocity > 1) return `${w}.velocity must be between 0 and 1.`;
