@@ -137,3 +137,44 @@ Less drawing work while playing: the per-slot progress animation in the playlist
 ## v0.18.2 — velocity per note
 - The velocity lane now has one bar per NOTE. The notes of a chord stand side by side on their step (lowest on the left); drag a bar to change only that note. Hold Shift to change the whole step (the old behaviour). Arrow keys adjust a focused bar; the label shows the note and value while dragging.
 - A block chord from the chord builder is no longer perfectly even: the lowest note is loudest and each higher note is a little softer (6% steps). Every note can be changed afterwards.
+
+## v0.18.3 — crackle safety
+- A soft clipper now sits after the limiter, so peaks that pile up when many layers play can no longer hard-clip (that is the harsh "khar-khar" sound).
+- The visualiser header shows `TIMING OK/…LATE STEPS…` and `LEVEL OK | CLIP ×n`. If the crackle comes back, tell me which one changes.
+- (v0.18.4: the voice cap that was added here was removed — Tone DROPS notes over the cap instead of replacing the oldest, which made pads and arps lose notes.)
+
+## v0.18.4 — fix
+Removed the 6/8-voice cap from v0.18.3: it silently dropped notes. Voice count is back to Tone's default (32).
+
+## v0.18.5 — sound audit
+All 81 built-in sounds were rendered one by one and measured (peak, DC offset, loudness at low/mid/high notes).
+- 11 sounds peaked at 0 to -3 dBFS from a single note (e.g. Santur, Glockenspiel, Rhodes, Music box, Upright bass, Arcade arp). With drums and other tracks on top, the limiter had to work constantly, which sounds like crackle. 18 sounds were turned down by 1–8 dB; the loudest single note is now -3.6 dBFS.
+- Pulse / PWM sounds (Clavinet, Chip pulse, Arcade arp, Harpsichord, PWM lead, Sitar) had a DC offset that made every note start and end click. It is now filtered out before the envelope.
+- Quiet pad-like sounds were NOT turned up (a short test note under-measures slow attacks).
+
+## v0.18.6 — mixer follows the tracks, PAN is a knob
+- The mixer always has exactly one channel per track (plus the 4 drum channels). A safety sync now runs whenever the track list changes (add, delete, load, undo), and a row is never hidden because its channel is missing.
+- PAN is now a rotary knob (`PanKnob.tsx`): drag up/right = right, down/left = left, arrow keys (Shift = bigger step), Home = centre, End = hard right, double-click = centre. It is a `role="slider"` with the same label as before (`<track> pan`).
+- Checked in a real browser (`e2e-v186.cjs`): adding Synth/Arpeggio tracks adds channels, renaming and deleting update the mixer, NEW project resets it. Not checked: by ear that every channel strip changes the sound as expected.
+
+## v0.18.7 — bolder type, prominent section headers
+- Section headers (MIXER, DRUMS, PLAYLIST ...) are now 17 px bold Space Grotesk with an accent bar and a soft highlighted background; their hint text on the right stays small. MASTER, mixer group names, channel names, tabs and buttons are bolder too, and the small grey mono labels are bigger and darker. Pure CSS: no behaviour changed.
+- Looked at in a desktop screenshot only; the phone layout (<700 px) has its own smaller header rule and was not viewed on a real phone.
+
+## v0.18.8 — Fun Sized heading font
+- The logo, the big intro title, every section header (PROJECT, MIXER ...), MASTER and the mixer group names use the **Fun Sized** font (`funsized.css`, embedded as base64 so it also works in the standalone file and offline). It only has capital letters and digits; any other symbol falls back to Space Grotesk. Small text keeps the readable fonts.
+- Licence: Fun Sized is CC BY-NC 4.0 (Xerographer Fonts / Max Infeld): **non-commercial use only and credit required**. The credit is in the footer and the licence text is `FunSized-LICENSE.txt`. Using BeatLab commercially would need a licence from the designer.
+
+## v0.18.9 — Dat Box interface font (test)
+- New header button **Aa DAT BOX / Aa FONT** switches the interface text (labels, tabs, buttons, mixer names, hints) between the normal fonts and the **Dat Box** font. It is ON by default in this test build and the choice is remembered. Headings keep Fun Sized.
+- Dat Box has capitals, lowercase and digits only, and its scribble boxes make small text hard to read, so this is for judging the look, not necessarily for keeping.
+- Licence: CC BY-NC 4.0 (Xerographer Fonts / Max Infeld), non-commercial only, credit in the footer, licence text in `DatBox-LICENSE.txt`.
+
+## v0.18.10 — Dat Box removed
+- The Dat Box interface-font test (v0.18.9) was judged not good (small text unreadable) and was removed completely: button, CSS, font file and licence. Fun Sized stays for headings.
+
+## v0.18.11 — Fun Sized only on the hero title
+- Fun Sized is now used only for the big "Make some noise." title. The logo, section headers (MIXER, PROJECT ...), MASTER and mixer groups are back to the bold Space Grotesk look of v0.18.7.
+
+## v0.18.12 — footer removed
+- The footer line (version, "built with", "audio unverified by ear", font credit) was removed from the page. The version is still shown in the header. The Fun Sized credit required by its CC BY-NC 4.0 licence now lives here and in `FunSized-LICENSE.txt`: *Fun Sized by Xerographer Fonts / Max Infeld*.

@@ -1,0 +1,34 @@
+// v0.18.6: mixer channels follow the tracks; PAN is a knob
+const { chromium } = require('playwright');
+let fail = 0; const ok = (n, c, d = '') => { console.log((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : ' ' + d)); if (!c) fail++; };
+(async () => {
+  const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1280, height: 900 } });
+  const errs = []; p.on('pageerror', e => errs.push(String(e))); p.on('dialog', d => d.accept());
+  await p.goto(process.argv[2]); await p.waitForTimeout(1200);
+  const rows = async () => (await p.locator('.mixer .mix-row:not(.mix-head) .instrument-name').allInnerTexts()).map(s => s.trim());
+  const add = async k => { await p.locator('button[aria-label="Add track"]').click(); await p.locator(`button[aria-label="Add ${k} track"]`).click(); await p.waitForTimeout(150); };
+  const base = await rows(); ok('starts with 4 drums + 4 tracks', base.length === 8, base.join());
+  await add('Synth'); await add('Arpeggio');
+  let r = await rows(); ok('new Synth and Arpeggio tracks get channels', r.includes('SYNTH 2') && r.includes('ARPEGGIO 2'), r.join());
+  ok('header count matches', /10 CHANNELS/.test(await p.textContent('.mixer .panel-label')), await p.textContent('.mixer .panel-label'));
+  await p.locator('input[aria-label="Track name"]').fill('Bass'); await p.waitForTimeout(150);
+  r = await rows(); ok('rename shows in the mixer', r.includes('BASS') && !r.includes('ARPEGGIO 2'), r.join());
+  await p.locator('button[aria-label^="Delete track"]').click(); await p.waitForTimeout(150);
+  r = await rows(); ok('deleting a track removes its channel', !r.includes('BASS') && r.length === 9, r.join());
+  ok('no range slider for pan any more', await p.locator('input[type=range][aria-label$=" pan"]').count() === 0);
+  const knob = p.locator('[role=slider][aria-label="MELODY pan"], [role=slider][aria-label="Melody pan"]').first();
+  ok('pan knob exists for every channel', await p.locator('.mixer [role=slider][aria-label$=" pan"]').count() === r.length);
+  await knob.focus(); const v0 = Number(await knob.getAttribute('aria-valuenow'));
+  await p.keyboard.press('ArrowRight'); await p.keyboard.press('ArrowRight');
+  const v1 = Number(await knob.getAttribute('aria-valuenow')); ok('arrow keys turn the knob', v1 === v0 + 10, `${v0}→${v1}`);
+  await knob.scrollIntoViewIfNeeded(); const bb = await knob.boundingBox();
+  await p.mouse.move(bb.x + 19, bb.y + 19); await p.mouse.down(); await p.mouse.move(bb.x + 19, bb.y - 41, { steps: 6 }); await p.mouse.up();
+  const v2 = Number(await knob.getAttribute('aria-valuenow')); ok('dragging up pans right', v2 > v1, `${v1}→${v2}`);
+  await knob.dblclick(); ok('double-click centres', Number(await knob.getAttribute('aria-valuenow')) === 0);
+  await p.keyboard.press('End'); ok('End = hard right', Number(await knob.getAttribute('aria-valuenow')) === 100);
+  await p.locator('.mixer').screenshot({ path: 'e2e-out/v186-mixer.png' });
+  await p.locator('button:text-is("NEW")').click(); await p.waitForTimeout(400);
+  r = await rows(); ok('NEW project: mixer matches its 4 tracks', r.length === 8, r.join());
+  ok('no page errors', errs.length === 0, errs.join('|'));
+  await b.close(); console.log(fail ? `${fail} FAILED` : 'ALL PASS'); process.exit(fail ? 1 : 0);
+})();

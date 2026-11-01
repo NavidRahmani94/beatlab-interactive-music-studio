@@ -174,6 +174,13 @@ export function notesStartingAt(notes: MelodyNote[], step: number): MelodyNote[]
  */
 applyToneFix();
 
+/** 0..0.9 unchanged, above that a smooth saturation that stays below 1. */
+export function softClip(x: number): number {
+  const a = Math.abs(x);
+  if (a <= 0.9) return x;
+  return Math.sign(x) * (0.9 + 0.0999 * Math.tanh((a - 0.9) / 0.0999));
+}
+
 /**
  * Tone.PolySynth builds a new voice (dozens of audio nodes) whenever it has none free, and every second throws idle voices away again.
  * Doing that while music plays costs main-thread time exactly when notes start (small stalls), and each thrown-away voice leaves audio nodes behind.
@@ -197,6 +204,7 @@ export class Rig {
   private masterReverb: Tone.Reverb;
   private masterVol: Tone.Volume;
   private limiter: Tone.Limiter;
+  private safety: Tone.WaveShaper;
   private meter: Tone.Meter;
   private spectrum: Tone.Analyser;
   private wave: Tone.Analyser;
@@ -230,15 +238,21 @@ export class Rig {
     this.comp = new Tone.Compressor({ threshold: -6, ratio: 1, attack: 0.02, release: 0.2 });
     this.masterReverb = new Tone.Reverb({ decay: REVERB_SIZES.hall.seconds, preDelay: 0.01 });
     this.masterVol = new Tone.Volume(0);
-    this.limiter = new Tone.Limiter(-3).toDestination();
+    this.limiter = new Tone.Limiter(-3);
+    // Safety stage after the limiter: untouched up to 0.9, then a smooth curve that never reaches 1.0, so loud passages can not clip
+    // (digital clipping is a harsh crackle that appears as layers pile up). Quiet material passes through unchanged.
+    this.safety = new Tone.WaveShaper(softClip, 4096);
+    this.safety.oversample = '2x';
+    this.limiter.connect(this.safety);
+    this.safety.toDestination();
     this.meter = new Tone.Meter({ smoothing: 0.85 });
     this.spectrum = new Tone.Analyser('fft', 128);
     this.spectrum.smoothing = 0.8;
-    this.wave = new Tone.Analyser('waveform', 256);
+    this.wave = new Tone.Analyser('waveform', 1024);
     this.masterIn.chain(this.eq, this.comp, this.masterReverb, this.masterVol, this.limiter);
-    this.limiter.connect(this.meter);
-    this.limiter.connect(this.spectrum);
-    this.limiter.connect(this.wave);
+    this.safety.connect(this.meter);
+    this.safety.connect(this.spectrum);
+    this.limiter.connect(this.wave);                       // the picture and the CLIP detector look at the signal BEFORE the safety stage
 
     this.sendReverb = new Tone.Reverb({ decay: 2.2, preDelay: 0.01 });
     this.sendReverb.wet.value = 1;
@@ -507,7 +521,7 @@ export class Rig {
     this.releaseAll();
     this.tracks.forEach(t => this.disposeVoice(t.voice));
     this.tracks.clear();
-    [this.kick, this.snare, this.hat, this.hatOut, this.clap, this.sendReverb, this.delay, this.eq, this.comp, this.masterReverb, this.masterVol, this.limiter, this.meter, this.spectrum, this.wave, this.masterIn].forEach(n => n.dispose());
+    [this.kick, this.snare, this.hat, this.hatOut, this.clap, this.sendReverb, this.delay, this.eq, this.comp, this.masterReverb, this.masterVol, this.limiter, this.safety, this.meter, this.spectrum, this.wave, this.masterIn].forEach(n => n.dispose());
     this.audition?.synth.dispose();
     this.auditionOut.dispose();
     Object.keys(this.strips).forEach(name => this.disposeStrip(name));

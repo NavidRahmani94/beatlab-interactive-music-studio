@@ -20,9 +20,11 @@ type Props = {
 /** Live picture of what is playing: frequency bars + waveform + a beat bar. Drawn straight onto a canvas (no React re-renders). */
 export default function Visualizer({ playing, getSpectrum, getWaveform, step, bar, bars, lite, getHealth }: Props) {
   const [health, setHealth] = useState('');
+  const clips = useRef(0);
   useEffect(() => {
     if (!playing || !getHealth) { setHealth(''); return; }
-    const id = window.setInterval(() => { const h = getHealth(); setHealth(h.late === 0 ? 'TIMING OK' : `TIMING: ${h.late} LATE STEP${h.late > 1 ? 'S' : ''} (WORST ${h.maxLateMs} MS)`); }, 1000);
+    clips.current = 0;
+    const id = window.setInterval(() => { const h = getHealth(); setHealth((h.late === 0 ? 'TIMING OK' : `TIMING: ${h.late} LATE STEP${h.late > 1 ? 'S' : ''} (WORST ${h.maxLateMs} MS)`) + (clips.current > 0 ? ` · CLIP ×${clips.current} (TURN THE MASTER OR A CHANNEL DOWN)` : ' · LEVEL OK')); }, 1000);
     return () => window.clearInterval(id);
   }, [playing, getHealth]);
   const ref = useRef<HTMLCanvasElement>(null);
@@ -99,6 +101,7 @@ export default function Visualizer({ playing, getSpectrum, getWaveform, step, ba
       ctx.globalAlpha = 1;
 
       const wave = playing ? getWaveform() : null;
+      if (wave) { let pk = 0; for (let i = 0; i < wave.length; i++) { const v = Math.abs(wave[i]); if (v > pk) pk = v; } if (pk >= 0.98) clips.current++; }
       ctx.lineWidth = 2; ctx.strokeStyle = accent; ctx.beginPath();
       if (wave && wave.length) {
         for (let i = 0; i < wave.length; i++) {

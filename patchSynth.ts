@@ -18,7 +18,7 @@ type Voice = {
   osc1: Tone.OmniOscillator<any>; osc2: Tone.OmniOscillator<any>; noise: Tone.Noise;
   g1: Tone.Gain; g2: Tone.Gain; gn: Tone.Gain;
   filter: Tone.Filter; fenv: Tone.FrequencyEnvelope; aenv: Tone.AmplitudeEnvelope; vel: Tone.Gain;
-  trem: Tone.Gain | null; lfo: Tone.LFO | null;
+  trem: Tone.Gain | null; lfo: Tone.LFO | null; dcb: Tone.Filter | null;
   busyUntil: number;
 };
 
@@ -89,7 +89,10 @@ export class PatchSynth implements NoteSynth {
     const vel = new Tone.Gain(1);
     osc1.connect(g1); osc2.connect(g2); noise.connect(gn);
     g1.connect(filter); g2.connect(filter); gn.connect(filter);
-    filter.connect(aenv); aenv.connect(vel);
+    // pulse / PWM waves are not centred on zero: the offset turns every note start and end into a click, so it is filtered out before the envelope
+    const dcb = (p.osc1.wave === 'pulse' || p.osc1.wave === 'pwm' || p.osc2.wave === 'pulse' || p.osc2.wave === 'pwm') ? new Tone.Filter({ type: 'highpass', frequency: 20, Q: 0.5 }) : null;
+    if (dcb) { filter.connect(dcb); dcb.connect(aenv); } else filter.connect(aenv);
+    aenv.connect(vel);
     let trem: Tone.Gain | null = null;
     let lfo: Tone.LFO | null = null;
     if (p.lfo.target === 'amp') {
@@ -111,7 +114,7 @@ export class PatchSynth implements NoteSynth {
         lfo.min = -span; lfo.max = span * 1.6;
       }
     }
-    return { osc1, osc2, noise, g1, g2, gn, filter, fenv, aenv, vel, trem, lfo, busyUntil: 0 };
+    return { osc1, osc2, noise, g1, g2, gn, filter, fenv, aenv, vel, trem, lfo, dcb, busyUntil: 0 };
   }
 
   private allocate(time: number): Voice {
@@ -186,7 +189,7 @@ export class PatchSynth implements NoteSynth {
   dispose(): this {
     try { this.releaseAll(); } catch { /* context may be gone */ }
     for (const v of this.voices) {
-      [v.osc1, v.osc2, v.noise, v.g1, v.g2, v.gn, v.filter, v.fenv, v.aenv, v.vel, v.trem, v.lfo].forEach(n => { try { n?.dispose(); } catch { /* already disposed */ } });
+      [v.osc1, v.osc2, v.noise, v.g1, v.g2, v.gn, v.filter, v.fenv, v.aenv, v.vel, v.trem, v.lfo, v.dcb].forEach(n => { try { n?.dispose(); } catch { /* already disposed */ } });
     }
     this.voices = [];
     [...this.fx, this.bus, this.out].forEach(n => { try { n.dispose(); } catch { /* already disposed */ } });

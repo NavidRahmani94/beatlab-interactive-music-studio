@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useRef } from 'react';
+import PanKnob from './PanKnob';
 import {
-  channelGroups, channelLabel, ChannelName, ChannelSettings, Channels, DELAY_DIVISIONS, DelayDivision, MAX_FEEDBACK, MasterSettings,
+  channelGroups, channelLabel, defaultChannel, ChannelName, ChannelSettings, Channels, DELAY_DIVISIONS, DelayDivision, MAX_FEEDBACK, MasterSettings,
   REVERB_SIZES, ReverbSize, VOLUME_MAX_DB, VOLUME_MIN_DB, EQ_MAX_DB, EQ_MIN_DB
 } from './mixer';
 import { TrackDef } from './tracks';
@@ -43,17 +44,15 @@ export default function MixerPanel({ channels, tracks, master, onChannel, onMast
     <div className="mixer-body">
       <div className="mix-row mix-head"><span /><span>M / S</span><span>PAN</span><span>VOLUME</span><span>REVERB SEND</span><span>DELAY SEND</span></div>
       {channelGroups(tracks).flatMap(g => g.channels.map((name, idx) => ({ name, group: idx === 0 ? g.label : null, kind: g.kind }))).map(({ name, group, kind }) => {
-        const c = channels[name];
+        const c = channels[name] ?? defaultChannel(name, kind === 'drums' ? undefined : kind);
         const label = channelLabel(name, tracks);
-        if (!c) return null;
         return <Fragment key={name}>{group && <div className="mix-group">{group}</div>}<div className={'mix-row' + (c.muted ? ' is-muted' : '')}>
           <div className="instrument-name"><span className={'inst-dot ' + (kind === 'drums' ? name : kind)} />{label}</div>
           <div className="seg small" role="group" aria-label={`${label} mute and solo`}>
             <button className={c.muted ? 'sel warn' : ''} aria-pressed={c.muted} aria-label={`${label} mixer ${c.muted ? 'muted' : 'on'}`} title="Mute" onClick={() => onChannel(name, { muted: !c.muted })}>M</button>
             <button className={c.solo ? 'sel' : ''} aria-pressed={c.solo} aria-label={`${label} solo`} title="Solo" onClick={() => onChannel(name, { solo: !c.solo })}>S</button>
           </div>
-          <label className="fader"><input type="range" min={-100} max={100} step={5} value={Math.round(c.pan * 100)} aria-label={`${label} pan`}
-            onChange={e => onChannel(name, { pan: Number(e.target.value) / 100 })} onDoubleClick={() => onChannel(name, { pan: 0 })} /><b>{fmtPan(c.pan)}</b></label>
+          <div className="fader knob-cell"><PanKnob label={`${label} pan`} value={c.pan} onChange={pan => onChannel(name, { pan })} /><b>{fmtPan(c.pan)}</b></div>
           <label className="fader"><input type="range" min={VOLUME_MIN_DB} max={VOLUME_MAX_DB} step={1} value={c.volumeDb} aria-label={`${label} volume`}
             onChange={e => onChannel(name, { volumeDb: Number(e.target.value) })} onDoubleClick={() => onChannel(name, { volumeDb: 0 })} /><b>{fmtDb(c.volumeDb)}</b></label>
           <label className="fader"><input type="range" min={0} max={100} step={1} value={Math.round(c.reverbSend * 100)} aria-label={`${label} reverb send`}

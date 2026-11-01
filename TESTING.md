@@ -73,3 +73,39 @@ timeline.test.ts (273 unit tests in total), e2e-v18.cjs (jump while stopped, pla
 
 ## v0.18.2 tests
 melody.test.ts (notesAtStep, setNoteVelocity), chords.test.ts (velocity shaping), e2e-v182.cjs (3 bars per triad, drag one, Shift, arrows, advanced). 277 unit tests.
+
+## v0.18.3 tests
+rig.test.ts (softClip: identity below 0.9, bounded above, odd-symmetric). 278 unit tests in total. Offline render of the Persian Mood demo: peak ≤ 0.89, 0 clipped samples. Not verified: listening by ear on real hardware.
+
+## v0.18.4 tests
+No new unit tests; regression checked by comparing offline renders of Persian Mood with and without the cap.
+
+## v0.18.5 tests
+Audit script (not shipped): every built-in sound rendered offline on 7 notes; before/after peaks and DC compared. 278 unit tests unchanged. Not verified by ear.
+
+## v0.18.6 — mixer follows the tracks, PAN is a knob
+- The mixer always has exactly one channel per track (plus the 4 drum channels). A safety sync now runs whenever the track list changes (add, delete, load, undo), and a row is never hidden because its channel is missing.
+- PAN is now a rotary knob (`PanKnob.tsx`): drag up/right = right, down/left = left, arrow keys (Shift = bigger step), Home = centre, End = hard right, double-click = centre. It is a `role="slider"` with the same label as before (`<track> pan`).
+- Checked in a real browser (`e2e-v186.cjs`): adding Synth/Arpeggio tracks adds channels, renaming and deleting update the mixer, NEW project resets it. Not checked: by ear that every channel strip changes the sound as expected.
+
+## v0.18.7 — bolder type, prominent section headers
+- Section headers (MIXER, DRUMS, PLAYLIST ...) are now 17 px bold Space Grotesk with an accent bar and a soft highlighted background; their hint text on the right stays small. MASTER, mixer group names, channel names, tabs and buttons are bolder too, and the small grey mono labels are bigger and darker. Pure CSS: no behaviour changed.
+- Looked at in a desktop screenshot only; the phone layout (<700 px) has its own smaller header rule and was not viewed on a real phone.
+
+## v0.18.8 — Fun Sized heading font
+- The logo, the big intro title, every section header (PROJECT, MIXER ...), MASTER and the mixer group names use the **Fun Sized** font (`funsized.css`, embedded as base64 so it also works in the standalone file and offline). It only has capital letters and digits; any other symbol falls back to Space Grotesk. Small text keeps the readable fonts.
+- Licence: Fun Sized is CC BY-NC 4.0 (Xerographer Fonts / Max Infeld): **non-commercial use only and credit required**. The credit is in the footer and the licence text is `FunSized-LICENSE.txt`. Using BeatLab commercially would need a licence from the designer.
+
+## v0.18.9 — Dat Box interface font (test)
+- New header button **Aa DAT BOX / Aa FONT** switches the interface text (labels, tabs, buttons, mixer names, hints) between the normal fonts and the **Dat Box** font. It is ON by default in this test build and the choice is remembered. Headings keep Fun Sized.
+- Dat Box has capitals, lowercase and digits only, and its scribble boxes make small text hard to read, so this is for judging the look, not necessarily for keeping.
+- Licence: CC BY-NC 4.0 (Xerographer Fonts / Max Infeld), non-commercial only, credit in the footer, licence text in `DatBox-LICENSE.txt`.
+
+## v0.18.10 — Dat Box removed
+- The Dat Box interface-font test (v0.18.9) was judged not good (small text unreadable) and was removed completely: button, CSS, font file and licence. Fun Sized stays for headings.
+
+## v0.18.11 — Fun Sized only on the hero title
+- Fun Sized is now used only for the big "Make some noise." title. The logo, section headers (MIXER, PROJECT ...), MASTER and mixer groups are back to the bold Space Grotesk look of v0.18.7.
+
+## v0.18.12 — footer removed
+- The footer line (version, "built with", "audio unverified by ear", font credit) was removed from the page. The version is still shown in the header. The Fun Sized credit required by its CC BY-NC 4.0 licence now lives here and in `FunSized-LICENSE.txt`: *Fun Sized by Xerographer Fonts / Max Infeld*.

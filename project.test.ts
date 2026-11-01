@@ -4,9 +4,9 @@ import {
 } from './project';
 import { makePreset } from './melody';
 import { startupProject } from './project';
-import { defaultChannels, syncChannels, defaultMaster, patchChannel, patchMaster, clampVolumeDb, clampSend, clampPan, clampFeedback, effectiveMuted, delaySeconds } from './mixer';
+import { defaultChannel, defaultChannels, syncChannels, defaultMaster, patchChannel, patchMaster, clampVolumeDb, clampSend, clampPan, clampFeedback, effectiveMuted, delaySeconds } from './mixer';
 import { toggleNote } from './melody';
-import { defaultTrackDefs, removeTrack } from './tracks';
+import { defaultTrackDefs, makeTrack, removeTrack } from './tracks';
 import { dropTrackNotes, notesFor } from './song';
 
 const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v));
@@ -372,5 +372,23 @@ describe('mixer helpers', () => {
     expect(c.snare.muted).toBe(false);
     expect(d.snare).toMatchObject({ muted: true, volumeDb: -40 });
     expect(d.kick).toEqual(c.kick);
+  });
+});
+
+describe('mixer follows the track list (v0.18.6)', () => {
+  it('adds a channel for a new Synth/Arpeggio track and drops it when the track is deleted', () => {
+    const tracks = defaultTrackDefs();
+    const ch = defaultChannels(tracks);
+    const more = [...tracks, makeTrack('t5', 'Synth 2', 'synth'), makeTrack('t6', 'Arp 2', 'arp')];
+    const grown = syncChannels(ch, more);
+    expect(Object.keys(grown)).toEqual(expect.arrayContaining(['t5', 't6']));
+    expect(grown.t6.pan).toBe(defaultChannel('t6', 'arp').pan);
+    const shrunk = syncChannels(grown, more.filter(t => t.id !== 't5'));
+    expect(Object.keys(shrunk)).not.toContain('t5');
+    expect(Object.keys(shrunk)).toContain('t6');
+  });
+  it('keeps the same object when nothing changed (no render loop)', () => {
+    const tracks = defaultTrackDefs(); const ch = defaultChannels(tracks);
+    expect(syncChannels(ch, tracks)).toBe(ch);
   });
 });

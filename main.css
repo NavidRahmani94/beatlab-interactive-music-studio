@@ -330,3 +330,30 @@ body,.panel,button,select,input{transition:background-color .15s,color .15s,bord
 .vel-note:focus-visible{outline:2px solid var(--strong)}
 .vel-cell.chord .vel-note + .vel-note{border-left:1px solid var(--surface)}
 .vel-readout{display:block;font-size:8px;letter-spacing:.5px;color:var(--accent-text);white-space:nowrap}
+
+.knob-cell{gap:8px}.pan-knob{width:38px;height:38px;flex:none;cursor:ns-resize;touch-action:none;border-radius:50%;user-select:none}.pan-knob:focus-visible{outline:2px solid var(--strong);outline-offset:2px}
+.knob-body{fill:var(--raised);stroke:var(--line2);stroke-width:1.5}.knob-tick{stroke:var(--accent-text);stroke-width:3;stroke-linecap:round}.knob-mid{fill:var(--muted)}
+.knob-cell b{min-width:36px}
+
+/* v0.18.7: bolder, clearer type and prominent section headers */
+body{font-weight:500}
+.panel-label{font-family:'Space Grotesk',Arial,sans-serif;font-size:17px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--strong,var(--text));align-items:center;padding:16px 24px 16px 22px;border-bottom:2px solid var(--line2);background:linear-gradient(90deg,color-mix(in srgb,var(--accent) 16%,var(--surface)),var(--surface) 70%)}
+.panel-label::before{content:'';flex:none;width:6px;height:24px;border-radius:3px;background:var(--accent);margin-right:12px;align-self:center}
+.panel-label{justify-content:flex-start}
+.panel-label>span{margin-left:auto;font-family:'DM Mono',monospace;font-size:11px;font-weight:500;letter-spacing:1.2px;color:var(--text3);text-transform:uppercase}
+.master-title{font-family:'Space Grotesk',Arial,sans-serif;font-size:16px;font-weight:700;letter-spacing:2px;color:var(--strong,var(--text));display:flex;align-items:center;gap:10px}
+.master-title::before{content:'';width:6px;height:20px;border-radius:3px;background:var(--accent)}
+.master-title span{font-family:'DM Mono',monospace;font-size:11px;font-weight:500;color:var(--text3);letter-spacing:.5px}
+.mix-group{font-family:'Space Grotesk',Arial,sans-serif;font-size:13px;font-weight:700;letter-spacing:2px;color:var(--accent-text)}
+.mix-head{font-size:11px;font-weight:500;color:var(--text3)}
+.instrument-name{font-family:'Space Grotesk',Arial,sans-serif;font-size:13px;font-weight:700;letter-spacing:1.2px}
+.ctl{font-size:11px;font-weight:500;color:var(--text3)}
+.fader b{font-weight:500;color:var(--text)}
+.tab{font-weight:700}
+.seg button,.auto-btn,.export-btn{font-weight:700}
+h1,h2,h3{font-weight:700}
+@media(max-width:700px){.panel-label{font-size:14px;letter-spacing:1.4px;padding:12px 14px}.panel-label>span{margin-left:0;font-size:10px;flex-basis:100%}.panel-label::before{height:18px}}
+.grid-footer,footer{font-size:11px;font-weight:500}.grid-footer{line-height:1.5}
+
+/* v0.18.11: Fun Sized only on the big "Make some noise." title; everything else keeps the normal fonts */
+.intro h2{font-family:'FunSized','Space Grotesk',Arial,sans-serif;font-weight:400;letter-spacing:1px}
