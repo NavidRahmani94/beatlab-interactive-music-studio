@@ -3,7 +3,7 @@ import * as Tone from 'tone';
 
 type Stats = {
   fps: number; lagAvg: number; lagMax: number;              // the page (React, canvas): frames per second and how late timers fire
-  clock: number | null;                                     // % of real time the audio clock advances (below ~99% = the audio thread is starving)
+  clock: number | null;                                     // % of real time the audio clock advances (averaged over ~8 s; below ~90% = the audio thread is really starving)
   load: number | null; peak: number | null; underruns: number | null;   // Chrome's own audio render load (not in every browser)
   heapMb: number | null; heapLimitMb: number | null;        // JavaScript memory (Chrome / Edge only)
   late: number; steps: number;
@@ -25,12 +25,13 @@ function useStats(on: boolean, playing: boolean, getHealth: () => { late: number
     try { ctx = Tone.getContext().rawContext as BaseAudioContext; } catch { ctx = null; }
     const onUpdate = (e: Event & { averageLoad: number; peakLoad: number; underrunRatio: number }) => { rcState = { load: e.averageLoad * 100, peak: e.peakLoad * 100, under: e.underrunRatio * 100 }; };
     try { rc = (ctx as unknown as { renderCapacity?: RenderCapacity }).renderCapacity ?? null; if (rc) { rc.addEventListener('update', onUpdate); rc.start({ updateInterval: 1 }); } } catch { rc = null; }
-    let ctxT = ctx ? ctx.currentTime : 0; let wallT = performance.now();
+    let wallT = performance.now(); const win: { c: number; w: number }[] = [];   // rolling window of (audio time, wall time) for the clock reading
     const timer = window.setInterval(() => {
       const nowWall = performance.now(); const dtWall = (nowWall - wallT) / 1000; wallT = nowWall;
       let clock: number | null = null;
-      if (ctx && ctx.state === 'running') { const dtCtx = ctx.currentTime - ctxT; clock = dtWall > 0 ? Math.min(100, (dtCtx / dtWall) * 100) : null; }
-      if (ctx) ctxT = ctx.currentTime;
+      // The browser updates the audio clock in chunks, so a single 1 s reading can be a few % off. Use the last ~8 s instead: a real starvation shows up there too.
+      if (ctx && ctx.state === 'running') { win.push({ c: ctx.currentTime, w: nowWall }); if (win.length > 9) win.shift(); if (win.length >= 3) { const a = win[0]; const z = win[win.length - 1]; clock = z.w > a.w ? Math.min(100, ((z.c - a.c) / ((z.w - a.w) / 1000)) * 100) : null; } }
+      else win.length = 0;
       const mem = (performance as unknown as { memory?: { usedJSHeapSize: number; jsHeapSizeLimit: number } }).memory;
       const h = getHealth();
       setS({ fps: Math.round(frames / dtWall), lagAvg: lagN ? lagSum / lagN : 0, lagMax, clock, load: rcState.load, peak: rcState.peak, underruns: rcState.under,
@@ -50,15 +51,15 @@ const tone = (bad: boolean, warn: boolean) => bad ? 'bad' : warn ? 'warn' : 'goo
 export default function SystemMonitor({ open, onClose, playing, getHealth }: { open: boolean; onClose: () => void; playing: boolean; getHealth: () => { late: number; maxLateMs: number; steps: number } }) {
   const s = useStats(open, playing, getHealth);
   if (!open) return null;
-  const clockTone = s.clock === null ? 'na' : tone(s.clock < 97, s.clock < 99.5);
+  const clockTone = s.clock === null ? 'na' : tone(s.clock < 90, s.clock < 97);
   const loadTone = s.load === null ? 'na' : tone(s.load > 85, s.load > 60);
   const fpsTone = !playing ? 'na' : tone(s.fps < 20, s.fps < 45);
   const lagTone = tone(s.lagMax > 120, s.lagMax > 50);
   const memTone = s.heapMb === null || s.heapLimitMb === null ? 'na' : tone(s.heapMb > s.heapLimitMb * 0.7, s.heapMb > s.heapLimitMb * 0.4);
   const lateTone = tone(s.late > 20, s.late > 0);
   const health = !playing ? { kind: 'na', text: 'idle (press PLAY)' }
-    : (s.clock !== null && s.clock < 97) || s.late > 20 || (s.underruns ?? 0) > 1 || (s.load ?? 0) > 85 ? { kind: 'bad', text: 'STRAINED' }
-    : (s.clock !== null && s.clock < 99.5) || s.late > 0 || s.lagMax > 100 || (s.underruns ?? 0) > 0 || (s.load ?? 0) > 60 ? { kind: 'warn', text: 'BORDERLINE' }
+    : (s.clock !== null && s.clock < 90) || s.late > 20 || (s.underruns ?? 0) > 1 || (s.load ?? 0) > 85 ? { kind: 'bad', text: 'STRAINED' }
+    : (s.clock !== null && s.clock < 97) || s.late > 0 || s.lagMax > 100 || (s.underruns ?? 0) > 0 || (s.load ?? 0) > 60 ? { kind: 'warn', text: 'BORDERLINE' }
     : { kind: 'good', text: 'OK' };
   const Row = ({ label, value, kind, hint }: { label: string; value: string; kind: string; hint: string }) => <div className={'sys-row ' + kind} title={hint}><span>{label}</span><b>{value}</b></div>;
   return <aside className="sys-monitor" aria-label="System monitor" role="region">

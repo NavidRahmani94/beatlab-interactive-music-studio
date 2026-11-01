@@ -414,3 +414,6 @@ h1,h2,h3{font-weight:700}
 .is-muted .lvl{opacity:.35}
 @media(min-width:701px){.mix-row{grid-template-columns:150px 72px repeat(4,minmax(120px,1fr)) 124px;min-width:980px}.mix-group,.mix-fx{min-width:980px}.mix-row>.fader{min-width:0}.mix-row>.fader input{min-width:0;width:100%}.mix-row>.fader b{min-width:44px;flex:none}}
 @media(max-width:700px){.mix-row>.lvl{grid-column:1/-1}}
+
+/* v0.18.18b: the meter box is layout-contained, so moving the bars never re-lays-out the page */
+.lvl-bar>span{contain:strict}

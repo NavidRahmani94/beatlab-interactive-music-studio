@@ -46,6 +46,8 @@ export class BeatLabEngine {
   setTuning(t: Tuning): void { this.tuning = t; this.rig?.setTuning(t); }
   setFrameCallback(callback: (frame: Frame) => void): void { this.frameCallback = callback; }
   /** Master output level in dB, or -Infinity before the first PLAY. */
+  private wantMetering = false;
+  setMetering(on: boolean): void { this.wantMetering = on; this.rig?.setMetering(on); }
   getChannelLevels(name: string): [number, number] { return this.rig ? this.rig.getChannelLevels(name) : [-Infinity, -Infinity]; }
   getLevelDb(): number { return this.rig ? this.rig.getLevelDb() : -Infinity; }
   getSpectrum(): Float32Array | null { return this.rig ? this.rig.getSpectrum() : null; }
@@ -63,6 +65,7 @@ export class BeatLabEngine {
     if (this.rig) return this.rig;
     const rig = new Rig();
     this.rig = rig;
+    rig.setMetering(this.wantMetering);
     rig.setSynths(this.synths);
     rig.setDrumKit(this.kit);
     rig.setGroove(this.groove);

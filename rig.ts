@@ -333,6 +333,12 @@ export class Rig {
     this.setMaster(defaultMaster());
   }
 
+  private metering = false;
+  /** Connects / disconnects the L-R channel meters. They cost a little audio-thread time, so they run only while the mixer is on screen and playing. */
+  setMetering(on: boolean): void {
+    if (on === this.metering) return; this.metering = on;
+    Object.values(this.strips).forEach(s => { if (on) s.pan.connect(s.split); else s.pan.disconnect(s.split); });
+  }
   private makeStrip(name: ChannelName): Strip {
     const vol = new Tone.Volume(0);
     const pan = new Tone.Panner(0);
@@ -346,7 +352,8 @@ export class Rig {
     delaySend.connect(this.delay);
     // level meters of the left and right side of the channel (after pan), for the mixer
     const split = new Tone.Split(2); const meterL = new Tone.Meter({ smoothing: 0.7 }); const meterR = new Tone.Meter({ smoothing: 0.7 });
-    pan.connect(split); split.connect(meterL, 0); split.connect(meterR, 1);
+    split.connect(meterL, 0); split.connect(meterR, 1);
+    if (this.metering) pan.connect(split);   // metering is switched on only while the meters are visible and playing (saves CPU)
     const strip: Strip = { vol, pan, split, meterL, meterR, reverbSend, delaySend, fxSig: '', fx: [] };
     this.strips[name] = strip;
     this.muted[name] = false;

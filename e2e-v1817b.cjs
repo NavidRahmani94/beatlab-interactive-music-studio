@@ -5,8 +5,11 @@ const { chromium } = require('playwright');
   await p.goto(process.argv[2]); await p.waitForTimeout(1500);
   const n = await p.locator('.lvl[data-ch]').count(); ok('every mixer channel has L/R meters', n >= 5, n);
   const w = () => p.evaluate(() => [...document.querySelectorAll('.lvl[data-ch]')].map(e => [e.dataset.ch, parseFloat(e.querySelector('.b0 i').style.width) || 0, parseFloat(e.querySelector('.b1 i').style.width) || 0]));
+  const w2 = () => w();
   const idle = await w(); ok('meters empty when stopped', idle.every(x => x[1] === 0 && x[2] === 0), JSON.stringify(idle));
-  await p.getByRole('button', { name: /^play/i }).first().click(); await p.waitForTimeout(3500);
+  await p.getByRole('button', { name: /^play/i }).first().click(); await p.waitForTimeout(1500);
+  const offscreen = await w2(); ok('mixer off screen: meters stay idle (saves CPU)', offscreen.every(x => x[1] === 0 && x[2] === 0), JSON.stringify(offscreen));
+  await p.locator('.mixer').scrollIntoViewIfNeeded(); await p.waitForTimeout(2000);
   let peak = {}; for (let i = 0; i < 40; i++) { (await w()).forEach(x => { peak[x[0]] = [Math.max(peak[x[0]]?.[0] || 0, x[1]), Math.max(peak[x[0]]?.[1] || 0, x[2])]; }); await p.waitForTimeout(80); }
   console.log(JSON.stringify(peak));
   ok('some channel shows signal while playing', Object.values(peak).some(v => v[0] > 5 || v[1] > 5));

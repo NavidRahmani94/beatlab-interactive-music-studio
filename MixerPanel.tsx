@@ -15,13 +15,14 @@ type Props = {
   onMaster: (patch: Partial<MasterSettings>) => void;
   getLevelDb: () => number;
   getChannelLevels: (name: string) => [number, number];
+  setMetering: (on: boolean) => void;
   playing: boolean;
 };
 
 const fmtDb = (v: number) => `${v > 0 ? '+' : ''}${v} dB`;
 const fmtPan = (p: number) => (Math.abs(p) < 0.02 ? 'C' : p < 0 ? `L${Math.round(-p * 100)}` : `R${Math.round(p * 100)}`);
 
-export default function MixerPanel({ channels, tracks, master, onChannel, onMaster, getLevelDb, getChannelLevels, playing }: Props) {
+export default function MixerPanel({ channels, tracks, master, onChannel, onMaster, getLevelDb, getChannelLevels, setMetering, playing }: Props) {
   const mixRef = useRef<HTMLDivElement>(null);
   const meterRef = useRef<HTMLDivElement>(null);
   const peakRef = useRef<HTMLSpanElement>(null);
@@ -43,25 +44,30 @@ export default function MixerPanel({ channels, tracks, master, onChannel, onMast
     return () => cancelAnimationFrame(raf);
   }, [playing, getLevelDb]);
 
-  // animate the L / R signal meters of every channel (straight on the DOM, no React re-render)
+  // animate the L / R signal meters of every channel (straight on the DOM, no React re-render). Only while the mixer is on screen, playing and the tab is visible,
+  // at about 30 frames per second, and inside a layout-contained box so the page does not have to re-layout.
   useEffect(() => {
-    const peaks = new Map<string, number>(); let raf = 0;
-    const tick = () => {
-      mixRef.current?.querySelectorAll<HTMLElement>('.lvl[data-ch]').forEach(el => {
-        const name = el.dataset.ch as string; const lv = playing ? getChannelLevels(name) : [-Infinity, -Infinity];
-        [0, 1].forEach(i => {
-          const db = Number.isFinite(lv[i]) ? Math.max(-60, lv[i]) : -60; const key = name + i;
-          const pk = Math.max(db, (peaks.get(key) ?? -60) - 0.5); peaks.set(key, pk);
-          const fill = el.querySelector<HTMLElement>(`.lvl-bar.b${i} i`); const peak = el.querySelector<HTMLElement>(`.lvl-bar.b${i} u`);
-          if (fill) fill.style.width = `${((db + 60) / 60) * 100}%`;
-          if (peak) peak.style.left = `${((pk + 60) / 60) * 100}%`;
-        });
-      });
+    const box = mixRef.current; let visible = true; let raf = 0; let last = 0; const peaks = new Map<string, number>();
+    const io = typeof IntersectionObserver !== 'undefined' && box ? new IntersectionObserver(es => { visible = es.some(e => e.isIntersecting); sync(); }) : null;
+    const active = () => playing && visible && !document.hidden;
+    function sync() { setMetering(active()); }
+    const paint = (el: HTMLElement, name: string, lv: [number, number] | number[]) => [0, 1].forEach(i => {
+      const db = Number.isFinite(lv[i]) ? Math.max(-60, lv[i]) : -60; const key = name + i; const pk = Math.max(db, (peaks.get(key) ?? -60) - 1); peaks.set(key, pk);
+      const fill = el.querySelector<HTMLElement>(`.lvl-bar.b${i} i`); const peak = el.querySelector<HTMLElement>(`.lvl-bar.b${i} u`);
+      if (fill) fill.style.width = `${((db + 60) / 60) * 100}%`;
+      if (peak) peak.style.left = `${((pk + 60) / 60) * 100}%`;
+    });
+    const tick = (t: number) => {
       raf = requestAnimationFrame(tick);
+      if (t - last < 33) return; last = t;
+      const on = active();
+      box?.querySelectorAll<HTMLElement>('.lvl[data-ch]').forEach(el => paint(el, el.dataset.ch as string, on ? getChannelLevels(el.dataset.ch as string) : [-Infinity, -Infinity]));
     };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [playing, getChannelLevels]);
+    if (io && box) io.observe(box);
+    document.addEventListener('visibilitychange', sync);
+    sync(); raf = requestAnimationFrame(tick);
+    return () => { cancelAnimationFrame(raf); io?.disconnect(); document.removeEventListener('visibilitychange', sync); setMetering(false); };
+  }, [playing, getChannelLevels, setMetering]);
 
   return <section className="panel mixer">
     <div className="panel-label">MIXER <span>{4 + tracks.length} CHANNELS → ONE MASTER (EQ · COMPRESSOR · REVERB · DELAY)</span></div>
