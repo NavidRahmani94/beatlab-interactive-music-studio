@@ -1,0 +1,24 @@
+const { chromium } = require('playwright');
+let fail = 0; const ok = (n, c, d = '') => { console.log((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : ' ' + d)); if (!c) fail++; };
+(async () => {
+  const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1280, height: 1000 } });
+  const errs = []; p.on('pageerror', e => errs.push(String(e))); p.on('dialog', d => d.accept());
+  await p.goto(process.argv[2]); await p.waitForTimeout(1200);
+  await p.locator('button:text-is("NEW")').click(); await p.waitForTimeout(400);
+  const tab = n => p.locator(`[role=tab]:has-text("${n}")`).first().click();
+  await tab('MELODY'); await p.waitForTimeout(300);
+  const clr = p.locator('button:has-text("CLEAR MELODY")'); if (await clr.count()) await clr.first().click();
+  const sec = p.locator('section[aria-label="Melody"], section:has(.slide-lane)').first();
+  ok('slide lane is shown on a melody track', await p.locator('.slide-lane').count() >= 1);
+  const c1 = p.locator('button[data-step="0"]').first(); const c2 = p.locator('button[data-step="8"]').nth(1);
+  await c1.scrollIntoViewIfNeeded(); await c1.click(); await c2.click();
+  const n0 = await p.locator('.slide-btn').count(); ok('a slide button for each note', n0 === 2, n0);
+  await p.locator('.slide-btn').first().click();
+  ok('slide button turns on', (await p.locator('.slide-btn.on').count()) === 1);
+  ok('the note shows the slide mark', (await p.locator('.mcell.on.slide.start').count()) === 1);
+  await p.locator('.slide-lane').first().screenshot({ path: 'e2e-out/v1814-slide.png' });
+  await p.locator('button.play').click(); await p.waitForTimeout(2500); await p.locator('button.stop').click();
+  await tab('ARPEGGIO'); await p.waitForTimeout(300); ok('no slide lane on an arpeggio track', await p.locator('.slide-lane').count() === 0);
+  ok('no page errors', errs.length === 0, errs.join('|'));
+  await b.close(); console.log(fail ? `${fail} FAILED` : 'ALL PASS'); process.exit(fail ? 1 : 0);
+})();

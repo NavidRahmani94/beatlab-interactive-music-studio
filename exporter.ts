@@ -63,6 +63,7 @@ export async function renderProjectToWav(project: BeatLabProject, loops: number,
     rig.setSynths(project.synths);
     rig.setDrumKit(project.drumKit);
     rig.setGroove(project.groove);
+    rig.setTuning(project.tuning);
     rig.setTracks(project.tracks);
     rig.setMaster(project.master);
     rig.setChannels(project.channels);

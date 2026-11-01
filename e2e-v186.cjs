@@ -5,7 +5,7 @@ let fail = 0; const ok = (n, c, d = '') => { console.log((c ? 'PASS ' : 'FAIL ')
   const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1280, height: 900 } });
   const errs = []; p.on('pageerror', e => errs.push(String(e))); p.on('dialog', d => d.accept());
   await p.goto(process.argv[2]); await p.waitForTimeout(1200);
-  const rows = async () => (await p.locator('.mixer .mix-row:not(.mix-head) .instrument-name').allInnerTexts()).map(s => s.trim());
+  const rows = async () => (await p.locator('.mixer .mix-row:not(.mix-head) .instrument-name').allInnerTexts()).map(s => s.trim().split('\n')[0].trim());
   const add = async k => { await p.locator('button[aria-label="Add track"]').click(); await p.locator(`button[aria-label="Add ${k} track"]`).click(); await p.waitForTimeout(150); };
   const base = await rows(); ok('starts with 4 drums + 4 tracks', base.length === 8, base.join());
   await add('Synth'); await add('Arpeggio');

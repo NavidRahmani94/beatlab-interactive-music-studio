@@ -5,6 +5,8 @@ import { DrumKitId, isDrumKit, isMelodyInstrument } from './instruments';
 import { KIND_DEFAULT_INSTRUMENT, MAX_TRACKS, MAX_TRACK_NAME, TrackDef, defaultTrackDefs, isTrackKind, isValidTrackId, makeTrack } from './tracks';
 import { ArpSettings, defaultArp, isArpMode, isArpOctaves, isArpRate } from './arp';
 import { MAX_SECTIONS, MAX_SECTION_NAME, Section, autoSections, clampSections } from './arrangement';
+import { FxSlot, validateFx } from './fx';
+import { Tuning, defaultTuning, validateTuning } from './tuning';
 import { Groove, GROOVE_PRESETS, defaultGroove, validateGroove } from './groove';
 import { MAX_BARS, MAX_PATTERNS, PatternData, Playlist, compactNotes, defaultPatternData, emptyDrumPattern } from './song';
 import { toggleNote } from './melody';
@@ -24,6 +26,7 @@ export type BeatLabProject = {
   synths: SynthSlot[];   // the user's own Synth Lab sounds; a track uses one as "synth:<id>"
   drumKit: DrumKitId;
   sections: Section[];  // named stretches of the playlist (Intro, Verse, Chorus …); only labels, they never change the sound
+  tuning: Tuning;       // global pitch: whole semitones + cents from A = 440 Hz (drums are not changed)
   groove: Groove;       // swing / humanize / ghost notes / variation of the drums
   melodyView: { key: number; scale: ScaleName };
   channels: Channels;
@@ -38,7 +41,7 @@ export function defaultProject(): BeatLabProject {
   return {
     schemaVersion: 5, name: 'Untitled', bpm: 120,
     patterns: [defaultPatternData('Pattern 1', makePreset('happy', 0).notes)], playlist: [0],
-    tracks: defaultTrackDefs(), synths: [], drumKit: 'classic', sections: [], groove: defaultGroove(), melodyView: { key: 0, scale: 'majorPent' },
+    tracks: defaultTrackDefs(), synths: [], drumKit: 'classic', sections: [], groove: defaultGroove(), tuning: defaultTuning(), melodyView: { key: 0, scale: 'majorPent' },
     channels: defaultChannels(defaultTrackDefs()), master: defaultMaster()
   };
 }
@@ -326,7 +329,8 @@ function validateNotes(raw: unknown, where: string): MelodyNote[] | string {
     if (!isNum(n.step) || !Number.isInteger(n.step) || n.step < 0 || n.step >= STEPS) return `${w}.step must be a whole number 0–${STEPS - 1}.`;
     if (!isNum(n.lengthSteps) || !Number.isInteger(n.lengthSteps) || n.lengthSteps < 1 || n.step + n.lengthSteps > STEPS) return `${w}.lengthSteps must be a whole number ≥ 1 that fits inside the bar.`;
     if (!isNum(n.velocity) || n.velocity < 0 || n.velocity > 1) return `${w}.velocity must be between 0 and 1.`;
-    notes.push({ id: n.id, pitch: n.pitch as string, step: n.step, lengthSteps: n.lengthSteps, velocity: n.velocity });
+    if (n.slide !== undefined && typeof n.slide !== 'boolean') return `${w}.slide must be true or false.`;
+    notes.push({ id: n.id, pitch: n.pitch as string, step: n.step, lengthSteps: n.lengthSteps, velocity: n.velocity, ...(n.slide === true ? { slide: true } : {}) });
   }
   return notes;
 }
@@ -499,6 +503,12 @@ export function validateProject(input: unknown): ParseResult {
     if (!gr.ok) return fail(gr.error);
     groove = gr.groove;
   }
+  let tuning = defaultTuning();
+  if (data.tuning !== undefined) {
+    const tu = validateTuning(data.tuning);
+    if (!tu.ok) return fail(tu.error);
+    tuning = tu.tuning;
+  }
   let melodyView = { key: 0, scale: 'majorPent' as ScaleName };
   if (data.melodyView !== undefined) {
     const v = data.melodyView;
@@ -522,7 +532,9 @@ export function validateProject(input: unknown): ParseResult {
     if (!isNum(c.delaySend) || c.delaySend < 0 || c.delaySend > 1) return fail(`channels.${name}.delaySend must be between 0 and 1.`);
     if (c.pan !== undefined && (!isNum(c.pan) || c.pan < -1 || c.pan > 1)) return fail(`channels.${name}.pan must be between -1 and 1.`);
     if (c.solo !== undefined && typeof c.solo !== 'boolean') return fail(`channels.${name}.solo must be true or false.`);
-    channels[name] = { volumeDb: c.volumeDb, muted: c.muted, solo: c.solo === true, pan: c.pan === undefined ? 0 : c.pan, reverbSend: c.reverbSend, delaySend: c.delaySend };
+    let fx: FxSlot[] = [];
+    if (c.fx !== undefined) { const fr = validateFx(c.fx); if (!fr.ok) return fail(`channels.${name}.${fr.error}`); fx = fr.fx; }
+    channels[name] = { volumeDb: c.volumeDb, muted: c.muted, solo: c.solo === true, pan: c.pan === undefined ? 0 : c.pan, reverbSend: c.reverbSend, delaySend: c.delaySend, ...(fx.length ? { fx } : {}) };
   }
 
   let master = defaultMaster();
@@ -548,7 +560,7 @@ export function validateProject(input: unknown): ParseResult {
     };
   }
 
-  return { ok: true, project: { schemaVersion: 5, name: data.name, bpm: Math.round(data.bpm), patterns, playlist, tracks, synths, drumKit, sections, groove, melodyView, channels, master } };
+  return { ok: true, project: { schemaVersion: 5, name: data.name, bpm: Math.round(data.bpm), patterns, playlist, tracks, synths, drumKit, sections, groove, tuning, melodyView, channels, master } };
 }
 
 export function parseProject(text: string): ParseResult {

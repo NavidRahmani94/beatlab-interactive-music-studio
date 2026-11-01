@@ -357,3 +357,49 @@ h1,h2,h3{font-weight:700}
 
 /* v0.18.11: Fun Sized only on the big "Make some noise." title; everything else keeps the normal fonts */
 .intro h2{font-family:'FunSized','Space Grotesk',Arial,sans-serif;font-weight:400;letter-spacing:1px}
+
+/* v0.18.13: tempo style + global pitch */
+.style-pick{display:flex;align-items:center;gap:8px;margin-top:10px;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1.2px;color:var(--text3)}
+.style-pick select{background:var(--raised);color:var(--text);border:1px solid var(--line);border-radius:5px;height:28px;padding:0 8px;font-size:12px}
+.pitch{min-width:250px;display:flex;flex-direction:column;gap:6px}
+.pitch>label{display:flex;justify-content:space-between;gap:10px;color:var(--muted);font-size:12px;font-family:'DM Mono',monospace}
+.pitch>label b{color:var(--text);font-size:14px}
+.pitch-row{display:flex;align-items:center;gap:8px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;color:var(--muted)}
+.pitch-row span{width:34px;flex:none}.pitch-row input{flex:1;accent-color:var(--accent-text)}.pitch-row em{font-style:normal;width:46px;text-align:right;color:var(--text2)}
+.pitch-row .auto-btn{flex:1}
+
+/* v0.18.14: insert effects in the mixer */
+.fx-btn{margin-left:auto;height:22px;padding:0 9px;border-radius:5px;border:1px solid var(--line2);background:transparent;color:var(--muted);font-family:'DM Mono',monospace;font-size:10px;font-weight:700;letter-spacing:1px}
+.fx-btn.has{border-color:var(--accent);color:var(--accent-text)}.fx-btn.open{background:var(--accent);color:var(--onaccent);border-color:var(--accent)}
+.mix-fx{margin:-6px 0 16px 0;padding:12px 14px;border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:8px;background:var(--bg2);display:flex;flex-direction:column;gap:8px;min-width:860px}
+.fx-empty{font-size:12px;color:var(--text3)}
+.fx-slot{display:grid;grid-template-columns:54px 170px minmax(160px,1fr) 52px 34px;gap:12px;align-items:center}
+.fx-slot.off .fader,.fx-slot.off select{opacity:.45}
+.fx-slot select,.fx-add{background:var(--raised);color:var(--text);border:1px solid var(--line);border-radius:5px;height:30px;padding:0 8px;font-size:12px}
+.fx-add{align-self:flex-start;min-width:240px;border-style:dashed;color:var(--accent-text);font-weight:700}
+.fx-move{display:flex;gap:2px}.fx-move button,.fx-del,.fx-on{height:28px;border-radius:5px;border:1px solid var(--line2);background:var(--raised);color:var(--text2);font-size:11px;font-weight:700}
+.fx-move button{width:24px;padding:0}.fx-move button:disabled{opacity:.3}.fx-on.sel{background:var(--accent);color:var(--onaccent);border-color:var(--accent)}
+@media(max-width:700px){.mix-fx{min-width:0}.fx-slot{grid-template-columns:1fr 1fr;gap:8px}.fx-slot .fader{grid-column:1/-1}.fx-add{min-width:0;width:100%}}
+.fx-btn{white-space:nowrap;flex:none}
+@media(min-width:701px){.mix-row{grid-template-columns:165px 76px repeat(4,minmax(110px,1fr));min-width:900px}.mix-group,.mix-fx{min-width:900px}}
+
+/* v0.18.14: slide notes */
+.mcell.on.slide.start::after{content:'⤴';font-size:12px;font-weight:700;color:var(--onaccent);line-height:1;display:block}
+.mcell.on.slide{background:linear-gradient(90deg,var(--mint),color-mix(in srgb,var(--mint) 55%,var(--orange,#ff9f43)))}
+.slide-lane{margin-top:2px}
+.slide-cell{display:flex;gap:2px;justify-content:center;align-items:stretch;min-height:26px;background:var(--surface2);border:1px solid var(--line);border-radius:4px}
+.slide-cell.beat{background:var(--raised)}.slide-cell.empty{opacity:.35}
+.slide-btn{flex:1;border:0;background:transparent;color:var(--muted);font-size:13px;font-weight:700;padding:0;border-radius:3px;min-width:0}
+.slide-btn.on{background:var(--accent);color:var(--onaccent)}
+.slide-btn:hover{outline:1px solid var(--accent)}
+.slide-btn.lonely{background:var(--red);color:var(--onaccent)}
+
+/* v0.18.15: system monitor */
+.sys-monitor{position:fixed;right:16px;bottom:16px;z-index:60;width:310px;background:var(--surface);border:1px solid var(--line2);border-left:4px solid var(--accent);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.25);padding:10px 12px;font-family:'DM Mono',monospace}
+.sys-head{display:flex;justify-content:space-between;align-items:center;font-family:'Space Grotesk',Arial,sans-serif;font-weight:700;letter-spacing:2px;font-size:13px;margin-bottom:6px}
+.sys-head button{border:0;background:transparent;color:var(--muted);font-size:14px;cursor:pointer}
+.sys-row{display:flex;justify-content:space-between;gap:10px;padding:4px 0;border-bottom:1px solid var(--raised);font-size:11px;letter-spacing:.8px;color:var(--text3)}
+.sys-row b{font-weight:700;color:var(--text)}
+.sys-row.good b{color:#1c8a4a}.sys-row.warn b{color:#b87400}.sys-row.bad b{color:#d03a3a}.sys-row.na b{color:var(--muted);font-weight:500}
+.sys-foot{margin-top:6px;font-size:10px;line-height:1.4;color:var(--muted)}
+@media(max-width:700px){.sys-monitor{left:10px;right:10px;width:auto;bottom:10px}}

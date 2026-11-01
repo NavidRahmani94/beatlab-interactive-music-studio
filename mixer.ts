@@ -2,7 +2,8 @@
 import { DRUM_IDS, TrackDef, TrackKind } from './tracks';
 export const DRUM_CHANNELS = DRUM_IDS;
 export type ChannelName = string;
-export type ChannelSettings = { volumeDb: number; muted: boolean; solo: boolean; pan: number; reverbSend: number; delaySend: number };
+import type { FxSlot } from './fx';
+export type ChannelSettings = { volumeDb: number; muted: boolean; solo: boolean; pan: number; reverbSend: number; delaySend: number; fx?: FxSlot[] };
 export type Channels = Record<ChannelName, ChannelSettings>;
 
 export const VOLUME_MIN_DB = -40;
@@ -81,7 +82,8 @@ export function patchChannel(channels: Channels, name: ChannelName, patch: Parti
       solo: patch.solo === undefined ? c.solo : patch.solo,
       pan: patch.pan === undefined ? c.pan : clampPan(patch.pan),
       reverbSend: patch.reverbSend === undefined ? c.reverbSend : clampSend(patch.reverbSend),
-      delaySend: patch.delaySend === undefined ? c.delaySend : clampSend(patch.delaySend)
+      delaySend: patch.delaySend === undefined ? c.delaySend : clampSend(patch.delaySend),
+      ...((patch.fx ?? c.fx) ? { fx: patch.fx ?? c.fx } : {})
     }
   };
 }

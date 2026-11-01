@@ -1,0 +1,22 @@
+const { chromium } = require('playwright');
+let fail = 0; const ok = (n, c, d = '') => { console.log((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : ' ' + d)); if (!c) fail++; };
+(async () => {
+  const b = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] }); const p = await b.newPage({ viewport: { width: 1280, height: 900 } });
+  const errs = []; p.on('pageerror', e => errs.push(String(e)));
+  await p.goto(process.argv[2]); await p.waitForTimeout(1200);
+  ok('hidden at start', await p.locator('.sys-monitor').count() === 0);
+  await p.locator('button[aria-label="System monitor"]').click(); ok('opens', await p.locator('.sys-monitor').count() === 1);
+  await p.locator('button.play').click(); await p.waitForTimeout(3500);
+  const rows = await p.locator('.sys-row').allInnerTexts(); console.log(rows.map(r => r.replace(/\n/g, ' = ')).join(' | '));
+  ok('6 rows without the browser load API', rows.length === 6, rows.length);
+  ok('health says OK while playing', /AUDIO HEALTH[\s\S]*OK/.test(rows.join(' ')), rows.join('|'));
+  const txt = k => rows.find(r => r.startsWith(k)) || '';
+  ok('audio clock is a percentage while playing', /\d+\.\d%/.test(txt('AUDIO CLOCK')), txt('AUDIO CLOCK'));
+  ok('fps shown while playing', /\d+ fps/.test(txt('PAGE SPEED')), txt('PAGE SPEED'));
+  ok('memory is a number (Chrome)', /\d+ MB/.test(txt('MEMORY')), txt('MEMORY'));
+  await p.screenshot({ path: 'e2e-out/v1815-stats.png' });
+  await p.locator('button.stop').click();
+  await p.locator('button[aria-label="Close system monitor"]').click(); ok('closes', await p.locator('.sys-monitor').count() === 0);
+  ok('no page errors', errs.length === 0, errs.join('|'));
+  await b.close(); console.log(fail ? `${fail} FAILED` : 'ALL PASS'); process.exit(fail ? 1 : 0);
+})();

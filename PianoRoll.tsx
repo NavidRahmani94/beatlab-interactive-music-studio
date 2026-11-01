@@ -1,6 +1,6 @@
 import { Dispatch, KeyboardEvent, PointerEvent, SetStateAction, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  MAX_MIDI, MIN_MIDI, MelodyNote, ScaleName, inScale, midiToNote, noteToMidi, noteAt, notesAtStep, resizeNote, scaleRows, setNoteVelocity, setStepVelocity, toggleNote
+  MAX_MIDI, MIN_MIDI, MelodyNote, ScaleName, inScale, midiToNote, noteToMidi, noteAt, notesAtStep, resizeNote, scaleRows, setNoteVelocity, setStepVelocity, toggleNote, toggleSlide, isSlideTarget
 } from './melody';
 import { STEPS } from './pattern';
 import { useFollowPlayhead } from './useFollow';
@@ -18,6 +18,7 @@ type Props = {
   accent: string;           // CSS colour of this track
   onPreview?: (midi: number, down: boolean) => void; // press / release a note name to hear it
   cursor?: number;          // step-entry position (highlighted column), -1 = none
+  slide?: boolean;          // show the SLIDE lane (not for arpeggio tracks, whose notes are chords)
   touchDraw: boolean;       // touch screens: true = dragging draws/stretches notes, false = dragging scrolls (a tap still adds/removes)
 };
 
@@ -28,7 +29,7 @@ type Drag =
   | { kind: 'create'; id: string; startStep: number; moved: boolean }
   | { kind: 'existing'; id: string; noteStep: number; startStep: number; moved: boolean };
 
-type CellInfo = { start: boolean; end: boolean; v: number };
+type CellInfo = { start: boolean; end: boolean; v: number; sl: boolean };
 type RowProps = {
   midi: number; name: string; inKey: boolean; isRoot: boolean; advanced: boolean; cursor: number; sig: string; row: (CellInfo | undefined)[];
   onPreview?: (midi: number, down: boolean) => void; onKey: (midi: number, step: number, detail: number) => void;
@@ -40,7 +41,7 @@ const Row = memo(function Row({ midi, name, inKey, isRoot, advanced, cursor, row
       onPointerDown={onPreview ? e => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); onPreview(midi, true); } : undefined}
       onPointerUp={onPreview ? () => onPreview(midi, false) : undefined} onPointerCancel={onPreview ? () => onPreview(midi, false) : undefined}>{name}</span>
     {row.map((cell, s) => {
-      const cls = 'mcell' + (cell ? ' on' + (cell.start ? ' start' : '') + (cell.end ? ' end' : '') : '') + (s % 4 === 0 ? ' beat' : '') + (s === 16 ? ' bar2' : '') +
+      const cls = 'mcell' + (cell ? ' on' + (cell.start ? ' start' : '') + (cell.end ? ' end' : '') + (cell.sl ? ' slide' : '') : '') + (s % 4 === 0 ? ' beat' : '') + (s === 16 ? ' bar2' : '') +
         (s === cursor ? ' stepcur' : '') + (advanced && !inKey ? ' out' : '');
       return <button key={s} data-midi={midi} data-step={s} className={cls} style={cell ? { ['--v' as string]: cell.v } : undefined}
         aria-label={`${name} step ${s + 1}`} aria-pressed={!!cell} onClick={e => onKey(midi, s, e.detail)} />;
@@ -52,7 +53,7 @@ const Row = memo(function Row({ midi, name, inKey, isRoot, advanced, cursor, row
  * Piano roll. CLICK an empty cell = new note (default length). DRAG sideways from an empty cell = a note of any length.
  * DRAG sideways from a cell of an existing note = stretch / shrink it. CLICK an existing note = remove it.
  */
-export default function PianoRoll({ notes, onNotes, advanced, keyPc, scale, defaultLength, velocity, enabled, playingStep, accent, touchDraw, onPreview, cursor = -1 }: Props) {
+export default function PianoRoll({ slide = true, notes, onNotes, advanced, keyPc, scale, defaultLength, velocity, enabled, playingStep, accent, touchDraw, onPreview, cursor = -1 }: Props) {
   const rollRef = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);
   const laneDragging = useRef(false);
@@ -82,9 +83,9 @@ export default function PianoRoll({ notes, onNotes, advanced, keyPc, scale, defa
       const midi = noteToMidi(n.pitch);
       if (midi === null) return;
       let r = map.get(midi); if (!r) { r = { row: Array(STEPS).fill(undefined), sig: '' }; map.set(midi, r); }
-      for (let s = n.step; s < n.step + n.lengthSteps && s < STEPS; s++) r.row[s] = { start: s === n.step, end: s === n.step + n.lengthSteps - 1, v: n.velocity };
+      for (let s = n.step; s < n.step + n.lengthSteps && s < STEPS; s++) r.row[s] = { start: s === n.step, end: s === n.step + n.lengthSteps - 1, v: n.velocity, sl: n.slide === true };
     });
-    map.forEach(r => { r.sig = r.row.map(c => (c ? `${c.start ? 1 : 0}${c.end ? 1 : 0}${c.v.toFixed(2)}` : '-')).join(','); });
+    map.forEach(r => { r.sig = r.row.map(c => (c ? `${c.start ? 1 : 0}${c.end ? 1 : 0}${c.sl ? 's' : ''}${c.v.toFixed(2)}` : '-')).join(','); });
     return map;
   }, [notes]);
   const emptyRow = useMemo<(CellInfo | undefined)[]>(() => Array(STEPS).fill(undefined), []);
@@ -214,6 +215,16 @@ export default function PianoRoll({ notes, onNotes, advanced, keyPc, scale, defa
             </div>;
           })}
         </div>
+        {slide && <div className="mrow slide-lane" onPointerDown={e => e.stopPropagation()} title="SLIDE: a slide note makes no sound itself. Put it where a note is still sounding and that note bends to the slide note's pitch (like the slide notes of FL Studio).">
+          <span className="mlabel">SLIDE</span>
+          {Array.from({ length: STEPS }, (_, s) => {
+            const list = notesAtStep(notes, s);
+            return <div key={s} className={'slide-cell' + (list.length === 0 ? ' empty' : '') + (s % 4 === 0 ? ' beat' : '')}>
+              {list.map(n => <button key={n.id} className={'slide-btn' + (n.slide ? ' on' : '') + (n.slide && !isSlideTarget(notes, n) ? ' lonely' : '')} aria-pressed={n.slide === true} aria-label={`Slide ${n.pitch} step ${s + 1}`} title={`${n.pitch}: ${n.slide ? (isSlideTarget(notes, n) ? 'silent slide: bends the note that is sounding into this pitch (click to turn off)' : 'slide is on, but no note is sounding here to bend, so it is played as a normal note') : 'click to make this a slide note: it is not played, it bends the note before it to this pitch'}`}
+                onClick={() => onNotes(prev => toggleSlide(prev, n.id))}>{n.slide ? '⤴' : '·'}</button>)}
+            </div>;
+          })}
+        </div>}
       </div>
     </div>
     {hidden > 0 && <div className="roll-note">{hidden} NOTE{hidden > 1 ? 'S' : ''} OUTSIDE THIS VIEW STILL PLAY</div>}

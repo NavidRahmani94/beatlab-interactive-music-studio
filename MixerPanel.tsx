@@ -1,4 +1,5 @@
-import { Fragment, useEffect, useRef } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
+import { FX_IDS, FX_TYPES, FxType, MAX_FX, addFx, isFxType, moveFx, patchFx, removeFx } from './fx';
 import PanKnob from './PanKnob';
 import {
   channelGroups, channelLabel, defaultChannel, ChannelName, ChannelSettings, Channels, DELAY_DIVISIONS, DelayDivision, MAX_FEEDBACK, MasterSettings,
@@ -22,6 +23,7 @@ const fmtPan = (p: number) => (Math.abs(p) < 0.02 ? 'C' : p < 0 ? `L${Math.round
 export default function MixerPanel({ channels, tracks, master, onChannel, onMaster, getLevelDb, playing }: Props) {
   const meterRef = useRef<HTMLDivElement>(null);
   const peakRef = useRef<HTMLSpanElement>(null);
+  const [fxOpen, setFxOpen] = useState<Record<string, boolean>>({});
 
   // animate the master level meter without re-rendering React
   useEffect(() => {
@@ -47,7 +49,8 @@ export default function MixerPanel({ channels, tracks, master, onChannel, onMast
         const c = channels[name] ?? defaultChannel(name, kind === 'drums' ? undefined : kind);
         const label = channelLabel(name, tracks);
         return <Fragment key={name}>{group && <div className="mix-group">{group}</div>}<div className={'mix-row' + (c.muted ? ' is-muted' : '')}>
-          <div className="instrument-name"><span className={'inst-dot ' + (kind === 'drums' ? name : kind)} />{label}</div>
+          <div className="instrument-name"><span className={'inst-dot ' + (kind === 'drums' ? name : kind)} />{label}
+            <button className={'fx-btn' + ((c.fx?.length ?? 0) > 0 ? ' has' : '') + (fxOpen[name] ? ' open' : '')} aria-expanded={!!fxOpen[name]} aria-label={`${label} effects`} title="Insert effects for this channel (chorus, phaser, distortion …)" onClick={() => setFxOpen(o => ({ ...o, [name]: !o[name] }))}>FX{(c.fx?.length ?? 0) > 0 ? ` ${c.fx!.length}` : ''}</button></div>
           <div className="seg small" role="group" aria-label={`${label} mute and solo`}>
             <button className={c.muted ? 'sel warn' : ''} aria-pressed={c.muted} aria-label={`${label} mixer ${c.muted ? 'muted' : 'on'}`} title="Mute" onClick={() => onChannel(name, { muted: !c.muted })}>M</button>
             <button className={c.solo ? 'sel' : ''} aria-pressed={c.solo} aria-label={`${label} solo`} title="Solo" onClick={() => onChannel(name, { solo: !c.solo })}>S</button>
@@ -59,7 +62,24 @@ export default function MixerPanel({ channels, tracks, master, onChannel, onMast
             onChange={e => onChannel(name, { reverbSend: Number(e.target.value) / 100 })} /><b>{Math.round(c.reverbSend * 100)}%</b></label>
           <label className="fader"><input type="range" min={0} max={100} step={1} value={Math.round(c.delaySend * 100)} aria-label={`${label} delay send`}
             onChange={e => onChannel(name, { delaySend: Number(e.target.value) / 100 })} /><b>{Math.round(c.delaySend * 100)}%</b></label>
-        </div></Fragment>;
+        </div>
+          {fxOpen[name] && <div className="mix-fx" role="group" aria-label={`${label} effects`}>
+            {(c.fx ?? []).length === 0 && <div className="fx-empty">No effects yet. Add one below (up to {MAX_FX}). They run in order, top to bottom, before pan and the reverb / delay sends.</div>}
+            {(c.fx ?? []).map((f, i, all) => <div className={'fx-slot' + (f.on ? '' : ' off')} key={f.id}>
+              <span className="fx-move"><button aria-label={`Move ${FX_TYPES[f.type].label} up`} disabled={i === 0} onClick={() => onChannel(name, { fx: moveFx(c.fx, f.id, -1) })}>▲</button><button aria-label={`Move ${FX_TYPES[f.type].label} down`} disabled={i === all.length - 1} onClick={() => onChannel(name, { fx: moveFx(c.fx, f.id, 1) })}>▼</button></span>
+              <select aria-label={`${label} effect ${i + 1} type`} title={FX_TYPES[f.type].hint} value={f.type} onChange={e => isFxType(e.target.value) && onChannel(name, { fx: patchFx(c.fx, f.id, { type: e.target.value }) })}>
+                {FX_IDS.map(t => <option key={t} value={t}>{FX_TYPES[t].label}</option>)}
+              </select>
+              <label className="fader"><input type="range" min={0} max={100} step={1} value={Math.round(f.amount * 100)} aria-label={`${label} effect ${i + 1} amount`} onChange={e => onChannel(name, { fx: patchFx(c.fx, f.id, { amount: Number(e.target.value) / 100 }) })} /><b>{Math.round(f.amount * 100)}%</b></label>
+              <button className={'fx-on' + (f.on ? ' sel' : '')} aria-pressed={f.on} aria-label={`${label} effect ${i + 1} ${f.on ? 'on' : 'bypassed'}`} title="Switch this effect on or off" onClick={() => onChannel(name, { fx: patchFx(c.fx, f.id, { on: !f.on }) })}>{f.on ? 'ON' : 'OFF'}</button>
+              <button className="fx-del" aria-label={`Remove ${FX_TYPES[f.type].label} from ${label}`} title="Remove this effect" onClick={() => onChannel(name, { fx: removeFx(c.fx, f.id) })}>✕</button>
+            </div>)}
+            <select className="fx-add" aria-label={`Add effect to ${label}`} value="" disabled={(c.fx?.length ?? 0) >= MAX_FX} onChange={e => { const t = e.target.value as FxType; if (isFxType(t)) onChannel(name, { fx: addFx(c.fx, t) }); }}>
+              <option value="">{(c.fx?.length ?? 0) >= MAX_FX ? `Most ${MAX_FX} effects` : '＋ ADD EFFECT…'}</option>
+              {FX_IDS.map(t => <option key={t} value={t}>{FX_TYPES[t].label} — {FX_TYPES[t].hint}</option>)}
+            </select>
+          </div>}
+        </Fragment>;
       })}
     </div>
 

@@ -8,10 +8,63 @@ import { KIND_DEFAULT_INSTRUMENT, TrackDef } from './tracks';
 import { FACTORY_SOUNDS, SynthPatch, SynthSlot, customId, isCustomRef, isFactorySound } from './synth';
 import { NoteSynth, PatchSynth } from './patchSynth';
 import { arpAt } from './arp';
+import { Tuning, tuningTotal } from './tuning';
+import { isSlideTarget, slidePath } from './melody';
+import { FxSlot, FxType, fxSignature } from './fx';
 import { Groove, defaultGroove, drumHits, stepDrift, swingDelay } from './groove';
 import { PatternData, notesFor } from './song';
 
-type Strip = { vol: Tone.Volume; pan: Tone.Panner; reverbSend: Tone.Gain; delaySend: Tone.Gain };
+type FxNode = { input: Tone.ToneAudioNode; output: Tone.ToneAudioNode; set(amount: number): void; dispose(): void };
+type Strip = { vol: Tone.Volume; pan: Tone.Panner; reverbSend: Tone.Gain; delaySend: Tone.Gain; fxSig: string; fx: { id: string; node: FxNode }[] };
+
+/** One insert effect. `amount` (0..1) is how much of it you hear; 0 sounds like the dry signal. */
+/**
+ * Lets a built-in PolySynth glide single notes. Tone gives a voice to a note only when its time comes, so we wrap the internal attack:
+ * right after the voice is chosen for a note that is waiting in `__slides`, its detune is ramped over the note. A voice that slid before
+ * is set back to 0 when it plays its next note.
+ */
+function hookSlides(synth: unknown): void {
+  const s = synth as { _triggerAttack?: (notes: string[], time: number, velocity?: number) => void; _activeVoices?: { midi: number; voice: { detune?: Tone.Signal<'cents'> } }[]; __slides?: unknown[] };
+  if (typeof s._triggerAttack !== 'function' || !Array.isArray(s._activeVoices)) return;
+  const queue: { midi: number; time: number; glide: { at: number; cents: number }[] }[] = [];
+  const slid = new WeakSet<object>();
+  s.__slides = queue;
+  const original = s._triggerAttack.bind(s);
+  s._triggerAttack = (notes, time, velocity) => {
+    const before = new Set(s._activeVoices!);
+    original(notes, time, velocity);
+    s._activeVoices!.filter(a => !before.has(a)).forEach(({ midi, voice }) => {
+      const d = voice.detune; if (!d) return;
+      const i = queue.findIndex(q => q.midi === midi && Math.abs(q.time - time) < 0.02);
+      if (i >= 0) {
+        const q = queue.splice(i, 1)[0];
+        d.cancelScheduledValues(time); d.setValueAtTime(0, time); q.glide.forEach(k => d.linearRampToValueAtTime(k.cents, time + Math.max(0, k.at))); slid.add(voice);
+      } else if (slid.has(voice)) { d.cancelScheduledValues(time); d.setValueAtTime(0, time); slid.delete(voice); }
+    });
+    if (queue.length > 64) queue.splice(0, queue.length - 64);
+  };
+}
+
+function makeFxNode(type: FxType): FxNode {
+  const wrap = <E extends Tone.ToneAudioNode>(node: E, set: (a: number) => void): FxNode => ({ input: node, output: node, set, dispose: () => node.dispose() });
+  switch (type) {
+    case 'chorus': { const n = new Tone.Chorus({ frequency: 1.6, delayTime: 3.5, depth: 0.7, spread: 180 }).start(); return wrap(n, a => { n.wet.value = a; }); }
+    case 'phaser': { const n = new Tone.Phaser({ frequency: 0.5, octaves: 3, baseFrequency: 350 }); return wrap(n, a => { n.wet.value = a; }); }
+    case 'flanger': { const n = new Tone.Chorus({ frequency: 0.25, delayTime: 1.2, depth: 0.9, spread: 90, feedback: 0.55 }).start(); return wrap(n, a => { n.wet.value = a; }); }
+    case 'tremolo': { const n = new Tone.Tremolo({ frequency: 5.5, depth: 1, spread: 90 }).start(); return wrap(n, a => { n.wet.value = a; }); }
+    case 'vibrato': { const n = new Tone.Vibrato({ frequency: 5.5, depth: 0.25 }); return wrap(n, a => { n.wet.value = a; }); }
+    case 'distortion': { const n = new Tone.Distortion({ distortion: 0.6, oversample: '2x' }); return wrap(n, a => { n.distortion = 0.15 + 0.75 * a; n.wet.value = Math.min(1, a * 1.4); }); }
+    case 'autofilter': { const n = new Tone.AutoFilter({ frequency: 0.9, baseFrequency: 220, octaves: 4, depth: 1 }).start(); return wrap(n, a => { n.wet.value = a; }); }
+    case 'autowah': { const n = new Tone.AutoWah({ baseFrequency: 120, octaves: 5, sensitivity: -24, Q: 4 }); return wrap(n, a => { n.wet.value = a; }); }
+    case 'widener': { const n = new Tone.StereoWidener(0.5); return wrap(n, a => { n.width.value = 0.5 + 0.5 * a; }); }
+    case 'bitcrusher': {
+      // quantises the signal to fewer and fewer levels (no worklet needed, so it also works offline)
+      const input = new Tone.Gain(1); const ws = new Tone.WaveShaper(x => x); const cf = new Tone.CrossFade(0);
+      input.connect(cf.a); input.connect(ws); ws.connect(cf.b);
+      return { input, output: cf, set: a => { const bits = 8 - 5 * a; const levels = Math.pow(2, bits); ws.setMap(x => Math.round(x * levels) / levels); cf.fade.value = Math.min(1, a * 1.5); }, dispose: () => { input.dispose(); ws.dispose(); cf.dispose(); } };
+    }
+  }
+}
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type KitDef = { kick: any; snare: any; hat: any; clap: any; dur: Record<Instrument, number>; kickNote?: string };
@@ -224,6 +277,7 @@ export class Rig {
   private groove: Groove = defaultGroove();
   private muted: Record<ChannelName, boolean> = {};
   private channels: Channels = {};
+  private tuneSemis = 0;
   private bpm = 120;
   // The hi-hat (a Tone.MetalSynth: 12 FM oscillators per hit) was by far the most expensive voice: it is rendered ONCE per kit into a buffer and then only played back.
   private hatOut!: Tone.Volume;
@@ -290,7 +344,7 @@ export class Rig {
     reverbSend.connect(this.sendReverb);
     pan.connect(delaySend);
     delaySend.connect(this.delay);
-    const strip = { vol, pan, reverbSend, delaySend };
+    const strip: Strip = { vol, pan, reverbSend, delaySend, fxSig: '', fx: [] };
     this.strips[name] = strip;
     this.muted[name] = false;
     return strip;
@@ -298,6 +352,7 @@ export class Rig {
   private disposeStrip(name: ChannelName): void {
     const s = this.strips[name];
     if (!s) return;
+    s.fx.forEach(f => f.node.dispose());
     s.vol.dispose(); s.pan.dispose(); s.reverbSend.dispose(); s.delaySend.dispose();
     delete this.strips[name];
     delete this.muted[name];
@@ -328,6 +383,7 @@ export class Rig {
     const m = buildMelody(ref);
     m.synth.volume.value = m.volume;
     pinVoices(m.synth, def.kind === 'ambient' ? 6 : 4);
+    hookSlides(m.synth);
     if (m.filter) { m.synth.connect(m.filter); m.filter.connect(out); } else m.synth.connect(out);
     return { sig: this.signature(wanted), synth: m.synth, filter: m.filter, shift: m.shift };
   }
@@ -370,8 +426,8 @@ export class Rig {
     }
     return this.audition.synth;
   }
-  auditionDown(patch: SynthPatch, note: string, velocity = 0.8): void { this.ensureAudition(patch).triggerAttack(note, Tone.now() + 0.005, velocity); }
-  auditionUp(patch: SynthPatch, note: string): void { this.ensureAudition(patch).triggerRelease(note, Tone.now()); }
+  auditionDown(patch: SynthPatch, note: string, velocity = 0.8): void { this.ensureAudition(patch).triggerAttack(this.pitchOf(note), Tone.now() + 0.005, velocity); }
+  auditionUp(patch: SynthPatch, note: string): void { this.ensureAudition(patch).triggerRelease(this.pitchOf(note), Tone.now()); }
   auditionStop(): void { this.audition?.synth.releaseAll(); }
 
   /** Resolves when the reverb impulse responses have been generated. */
@@ -388,9 +444,26 @@ export class Rig {
       strip.pan.pan.value = c.pan;
       strip.reverbSend.gain.value = c.reverbSend;
       strip.delaySend.gain.value = c.delaySend;
+      this.applyFx(strip, c.fx);
       this.muted[name] = muted;
       if (muted) this.tracks.get(name)?.voice.synth.releaseAll();
     });
+  }
+
+  /** Keeps the insert effects of one strip in step with the settings: the chain is rebuilt only when effects are added, removed, reordered, switched on/off or changed type; knob moves just set the amount. */
+  private applyFx(strip: Strip, list: FxSlot[] | undefined): void {
+    const active = (list ?? []).filter(f => f.on);
+    const sig = fxSignature(list);
+    if (sig !== strip.fxSig) {
+      strip.vol.disconnect();
+      strip.fx.forEach(f => f.node.dispose());
+      strip.fx = active.map(f => ({ id: f.id, node: makeFxNode(f.type) }));
+      let prev: Tone.ToneAudioNode = strip.vol;
+      strip.fx.forEach(f => { prev.connect(f.node.input); prev = f.node.output; });
+      prev.connect(strip.pan);
+      strip.fxSig = sig;
+    }
+    active.forEach((f, i) => strip.fx[i]?.node.set(f.amount));
   }
 
   setMaster(master: MasterSettings): void {
@@ -413,6 +486,27 @@ export class Rig {
   setTempo(bpm: number): void { this.bpm = bpm; this.updateDelay(); }
 
   setGroove(g: Groove): void { this.groove = g; }
+  /** Global pitch for every track and the Synth Lab keyboard (not the drums). */
+  setTuning(t: Tuning): void { this.tuneSemis = tuningTotal(t); }
+  /** A note name moved by the track's own shift plus the global tuning. With no shift at all the note name is returned untouched; otherwise an exact frequency such as "432.1hz". */
+  /**
+   * Plays one note. `cents` ≠ 0 makes the pitch glide by that amount over the note (a "slide" note).
+   * The patch synth does it itself; for the built-in PolySynths the voice that is given to the note is found through a small hook
+   * on the synth (see makeVoice) and its detune is ramped.
+   */
+  private playNote(voice: Voice, pitch: string, duration: number, time: number, velocity: number, glide: { at: number; cents: number }[]): void {
+    if (glide.length > 0) {
+      const hook = (voice.synth as unknown as { __slides?: { midi: number; time: number; glide: { at: number; cents: number }[] }[] }).__slides;
+      if (hook) hook.push({ midi: Tone.Frequency(pitch).toMidi(), time, glide });
+    }
+    voice.synth.triggerAttackRelease(pitch, duration, time, velocity, glide);
+  }
+  private pitchOf(note: string, shift = 0): string {
+    const total = shift + this.tuneSemis;
+    if (total === 0) return note;
+    if (Number.isInteger(total)) return Tone.Frequency(note).transpose(total).toNote();
+    return `${Tone.Frequency(note).transpose(total).toFrequency().toFixed(3)}hz`;
+  }
   setDrumKit(id: DrumKitId): void {
     const kit = KITS[id];
     this.kick.set(kit.kick);
@@ -470,15 +564,18 @@ export class Rig {
       const notes = notesFor(pattern, id);
       if (def.kind === 'arp') {
         arpAt(notes, step, def.arp, tick).forEach(e => {
-          const pitch = voice.shift ? Tone.Frequency(e.pitch).transpose(voice.shift).toNote() : e.pitch;
-          voice.synth.triggerAttackRelease(pitch, Math.max(0.05, e.durationSteps * stepSeconds), time, e.velocity * drift.gain);
+          const pitch = this.pitchOf(e.pitch, voice.shift);
+          this.playNote(voice, pitch, Math.max(0.05, e.durationSteps * stepSeconds), time, e.velocity * drift.gain, []);
         });
         return;
       }
       const hold = def.kind === 'ambient' ? 1 : 0.95;
       notesStartingAt(notes, step).forEach(n => {
-        const pitch = voice.shift ? Tone.Frequency(n.pitch).transpose(voice.shift).toNote() : n.pitch;
-        voice.synth.triggerAttackRelease(pitch, Math.max(0.05, n.lengthSteps * stepSeconds * hold), time, n.velocity * drift.gain);
+        if (isSlideTarget(notes, n)) return;                       // a slide note is silent: it only bends the note that is sounding
+        const pitch = this.pitchOf(n.pitch, voice.shift);
+        const sp = slidePath(notes, n);
+        const steps = sp ? sp.endStep - n.step : n.lengthSteps;
+        this.playNote(voice, pitch, Math.max(0.05, steps * stepSeconds * hold), time, n.velocity * drift.gain, sp ? sp.path.map(k => ({ at: k.at * stepSeconds, cents: k.cents })) : []);
       });
     });
   }
@@ -500,7 +597,7 @@ export class Rig {
   private liveSynth(id: string, note: string): { synth: NoteSynth; pitch: string } | null {
     const rt = this.tracks.get(id);
     if (!rt) return null;
-    return { synth: rt.voice.synth, pitch: rt.voice.shift ? Tone.Frequency(note).transpose(rt.voice.shift).toNote() : note };
+    return { synth: rt.voice.synth, pitch: this.pitchOf(note, rt.voice.shift) };
   }
   /**
    * While the song plays, the transport has already handed some notes to the same voices a few ms ahead, and Tone refuses events that go back in time,

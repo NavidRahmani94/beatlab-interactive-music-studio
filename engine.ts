@@ -6,6 +6,7 @@ import { TrackDef } from './tracks';
 import { Frame, PatternData, PlayMode, Playlist, frameAt } from './song';
 import { Rig } from './rig';
 import { Groove, defaultGroove } from './groove';
+import { Tuning, defaultTuning } from './tuning';
 import { SynthPatch, SynthSlot } from './synth';
 
 export type SongState = { patterns: PatternData[]; playlist: Playlist; mode: PlayMode; current: number };
@@ -20,6 +21,7 @@ export class BeatLabEngine {
   private master: MasterSettings = defaultMaster();
   private kit: DrumKitId = 'classic';
   private groove: Groove = defaultGroove();
+  private tuning: Tuning = defaultTuning();
   private synths: SynthSlot[] = [];
   private bpm = 120;
   private frameCallback: (frame: Frame) => void;
@@ -41,6 +43,7 @@ export class BeatLabEngine {
   setSynths(synths: SynthSlot[]): void { this.synths = synths; this.rig?.setSynths(synths); }
   setDrumKit(id: DrumKitId): void { this.kit = id; this.rig?.setDrumKit(id); }
   setGroove(g: Groove): void { this.groove = g; this.rig?.setGroove(g); }
+  setTuning(t: Tuning): void { this.tuning = t; this.rig?.setTuning(t); }
   setFrameCallback(callback: (frame: Frame) => void): void { this.frameCallback = callback; }
   /** Master output level in dB, or -Infinity before the first PLAY. */
   getLevelDb(): number { return this.rig ? this.rig.getLevelDb() : -Infinity; }
@@ -62,6 +65,7 @@ export class BeatLabEngine {
     rig.setSynths(this.synths);
     rig.setDrumKit(this.kit);
     rig.setGroove(this.groove);
+    rig.setTuning(this.tuning);
     rig.setTracks(this.trackDefs);
     rig.setMaster(this.master);
     rig.setChannels(this.channels);

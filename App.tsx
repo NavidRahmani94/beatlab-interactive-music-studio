@@ -31,6 +31,8 @@ import { ExportFormat, renderProjectToWav } from './exporter';
 import { STEPS } from './pattern';
 import { History, commit, emptyHistory, redo as redoStep, undo as undoStep } from './history';
 import { Groove } from './groove';
+import SystemMonitor from './SystemMonitor';
+import { Tuning, TEMPO_STYLES, TUNING_MAX_CENTS, TUNING_MAX_SEMITONES, clampCents, clampSemitones, cleanTuning, defaultTuning, fmtA4, isDefaultTuning, styleForBpm } from './tuning';
 import { Autosave, clearAutosave, readAutosave, saveAutosave } from './autosave';
 import { ThemeChoice, THEME_LABEL, applyTheme, loadTheme, nextTheme, saveTheme } from './theme';
 import './main.css';
@@ -63,6 +65,7 @@ export default function App() {
   const [synths, setSynths] = useState<SynthSlot[]>(initial.synths);
   const [kit, setKit] = useState<DrumKitId>(initial.drumKit);
   const [groove, setGroove] = useState<Groove>(initial.groove);
+  const [tuning, setTuning] = useState<Tuning>(initial.tuning ?? defaultTuning());
   const [sections, setSections] = useState<Section[]>(initial.sections);
   const [keyPc, setKeyPc] = useState(initial.melodyView.key);
   const [scale, setScale] = useState<ScaleName>(initial.melodyView.scale);
@@ -97,8 +100,8 @@ export default function App() {
   const pattern = patterns[cur];
 
   const project: BeatLabProject = useMemo(() => ({
-    schemaVersion: 5, name, bpm, patterns, playlist, tracks, synths, drumKit: kit, sections, groove, melodyView: { key: keyPc, scale }, channels, master
-  }), [name, bpm, patterns, playlist, tracks, synths, kit, sections, groove, keyPc, scale, channels, master]);
+    schemaVersion: 5, name, bpm, patterns, playlist, tracks, synths, drumKit: kit, sections, groove, tuning, melodyView: { key: keyPc, scale }, channels, master
+  }), [name, bpm, patterns, playlist, tracks, synths, kit, sections, groove, tuning, keyPc, scale, channels, master]);
   const dirty = useMemo(() => serializeProject(project) !== savedJson, [project, savedJson]);
 
   const engine = useRef<BeatLabEngine | null>(null);
@@ -121,6 +124,7 @@ export default function App() {
   useEffect(() => { setChannels(c => syncChannels(c, tracks)); }, [tracks]);
   useEffect(() => { engine.current?.setDrumKit(kit); }, [kit]);
   useEffect(() => { engine.current?.setGroove(groove); }, [groove]);
+  useEffect(() => { engine.current?.setTuning(tuning); }, [tuning]);
   const getHealth = useCallback(() => engine.current?.getHealth() ?? { late: 0, maxLateMs: 0, steps: 0 }, []);
   const keysDown = useCallback((patch: SynthPatch, note: string) => { void engine.current?.auditionDown(patch, note); }, []);
   const keysUp = useCallback((patch: SynthPatch, note: string) => { engine.current?.auditionUp(patch, note); }, []);
@@ -170,7 +174,7 @@ export default function App() {
 
   function setAll(p: BeatLabProject) {
     setName(p.name); setBpm(p.bpm); setPatterns(p.patterns); setPlaylist(p.playlist); setTracks(p.tracks); setSynths(p.synths); setView(v => (v === 'lab' || v === DRUMS_TAB || p.tracks.some(t => t.id === v) ? v : (p.tracks[0]?.id ?? DRUMS_TAB)));
-    setChannels(p.channels); setMaster(p.master); setKit(p.drumKit); setSections(p.sections); setGroove(p.groove); setKeyPc(p.melodyView.key); setScale(p.melodyView.scale);
+    setChannels(p.channels); setMaster(p.master); setKit(p.drumKit); setSections(p.sections); setGroove(p.groove); setTuning(cleanTuning(p.tuning)); setKeyPc(p.melodyView.key); setScale(p.melodyView.scale);
   }
   /** Loads a whole project (new / open / sample / restore): the undo history starts again. */
   function apply(p: BeatLabProject, saved = true) {
@@ -272,6 +276,7 @@ export default function App() {
   const [startStep, setStartStep] = useState(0);
   const [keysOn, setKeysOn] = useState(true);
   const [lite, setLite] = useState(loadLite);
+  const [sysOpen, setSysOpen] = useState(false);
   const [octave, setOctave] = useState(DEFAULT_OCTAVE);
   const [stepCursor, setStepCursor] = useState(0);
   const cursorRef = useRef(0); cursorRef.current = stepCursor;
@@ -512,7 +517,8 @@ export default function App() {
   const bars = mode === 'song' ? playlist.length : 1;
 
   return <main className="shell" style={{ ['--bar-s' as string]: `${(STEPS * 15) / bpm}s` }}>
-    <header><div><div className="eyebrow">INTERACTIVE MUSIC STUDIO</div><h1><span>BEAT</span>LAB<span className="dot">.</span></h1></div><div className="head-right"><button className={'theme-btn' + (lite ? ' on' : '')} aria-pressed={lite} aria-label="Lite mode" title="Lite mode: stops the decorative animation and draws the visualiser less often. Helps slow computers and phones." onClick={() => { setLite(l => { saveLite(!l); return !l; }); }}>{lite ? '🍃 LITE ON' : '🍃 LITE'}</button><button className="theme-btn" aria-label="Colour theme" title="Switch between automatic, dark and light" onClick={() => setTheme(nextTheme(theme))}>{THEME_LABEL[theme]}</button><div className="phase">PHASE 01–10 <span>• V0.18.12 TEST BUILD</span></div></div></header>
+    <header><div><div className="eyebrow">INTERACTIVE MUSIC STUDIO</div><h1><span>BEAT</span>LAB<span className="dot">.</span></h1></div><div className="head-right"><button className={'theme-btn' + (lite ? ' on' : '')} aria-pressed={lite} aria-label="Lite mode" title="Lite mode: stops the decorative animation and draws the visualiser less often. Helps slow computers and phones." onClick={() => { setLite(l => { saveLite(!l); return !l; }); }}>{lite ? '🍃 LITE ON' : '🍃 LITE'}</button><button className={'theme-btn' + (sysOpen ? ' on' : '')} aria-pressed={sysOpen} aria-label="System monitor" title="Show CPU / audio load and memory use" onClick={() => setSysOpen(o => !o)}>📊 STATS</button><button className="theme-btn" aria-label="Colour theme" title="Switch between automatic, dark and light" onClick={() => setTheme(nextTheme(theme))}>{THEME_LABEL[theme]}</button><div className="phase">PHASE 01–10 <span>• V0.18.17 TEST BUILD</span></div></div></header>
+    <SystemMonitor open={sysOpen} onClose={() => setSysOpen(false)} playing={playing} getHealth={getHealth} />
     <section className="intro hero"><div className="hero-text"><div className="eyebrow">YOUR FIRST SONG</div><h2>Make some noise.</h2><p>Ambient. Drums. Melody. Arpeggio. Mix. Master. Arrange. Export WAV / MP3.</p></div><HeroArt playing={playing} bpm={bpm} lite={lite} /></section>
     {pendingRestore && <div className="restore-banner" role="alert">
       <span>Unsaved work from {new Date(pendingRestore.savedAt).toLocaleString()} was found on this device.</span>
@@ -520,7 +526,15 @@ export default function App() {
     </div>}
     <ProjectBar name={name} onName={setName} dirty={dirty} exporting={exporting} loops={loops} unit={mode === 'song' ? 'song' : 'pattern'} onLoops={setLoops} format={format} onFormat={setFormat}
       onNew={newProject} onOpenFile={openFile} onSave={save} onSample={loadSample} onExport={exportWav} />
-    <section className="panel transport"><div className="panel-label">TRANSPORT <span>SPACE = PLAY / STOP</span></div><div className="transport-controls"><button className={playing ? 'stop' : 'play'} onClick={playing ? stop : play}>{playing ? '■ STOP' : '▶ PLAY'}</button><div className="bpm"><label htmlFor="bpm">TEMPO <b>{bpm} <small>BPM</small></b></label><input id="bpm" type="range" min="60" max="200" value={bpm} onChange={e => setBpm(clampBpm(Number(e.target.value)))} /></div><div className="undo-redo" role="group" aria-label="History"><button aria-label="Undo" title="Undo (Ctrl+Z)" disabled={histInfo.undo === 0} onClick={() => stepHistory('undo')}>↶ UNDO</button><button aria-label="Redo" title="Redo (Ctrl+Shift+Z)" disabled={histInfo.redo === 0} onClick={() => stepHistory('redo')}>↷ REDO</button></div><div className="indicator"><span className={playing ? 'pulse on' : 'pulse'} />{playing ? 'PLAYING' : 'STOPPED'}</div></div>
+    <section className="panel transport"><div className="panel-label">TRANSPORT <span>SPACE = PLAY / STOP</span></div><div className="transport-controls"><button className={playing ? 'stop' : 'play'} onClick={playing ? stop : play}>{playing ? '■ STOP' : '▶ PLAY'}</button><div className="bpm"><label htmlFor="bpm">TEMPO <b>{bpm} <small>BPM</small></b></label><input id="bpm" type="range" min="60" max="200" value={bpm} onChange={e => setBpm(clampBpm(Number(e.target.value)))} />
+        <label className="style-pick">STYLE <select aria-label="Tempo style" value={styleForBpm(bpm)} onChange={e => { const s = TEMPO_STYLES.find(x => x.id === e.target.value); if (s) setBpm(clampBpm(s.bpm)); }}>
+          <option value="custom" disabled={styleForBpm(bpm) !== 'custom'}>Custom</option>
+          {TEMPO_STYLES.map(s => <option key={s.id} value={s.id}>{s.label} · {s.bpm}</option>)}
+        </select></label></div>
+      <div className="pitch" role="group" aria-label="Global pitch"><label htmlFor="pitch-semi">PITCH <b>{fmtA4(tuning)}</b></label>
+        <div className="pitch-row"><span>KEY</span><input id="pitch-semi" type="range" min={-TUNING_MAX_SEMITONES} max={TUNING_MAX_SEMITONES} step={1} value={tuning.semitones} aria-label="Pitch in semitones" onChange={e => setTuning(t => ({ ...t, semitones: clampSemitones(Number(e.target.value)) }))} onDoubleClick={() => setTuning(t => ({ ...t, semitones: 0 }))} /><em>{tuning.semitones > 0 ? '+' : ''}{tuning.semitones} st</em></div>
+        <div className="pitch-row"><span>FINE</span><input type="range" min={-TUNING_MAX_CENTS} max={TUNING_MAX_CENTS} step={1} value={tuning.cents} aria-label="Pitch in cents" onChange={e => setTuning(t => ({ ...t, cents: clampCents(Number(e.target.value)) }))} onDoubleClick={() => setTuning(t => ({ ...t, cents: 0 }))} /><em>{tuning.cents > 0 ? '+' : ''}{tuning.cents} ct</em></div>
+        <div className="pitch-row"><button className="auto-btn" aria-label="Pitch 432 Hz" title="Set the fine tuning so that A = 432 Hz" onClick={() => setTuning({ semitones: 0, cents: -32 })}>≈ 432 Hz</button><button className="auto-btn" aria-label="Reset pitch" disabled={isDefaultTuning(tuning)} onClick={() => setTuning(defaultTuning())}>RESET 440</button></div></div><div className="undo-redo" role="group" aria-label="History"><button aria-label="Undo" title="Undo (Ctrl+Z)" disabled={histInfo.undo === 0} onClick={() => stepHistory('undo')}>↶ UNDO</button><button aria-label="Redo" title="Redo (Ctrl+Shift+Z)" disabled={histInfo.redo === 0} onClick={() => stepHistory('redo')}>↷ REDO</button></div><div className="indicator"><span className={playing ? 'pulse on' : 'pulse'} />{playing ? 'PLAYING' : 'STOPPED'}</div></div>
       <Timeline mode={mode} playlist={playlist} sections={sections} current={cur} bpm={bpm} playing={playing} startStep={startStep} getPlayhead={getPlayhead} onSeek={seek} /></section>
     <Visualizer lite={lite} getHealth={getHealth} playing={playing} getSpectrum={getSpectrum} getWaveform={getWaveform} step={playFrame?.step ?? -1} bar={playFrame?.bar ?? 0} bars={bars} />
 

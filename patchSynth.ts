@@ -4,7 +4,7 @@ import { OscSettings, SynthPatch } from './synth';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /** What the Rig needs from any melodic sound source (the built-in PolySynths and the patch synth both fit). */
 export interface NoteSynth {
-  triggerAttackRelease(note: string, duration: number, time: number, velocity: number): unknown;
+  triggerAttackRelease(note: string, duration: number, time: number, velocity: number, glide?: { at: number; cents: number }[]): unknown;
   releaseAll(): unknown;
   dispose(): unknown;
   connect(destination: any): unknown;
@@ -159,9 +159,19 @@ export class PatchSynth implements NoteSynth {
     v.busyUntil = end + 0.01;
   }
 
-  triggerAttackRelease(note: string, duration: number, time: number = Tone.now(), velocity = 0.8): this {
+  /** `glide`: keyframes (seconds from the start, cents from the start pitch) – the pitch follows them (a slide note). */
+  triggerAttackRelease(note: string, duration: number, time: number = Tone.now(), velocity = 0.8, glide: { at: number; cents: number }[] = []): this {
     const v = this.allocate(time);
     this.startVoice(v, note, time, velocity);
+    if (glide.length > 0) {
+      // ramp the FREQUENCY (not the detune): an LFO that adds vibrato is wired into the detune and would make Tone ignore the ramp
+      const p = this.patch; const f = Tone.Frequency(note).transpose(p.transpose).toFrequency();
+      glide.forEach(k => {
+        const t = time + Math.max(0, k.at); const ratio = Math.pow(2, k.cents / 1200);
+        v.osc1.frequency.exponentialRampToValueAtTime(f * ratio * Math.pow(2, p.osc1.octave), t);
+        v.osc2.frequency.exponentialRampToValueAtTime(f * ratio * Math.pow(2, p.osc2.octave), t);
+      });
+    }
     this.releaseVoice(v, time + Math.max(0.02, duration));
     return this;
   }

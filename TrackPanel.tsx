@@ -154,7 +154,7 @@ export default function TrackPanel(p: Props) {
       <button className={!touchDraw ? 'sel' : ''} aria-pressed={!touchDraw} onClick={() => setTouchDraw(false)}>↔ SCROLL (tap = note)</button>
       <button className={touchDraw ? 'sel' : ''} aria-pressed={touchDraw} onClick={() => setTouchDraw(true)}>✏ DRAW (drag = long note)</button>
     </div>}
-    <PianoRoll notes={p.notes} onNotes={p.onNotes} advanced={advanced} keyPc={p.keyPc} scale={p.scale} defaultLength={length} velocity={velocity}
+    <PianoRoll slide={track.kind !== 'arp'} notes={p.notes} onNotes={p.onNotes} advanced={advanced} keyPc={p.keyPc} scale={p.scale} defaultLength={length} velocity={velocity}
       enabled={p.enabled} playingStep={p.playingStep} accent={p.accent} touchDraw={touchDraw} onPreview={p.onPreview} cursor={p.cursor} />
     <div className="grid-footer">
       <span>CLICK = NEW NOTE · DRAG SIDEWAYS = ANY LENGTH · DRAG A NOTE'S END TO STRETCH · CLICK A NOTE TO REMOVE IT</span>

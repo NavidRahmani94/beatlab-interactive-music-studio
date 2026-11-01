@@ -2,7 +2,7 @@ import { LEGACY_STEPS, STEPS } from './pattern';
 import { MelodyInstrumentId } from './instruments';
 
 // One data model for BOTH Easy and Advanced melody views.
-export type MelodyNote = { id: string; pitch: string; step: number; lengthSteps: number; velocity: number };
+export type MelodyNote = { id: string; pitch: string; step: number; lengthSteps: number; velocity: number; slide?: boolean };
 
 export const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
 export const MIN_MIDI = 48; // C3
@@ -270,3 +270,61 @@ export function makeTrackPreset(name: TrackPresetName, keyPc: number): { scale: 
   const rows = scaleRows(keyPc, p.scale);
   return { scale: p.scale, instrument: p.instrument, notes: normalizeNotes(tile16(p.notes).map(([step, degree, len, vel]) => make(rows[Math.min(degree, rows.length - 1)], step, len, vel))) };
 }
+
+// ---------- slide notes ----------
+/** A note with `slide` set is silent and bends the pitch of the note that is sounding when it starts (see slidePath). */
+export const MAX_SLIDE_SEMITONES = 24;
+export function toggleSlide(notes: MelodyNote[], id: string): MelodyNote[] {
+  if (!notes.some(n => n.id === id)) return notes;
+  return notes.map(n => {
+    if (n.id !== id) return n;
+    if (n.slide) { const { slide: _gone, ...rest } = n; void _gone; return rest; }
+    return { ...n, slide: true };
+  });
+}
+/** The note a sliding note glides to: the first note that starts after it (the closest in pitch when several start together). */
+export function slideTarget(notes: MelodyNote[], n: MelodyNote): MelodyNote | null {
+  const here = noteToMidi(n.pitch);
+  if (here === null) return null;
+  const later = notes.filter(o => o.id !== n.id && o.step > n.step && noteToMidi(o.pitch) !== null);
+  if (later.length === 0) return null;
+  const first = Math.min(...later.map(o => o.step));
+  const cand = later.filter(o => o.step === first);
+  return cand.reduce((best, o) => Math.abs((noteToMidi(o.pitch) as number) - here) < Math.abs((noteToMidi(best.pitch) as number) - here) ? o : best);
+}
+/** How far a sliding note bends, in cents (+ = up). 0 when the note does not slide or has nothing to slide to. */
+export function slideCents(notes: MelodyNote[], n: MelodyNote): number {
+  if (!n.slide) return 0;
+  const to = slideTarget(notes, n); const from = noteToMidi(n.pitch);
+  if (!to || from === null) return 0;
+  const semis = Math.max(-MAX_SLIDE_SEMITONES, Math.min(MAX_SLIDE_SEMITONES, (noteToMidi(to.pitch) as number) - from));
+  return semis * 100;
+}
+
+/**
+ * Slide notes work like the slide notes of FL Studio: a slide note is NOT played itself. It tells the note that is sounding (or that ends exactly
+ * where it starts) to bend its pitch: the pitch glides from where it is to the pitch of the slide note, over the slide note's own length, and then
+ * stays there until the slide note ends. Slide notes that follow one after another continue the glide.
+ * `path` = (step offset from the plain note, cents from its pitch); `endStep` = where the sound stops; `skip` = ids of the (silent) slide notes used.
+ */
+export type SlidePath = { path: { at: number; cents: number }[]; endStep: number; skip: string[] };
+export function slidePath(notes: MelodyNote[], n: MelodyNote): SlidePath | null {
+  if (n.slide) return null;
+  const base = noteToMidi(n.pitch); if (base === null) return null;
+  const path: { at: number; cents: number }[] = []; const skip: string[] = [];
+  let end = n.step + n.lengthSteps; let cents = 0; let guard = 0;
+  while (guard++ < 8) {
+    const cand = notes.filter(s => s.slide && !skip.includes(s.id) && s.step > n.step && s.step <= end && noteToMidi(s.pitch) !== null);
+    if (cand.length === 0) break;
+    const first = Math.min(...cand.map(s => s.step));
+    const s = cand.filter(o => o.step === first).reduce((best, o) => Math.abs((noteToMidi(o.pitch) as number) - base) < Math.abs((noteToMidi(best.pitch) as number) - base) ? o : best);
+    const target = Math.max(-MAX_SLIDE_SEMITONES, Math.min(MAX_SLIDE_SEMITONES, (noteToMidi(s.pitch) as number) - base)) * 100;
+    path.push({ at: s.step - n.step, cents });                      // hold the current pitch until the slide note starts …
+    path.push({ at: s.step + s.lengthSteps - n.step, cents: target }); // … glide to its pitch within its length
+    cents = target; end = Math.max(end, s.step + s.lengthSteps); skip.push(s.id);
+  }
+  if (skip.length === 0) return null;
+  return { path, endStep: end, skip };
+}
+/** True for a slide note that bends another note: it is silent itself. A slide note with nothing to bend is played as a normal note. */
+export const isSlideTarget = (notes: MelodyNote[], n: MelodyNote): boolean => n.slide === true && notes.some(o => !o.slide && slidePath(notes, o)?.skip.includes(n.id));
