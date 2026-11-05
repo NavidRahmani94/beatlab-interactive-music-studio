@@ -1,6 +1,6 @@
 // FILE: Sound engine 2: a synthesizer that runs inside an AudioWorklet (see voiceWorklet.js). It plays the same SynthPatch as PatchSynth,
 // but all voices of a sound are computed in ONE audio node (instead of ~10 Web Audio nodes per voice), so chords use much less CPU.
-// It is used for live playing only (SHAPE LAB). The song and the export keep PatchSynth, so they always sound the same as before.
+// It plays the live sound (tracks, keyboard, SHAPE LAB) and copies PatchSynth's sound (see voiceWorklet.js). The export keeps PatchSynth.
 import * as Tone from 'tone';
 import workletSource from './voiceWorklet.js?raw';
 import type { NoteSynth } from './patchSynth';
