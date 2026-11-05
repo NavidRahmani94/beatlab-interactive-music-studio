@@ -6,7 +6,7 @@ React + TypeScript + Vite + Tone.js, no backend, **all files in one flat folder*
 Four tabs (Ambient, Drums, Melody, Arpeggio), 7 mixer channels → one master (EQ, compressor, reverb, delay, limiter),
 notes drawn/stretched by dragging, patterns (1 bar = 16 steps) + playlist (max 32 bars), PATTERN/SONG play modes,
 per-pattern ▶, SOLO per instrument/track, sticky quick-play bar, visualiser, Save/Open (schemaVersion 2, v0.5 files upgrade),
-WAV export (song or pattern), startup demo song, phone layout (≤700 px), GitHub Pages workflow, standalone single-file build.
+WAV export (song or pattern), startup demo song, phone layout (≤700 px), hosted on Vercel and GitHub Pages (`.github/workflows/pages.yml`), standalone single-file build.
 
 ## Checks done
 122 unit tests, 72-check browser test (before the latest small UI additions), WAV analysis, phone emulation at 390/360 px.

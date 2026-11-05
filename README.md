@@ -52,9 +52,12 @@ More: `ARCHITECTURE.md`, `TESTING.md`, `DEMO_SCRIPT.md`, `BeatLab_Project_Master
 - A pattern is one bar (32 steps); longer songs use the playlist. Ambient notes that continue over several bars are re-triggered at each bar (a soft swell every bar).
 - Fonts load from Google Fonts (system fonts are used offline). Instruments are synthesised (no sample files).
 
-## GitHub Pages
-Push to a repository's `main` branch, then in the repo go to **Settings → Pages → Source: GitHub Actions**. The workflow in `.github/workflows/pages.yml` runs the tests, builds, and publishes the site at `https://<user>.github.io/<repo>/`. (If your tooling cannot keep the `.github` folder, delete it; the app itself stays flat.)
+## Hosting: Vercel and GitHub Pages
+The site is published in two places, both built from the `main` branch:
+- **Vercel**: https://beatlab-interactive-music-studio.vercel.app (Vercel builds every push to `main` by itself).
+- **GitHub Pages**: https://navidrahmani94.github.io/beatlab-interactive-music-studio/ – the workflow `.github/workflows/pages.yml` runs the tests, builds, and publishes the site. One-time setup in the repo: **Settings → Pages → Source: GitHub Actions**.
 
+`vite.config.ts` uses `base: './'`, so the same build works at both addresses. `.github/workflows/` is the only sub-folder: GitHub runs workflows only from there. The app itself stays flat.
 
 ## New in v0.14 – MIDI
 Open the **🎹 MIDI** panel (under the visualizer).
