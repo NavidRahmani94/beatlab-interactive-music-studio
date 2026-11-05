@@ -157,7 +157,8 @@ const KITS: Record<DrumKitId, KitDef> = {
 };
 
 type MelodyBuild = { synth: NoteSynth; filter: Tone.Filter | null; volume: number; shift: number };
-function buildMelody(id: MelodyInstrumentId): MelodyBuild {
+/** The 11 basic instruments on the old engine (exported for the engine comparison tool, enginecmp-basic.cjs). */
+export function buildMelody(id: MelodyInstrumentId): MelodyBuild {
   switch (id) {
     case 'electricPiano':
       return {

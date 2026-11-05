@@ -278,6 +278,16 @@ The bouncing balls (v0.20) are gone. Now a shape with 3–6 corners is a chord w
 ## v0.22.1 — the piano roll shows the notes you play
 When you play with the computer keyboard, a MIDI keyboard, or click a note name, the **row of that note lights up** in the piano roll (labels glow, the row is tinted), in both EASY and ADVANCED mode. A chord lights several rows. A note outside the shown range lights the row with the same note name. Lights go out when you release the key.
 
+## v0.23.0 — engine 2 sounds like the old engine
+Engine 2 (`voiceWorklet.js`) now copies how the old engine (Tone.js) shapes the sound, so switching engines no longer changes the character of a sound:
+- **Envelopes:** decay and release use Tone's curve (exponential approach with time constant ln(t+1)/ln(200), straight for the last 10 %, ending exactly at the set time). Before, notes on engine 2 rang 2–3× longer (e.g. toy piano: −20 dB after 0.23 s on the old engine, 0.54 s on engine 2). This was the main difference and affected 78 of the 81 sounds.
+- **FM:** the carrier keeps its own wave and the modulator is a square (Tone's default), with real frequency modulation. The 3 FM basic instruments (electric piano, bell, glass pad) now have their own modulator envelope (`fmWave` / `fmEnv` in `legacyPatches.ts`, like Tone's FMSynth): the tone starts bright and gets round, softer notes are rounder.
+- **Unison:** copies spread over ±spread/2 (was ±spread), each at −6 − 1.1·count dB, with Tone's start phases, so pads beat the same way.
+- **Noise:** real pink and brown noise (was always white), at the old level. **Filter envelope:** Tone's curve (exponent 2). **Drive:** Tone's distortion curve, before the volume. **Chorus:** Tone's depth.
+- **Loudness:** `workletTrim.ts` was measured again; most trims are now small (the old ones went up to ±12 dB). User synths get the same loudness on both engines too.
+- **Measured** with `enginecmp.cjs` (70 library sounds) and `enginecmp-basic.cjs` (11 basic instruments), one note rendered on both engines: envelope difference 7.2 → 0.6 dB, spectrum difference 3.9 → 0.6 dB (basic instruments: 0.7 dB / 0.1 dB). CPU of engine 2 about the same as before (0–30 % more on some pads in the sandbox, still far below the old engine).
+- **Known:** the old engine's FM sounds change a little depending on where a note starts inside a 128-sample audio block (a Chrome/Tone effect); engine 2 matches the block-aligned case. Tone's PWM wave and noise-based sounds differ slightly. **Not verified:** listening by ear, a real device.
+
 ## v0.22.0 — two sound engines: engine 2 now plays ALL live sound
 Engine 2 (AudioWorklet, see v0.21.3) now also plays the **tracks of the song, the keyboard and live MIDI**, not only SHAPE LAB. Slide notes (glide) work in it too. Switch: STATS → SOUND ENGINE → ENGINE 2 / OLD (used after a reload; the choice is remembered). Drums, the mixer and the master chain are the same for both engines.
 - **The export (WAV/MP3) still uses the original engine**, so an exported file sounds as before. (Engine 2 for the export needs the note list of the song to be given to the worklet before the offline render; planned.) Because of this, with ENGINE 2 on, the live sound and the export can differ slightly in colour.

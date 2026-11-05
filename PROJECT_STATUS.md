@@ -191,3 +191,6 @@ Built after the crackle diagnosis and the user's OK. Live SHAPE LAB sounds only;
 - Canvas loops (Visualizer, Synth Lab scope, Timeline playhead) no longer read layout / computed style every frame (`canvasWatch.ts`: ResizeObserver + theme MutationObserver).
 - Result: main JS 1368 → 710 kB (gzip 393 → 211 kB), CSS gzip 89 → 10 kB. Checked: 348 unit tests, build, headless Chromium (play, open SHAPE LAB, MP3 export of one pattern, theme switch, no console errors). Not checked: real phone, Firefox/Safari.
 - Note: the build now has more than one JS file plus a font file. A hand-made single-file / file:// build must inline those too.
+
+## v0.23.0 — engine 2 sounds like the old engine
+`voiceWorklet.js` copies Tone's envelope curves, FM (square modulator, carrier wave kept, FMSynth modulator envelope for the 3 FM basic instruments), unison spread/levels/phases, pink/brown noise, filter-envelope curve, drive and chorus. `workletTrim.ts` re-measured. Comparison tools: `enginecmp.cjs`, `enginecmp-basic.cjs`. Envelope difference 7.2 → 0.6 dB, spectrum 3.9 → 0.6 dB. 348 unit tests, build, live check in Chromium (engine-2 nodes play, no errors). Not verified: by ear, real device.

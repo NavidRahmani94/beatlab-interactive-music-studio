@@ -19,6 +19,9 @@ export type OscSettings = {
   level: number;    // 0..1 (0 = this oscillator is off)
   fmIndex: number;  // 0..12 (0 = plain wave; above 0 the wave is frequency-modulated: bell / electric-piano / metallic tones)
   fmRatio: number;  // 0.25..8 modulator pitch relative to the note
+  // Sound engine 2 only (voiceWorklet.js), used by legacyPatches.ts to copy Tone's FMSynth. Not shown in the Synth Lab and not saved.
+  fmWave?: 'sine' | 'square';   // modulator wave (default square, like Tone's FM oscillator)
+  fmEnv?: Envelope;              // the modulator's own envelope, scaled by velocity: the tone starts bright and gets round
 };
 export type Envelope = { a: number; d: number; s: number; r: number }; // seconds, seconds, level 0..1, seconds
 export type SynthPatch = {
