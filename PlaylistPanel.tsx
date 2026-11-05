@@ -1,3 +1,4 @@
+// FILE: The pattern list and the playlist (the order of patterns that makes the song).
 import { useState } from 'react';
 import { MAX_BARS, MAX_PATTERNS, PatternData, PlayMode, Playlist } from './song';
 import { MAX_SECTIONS, MAX_SECTION_NAME, ROLES, ROLE_LABEL, Role, STRUCTURES, Section, addSection, autoSections, buildStructure, guessRoles, removeSection, sectionIndexAt, sectionStartingAt, updateSection } from './arrangement';

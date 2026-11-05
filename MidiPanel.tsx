@@ -1,3 +1,4 @@
+// FILE: The MIDI panel: computer-keyboard piano, recording, MIDI keyboard connection, and .mid file import / export.
 import { ChangeEvent, useRef, useState } from 'react';
 import { MidiDevice } from './midiInput';
 import { MidiData, barsOf, decodeMidi, hasDrumNotes, sourceNotes } from './midiFile';

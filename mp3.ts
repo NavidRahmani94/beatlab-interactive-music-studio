@@ -1,3 +1,4 @@
+// FILE: Turns audio samples into an MP3 file (uses the lamejs encoder).
 import { Mp3Encoder } from '@breezystack/lamejs';
 
 /** Encodes float samples (-1..1) as an MP3 (CBR). Works in the browser, no server. */

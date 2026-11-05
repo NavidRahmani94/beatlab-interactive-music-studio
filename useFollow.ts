@@ -1,3 +1,4 @@
+// FILE: A small React hook for editors that scroll sideways.
 import { RefObject, useEffect } from 'react';
 
 /** While playing, scrolls a horizontally scrollable editor so the playing step stays in view. */

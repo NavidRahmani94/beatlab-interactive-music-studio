@@ -1,11 +1,12 @@
+// FILE: Patterns and the playlist (which pattern plays when). It also has the maths to find the pattern and step for a given time.
 import { DrumPattern, STEPS, makePattern } from './pattern';
 import { MelodyNote } from './melody';
 
-// A PATTERN is 32 steps (2 bars) of all four tracks. The PLAYLIST places patterns in slots, so a song can be any length.
+// A PATTERN is 32 steps (2 bars) with the drums and the notes of every track. The PLAYLIST puts patterns in slots, so a song can have any length.
 export type PatternData = { name: string; drums: DrumPattern; notes: Record<string, MelodyNote[]> };
 /** The notes of one track in a pattern (tracks added later simply start empty). */
 export const notesFor = (p: PatternData, trackId: string): MelodyNote[] => p.notes[trackId] ?? [];
-/** Notes are stored canonically: a track with no notes in a pattern simply has no entry. */
+/** A track that has no notes in a pattern has no entry at all (we do not store empty lists). */
 export const compactNotes = (notes: Record<string, MelodyNote[]>): Record<string, MelodyNote[]> =>
   Object.fromEntries(Object.entries(notes).filter(([, list]) => list.length > 0));
 export const withNotes = (p: PatternData, trackId: string, notes: MelodyNote[]): PatternData => ({ ...p, notes: compactNotes({ ...p.notes, [trackId]: notes }) });

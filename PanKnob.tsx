@@ -1,3 +1,4 @@
+// FILE: A small round knob for the left / right position (pan) of a channel. It works with the mouse, touch and the keyboard.
 import { PointerEvent, KeyboardEvent, useRef } from 'react';
 
 type Props = { label: string; value: number; onChange: (pan: number) => void };

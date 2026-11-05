@@ -1,3 +1,4 @@
+// FILE: The project file: its type, the default and sample projects, checking a loaded file (validation) and upgrading old file versions.
 import { DrumPattern, INSTRUMENTS, LEGACY_STEPS, STEPS } from './pattern';
 import { MAX_MIDI, MIN_MIDI, MelodyNote, SCALES, ScaleName, makePreset, makeTrackPreset, noteToMidi } from './melody';
 import { DRUM_CHANNELS, ChannelSettings, Channels, MAX_FEEDBACK, MasterSettings, VOLUME_MAX_DB, VOLUME_MIN_DB, EQ_MAX_DB, EQ_MIN_DB, defaultChannel, defaultChannels, defaultMaster, effectiveMuted, isDelayDivision, isReverbSize } from './mixer';
@@ -22,10 +23,10 @@ export type BeatLabProject = {
   bpm: number;
   patterns: PatternData[];
   playlist: Playlist;
-  tracks: TrackDef[];    // the user's tracks (drums are fixed and not listed). Each has a name, kind, instrument and (for arpeggio) its settings
+  tracks: TrackDef[];    // the user's tracks (the drums are fixed and not in this list). Each track has a name, a kind, an instrument and, for an arpeggio, its settings
   synths: SynthSlot[];   // the user's own Synth Lab sounds; a track uses one as "synth:<id>"
   drumKit: DrumKitId;
-  sections: Section[];  // named stretches of the playlist (Intro, Verse, Chorus …); only labels, they never change the sound
+  sections: Section[];  // named parts of the playlist (Intro, Verse, Chorus …). They are only labels and never change the sound
   tuning: Tuning;       // global pitch: whole semitones + cents from A = 440 Hz (drums are not changed)
   groove: Groove;       // swing / humanize / ghost notes / variation of the drums
   melodyView: { key: number; scale: ScaleName };
@@ -219,7 +220,7 @@ export function trapDemo(): BeatLabProject {
     { reverbMix: 0.12, eqLow: 3, compAmount: 0.4, delayFeedback: 0.35 });
 }
 
-/** A Persian-inspired mood (synth imitations of santur, tar and ney): A with a flat second (Phrygian-dominant colour), 100 BPM. */
+/** A Persian-style mood (synth imitations of santur, tar and ney). Key A with a flat second note (Phrygian dominant scale), 100 BPM. */
 export function persianDemo(): BeatLabProject {
   const avaz: N4[] = [[69, 0, 2, 0.9], [70, 2, 2, 0.8], [73, 4, 2, 0.85], [70, 6, 1, 0.7], [69, 7, 1, 0.7], [70, 8, 4, 0.8], [69, 12, 2, 0.8], [67, 14, 2, 0.75],
     [65, 16, 3, 0.85], [67, 19, 1, 0.7], [69, 20, 4, 0.9], [70, 24, 2, 0.8], [69, 26, 2, 0.75], [64, 28, 4, 0.8]];
@@ -347,7 +348,7 @@ function validateDrums(raw: unknown, where: string): DrumPattern | string {
   return drums;
 }
 
-/** Files from before v0.8 have 16-step patterns: play the same content twice so they still sound the same in 32 steps. */
+/** Files from before v0.8 have patterns with 16 steps. We repeat the content twice, so it sounds the same in 32 steps. */
 function widenV2(data: Record<string, unknown>): Record<string, unknown> {
   if (!Array.isArray(data.patterns)) return data;
   const widenNotes = (v: unknown): unknown => {
@@ -368,7 +369,7 @@ function widenV2(data: Record<string, unknown>): Record<string, unknown> {
   return { ...data, patterns, schemaVersion: SCHEMA_VERSION };
 }
 
-/** Files before version 5 have three fixed tracks (melody, ambient, arp) with notes in pattern.melody/.ambient/.arp. */
+/** Files before version 5 have three fixed tracks (melody, ambient, arp) with their notes in pattern.melody, pattern.ambient and pattern.arp. */
 function toV5(data: Record<string, unknown>): Record<string, unknown> {
   const t = isObj(data.tracks) ? data.tracks : {};
   const tracks = [
@@ -524,7 +525,7 @@ export function validateProject(input: unknown): ParseResult {
   const channelNames: { name: string; kind?: TrackDef['kind'] }[] = [...DRUM_CHANNELS.map(n => ({ name: n as string })), ...tracks.map(t => ({ name: t.id, kind: t.kind }))];
   for (const { name, kind } of channelNames) {
     const c = data.channels[name];
-    if (c === undefined && kind) { channels[name] = defaultChannel(name, kind); continue; } // tracks added later / files from before these tracks existed
+    if (c === undefined && kind) { channels[name] = defaultChannel(name, kind); continue; } // the track was added later, or the file is older than this track
     if (!isObj(c)) return fail(`channels.${name} is missing.`);
     if (!isNum(c.volumeDb) || c.volumeDb < VOLUME_MIN_DB || c.volumeDb > VOLUME_MAX_DB) return fail(`channels.${name}.volumeDb must be between ${VOLUME_MIN_DB} and ${VOLUME_MAX_DB}.`);
     if (typeof c.muted !== 'boolean') return fail(`channels.${name}.muted must be true or false.`);

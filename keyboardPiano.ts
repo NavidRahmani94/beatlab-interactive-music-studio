@@ -17,3 +17,25 @@ export const keyToPad = (key: string): number | null => PADS[key.toLowerCase()] 
 export const octaveShift = (key: string): -1 | 1 | 0 => (key.toLowerCase() === 'z' ? -1 : key.toLowerCase() === 'x' ? 1 : 0);
 /** Step entry: the cursor walks along the 32 steps of the pattern. */
 export const nextStep = (step: number, by = 1, steps = 32): number => (((step + by) % steps) + steps) % steps;
+
+/**
+ * True when the focused element is something the person TYPES text into (name fields, number boxes), so piano keys must not play.
+ * Sliders, drop-down lists, tick boxes and buttons do not count: after the person touched a slider or chose an instrument the piano keys must keep working.
+ */
+export function isTypingTarget(el: { tagName?: string; type?: string; isContentEditable?: boolean } | null): boolean {
+  if (!el) return false;
+  if (el.isContentEditable || el.tagName === 'TEXTAREA') return true;
+  if (el.tagName === 'INPUT') return !['range', 'checkbox', 'radio', 'button', 'submit', 'reset', 'color', 'file', 'image'].includes((el.type ?? 'text').toLowerCase());
+  return false;
+}
+
+/**
+ * The key as the PHYSICAL position on the keyboard ('a' for the key where the letter A is on a US keyboard), whatever layout is active.
+ * With a Persian, Arabic, Russian, … layout `event.key` is another letter (ش, ф …) and the piano would be silent; `event.code` ("KeyA") does not change.
+ */
+export function pianoKey(e: { key: string; code?: string }): string {
+  const c = e.code ?? '';
+  if (/^Key[A-Z]$/.test(c)) return c.slice(3).toLowerCase();
+  if (c === 'Semicolon') return ';';
+  return e.key.toLowerCase();
+}

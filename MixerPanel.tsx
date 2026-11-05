@@ -1,3 +1,4 @@
+// FILE: The mixer: one row per channel (mute, solo, pan, volume, sends, effects, L / R signal meters) and the master settings.
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { FX_IDS, FX_TYPES, FxType, MAX_FX, addFx, isFxType, moveFx, patchFx, removeFx } from './fx';
 import PanKnob from './PanKnob';
@@ -44,7 +45,7 @@ export default function MixerPanel({ channels, tracks, master, onChannel, onMast
     return () => cancelAnimationFrame(raf);
   }, [playing, getLevelDb]);
 
-  // animate the L / R signal meters of every channel (straight on the DOM, no React re-render). Only while the mixer is on screen, playing and the tab is visible,
+  // Animate the left / right signal meters of every channel (directly in the DOM, no React redraw). It runs only while the mixer is on screen, the music plays and the tab is visible,
   // at about 30 frames per second, and inside a layout-contained box so the page does not have to re-layout.
   useEffect(() => {
     const box = mixRef.current; let visible = true; let raf = 0; let last = 0; const peaks = new Map<string, number>();

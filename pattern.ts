@@ -1,3 +1,4 @@
+// FILE: The basic drum pattern: the list of instruments, the number of steps, and small helpers to switch a step on or off.
 export const INSTRUMENTS = ['kick', 'snare', 'hat', 'clap'] as const;
 export type Instrument = typeof INSTRUMENTS[number];
 export type DrumPattern = Record<Instrument, boolean[]>;

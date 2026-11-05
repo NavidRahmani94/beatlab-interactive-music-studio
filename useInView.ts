@@ -1,3 +1,4 @@
+// FILE: React hooks that pause decorations when they are not visible, and a saved "lite mode" setting.
 import { RefObject, useEffect, useState } from 'react';
 
 /** True while the element is on screen (and the tab is visible). Off-screen decoration is paused so it costs nothing. */

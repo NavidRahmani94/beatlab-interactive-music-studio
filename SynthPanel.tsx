@@ -1,3 +1,4 @@
+// FILE: The Synth Lab: build your own sound (oscillators, filter, envelopes, effects) and play it with a keyboard.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Envelope, FACTORY_IDS, FACTORY_SOUNDS, FILTER_TYPES, FilterType, LFO_TARGETS, LFO_WAVES, LfoTarget, LfoWave, LIMITS, MAX_SYNTHS, NOISE_COLORS, NoiseColor,

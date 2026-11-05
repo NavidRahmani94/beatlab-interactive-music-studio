@@ -108,3 +108,31 @@ describe('live MIDI input', () => {
   });
   it('held length is at least one step', () => { expect(heldSteps(10, 120)).toBe(1); expect(heldSteps(500, 120)).toBe(4); });
 });
+
+import { isTypingTarget, pianoKey, keyToMidi } from './keyboardPiano';
+describe('piano keys and focus', () => {
+  it('text fields block the piano keys; sliders, lists, tick boxes and buttons do not', () => {
+    expect(isTypingTarget({ tagName: 'INPUT', type: 'text' })).toBe(true);
+    expect(isTypingTarget({ tagName: 'INPUT' })).toBe(true);
+    expect(isTypingTarget({ tagName: 'INPUT', type: 'number' })).toBe(true);
+    expect(isTypingTarget({ tagName: 'TEXTAREA' })).toBe(true);
+    expect(isTypingTarget({ tagName: 'DIV', isContentEditable: true })).toBe(true);
+    expect(isTypingTarget({ tagName: 'INPUT', type: 'range' })).toBe(false);
+    expect(isTypingTarget({ tagName: 'INPUT', type: 'checkbox' })).toBe(false);
+    expect(isTypingTarget({ tagName: 'SELECT' })).toBe(false);
+    expect(isTypingTarget({ tagName: 'BUTTON' })).toBe(false);
+    expect(isTypingTarget(null)).toBe(false);
+  });
+});
+
+describe('piano keys on other keyboard layouts', () => {
+  it('uses the physical key, so a Persian / Russian layout plays the same notes', () => {
+    expect(pianoKey({ key: 'ش', code: 'KeyA' })).toBe('a');          // Persian layout: the A key types ش
+    expect(pianoKey({ key: 'ф', code: 'KeyA' })).toBe('a');          // Russian
+    expect(pianoKey({ key: 'گ', code: 'Semicolon' })).toBe(';');
+    expect(pianoKey({ key: 'z', code: 'KeyZ' })).toBe('z');
+    expect(pianoKey({ key: 'a' })).toBe('a');                        // no code (old browsers): fall back to the letter
+    expect(keyToMidi(pianoKey({ key: 'ش', code: 'KeyA' }), 4)).toBe(60);
+    expect(keyToMidi(pianoKey({ key: 'ص', code: 'KeyW' }), 4)).toBe(61);
+  });
+});

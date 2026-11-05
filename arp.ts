@@ -1,3 +1,4 @@
+// FILE: The arpeggiator: it turns the held notes of an arpeggio track into a run of single notes. Pure logic, no audio.
 import { MelodyNote, clampVelocity, midiToNote, noteToMidi } from './melody';
 
 // An arpeggiator turns the notes that are HELD (stretched) on the arpeggio track into a run of single notes.

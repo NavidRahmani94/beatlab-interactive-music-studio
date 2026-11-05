@@ -1,3 +1,4 @@
+// FILE: Renders the song or one pattern to a WAV or MP3 file, using Tone.Offline and the same Rig as the live player (so the file sounds like the live music).
 import * as Tone from 'tone';
 import { Rig } from './rig';
 import { frameAt, usedBars } from './song';

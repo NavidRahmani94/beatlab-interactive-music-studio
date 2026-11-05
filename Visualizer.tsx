@@ -1,3 +1,4 @@
+// FILE: The live picture of the sound (frequency bars, waveform and a beat bar), drawn on a canvas.
 import { useEffect, useRef, useState } from 'react';
 import { useInView } from './useInView';
 import { BeatPulse, VIZ_LABEL, VIZ_MODES, VizMode, attackRelease, bandsOf, dbToUnit, isVizMode } from './vizMath';

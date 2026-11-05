@@ -1,3 +1,4 @@
+// FILE: The piano roll: a grid where you click or drag to add notes. It also has the velocity lane and the slide lane.
 import { Dispatch, KeyboardEvent, PointerEvent, SetStateAction, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   MAX_MIDI, MIN_MIDI, MelodyNote, ScaleName, inScale, midiToNote, noteToMidi, noteAt, notesAtStep, resizeNote, scaleRows, setNoteVelocity, setStepVelocity, toggleNote, toggleSlide, isSlideTarget
@@ -20,7 +21,7 @@ type Props = {
   cursor?: number;          // step-entry position (highlighted column), -1 = none
   octave?: number;          // EASY mode: shifts the shown octave by this many octaves
   slide?: boolean;          // show the SLIDE lane (not for arpeggio tracks, whose notes are chords)
-  touchDraw: boolean;       // touch screens: true = dragging draws/stretches notes, false = dragging scrolls (a tap still adds/removes)
+  touchDraw: boolean;       // touch screens: true = dragging draws or stretches notes, false = dragging scrolls (a tap still adds or removes a note)
 };
 
 const ADV_ROW_PX = 23; // 20px row + 3px gap
@@ -35,7 +36,7 @@ type RowProps = {
   midi: number; name: string; inKey: boolean; isRoot: boolean; advanced: boolean; cursor: number; sig: string; row: (CellInfo | undefined)[];
   onPreview?: (midi: number, down: boolean) => void; onKey: (midi: number, step: number, detail: number) => void;
 };
-/** One row of the roll. Memoised on what it shows (the signature of its cells), so changing pattern or note only redraws the rows that really changed. */
+/** One row of the piano roll. It is redrawn only when its own cells change (it is compared by a short text signature of its cells), so a change redraws only the rows that changed. */
 const Row = memo(function Row({ midi, name, inKey, isRoot, advanced, cursor, row, onPreview, onKey }: RowProps) {
   return <div className={'mrow' + (name.includes('#') ? ' black' : '') + (inKey ? ' inkey' : '') + (isRoot ? ' root' : '')}>
     <span className={'mlabel' + (onPreview ? ' key' : '')} role={onPreview ? 'button' : undefined} aria-label={onPreview ? `Hear ${name}` : undefined} title={onPreview ? `Click to hear ${name}` : undefined}
@@ -59,7 +60,7 @@ export default function PianoRoll({ octave = 0, slide = true, notes, onNotes, ad
   const drag = useRef<Drag | null>(null);
   const laneDragging = useRef(false);
   useFollowPlayhead(rollRef, playingStep);
-  // The playhead is moved on the DOM directly: re-rendering ~2000 cells every sixteenth note was the main cause of small hiccups
+  // The playhead is moved directly in the DOM. Redrawing about 2000 cells on every sixteenth note caused small hiccups.
   useEffect(() => {
     const el = rollRef.current; if (!el) return;
     el.querySelectorAll('.mcell.current').forEach(c => c.classList.remove('current'));
@@ -118,7 +119,7 @@ export default function PianoRoll({ octave = 0, slide = true, notes, onNotes, ad
     if (!cell || e.button !== 0) return;
     const midi = Number(cell.dataset.midi);
     const step = Number(cell.dataset.step);
-    if (e.pointerType === 'touch') { // a finger may be scrolling: decide on release (tap) or after a sideways drag (draw mode)
+    if (e.pointerType === 'touch') { // a finger may be scrolling, so we decide when it is released (tap) or after a sideways drag (draw mode)
       drag.current = { kind: 'tap', midi, step };
       if (touchDraw) e.currentTarget.setPointerCapture(e.pointerId);
       return;
@@ -154,9 +155,9 @@ export default function PianoRoll({ octave = 0, slide = true, notes, onNotes, ad
     const d = drag.current;
     drag.current = null;
     if (d && d.kind === 'tap') { onNotes(prev => toggleNote(prev, d.midi, d.step, defaultLength, velocity)); return; }
-    if (d && d.kind === 'existing' && !d.moved) onNotes(prev => prev.filter(n => n.id !== d.id)); // plain click removes
+    if (d && d.kind === 'existing' && !d.moved) onNotes(prev => prev.filter(n => n.id !== d.id)); // a simple click removes the note
   }
-  // ---- velocity lane: one bar per NOTE (the notes of a chord side by side, lowest on the left); drag a bar to change only that note, hold Shift to change the whole step
+  // ---- velocity lane: one bar per note (notes of a chord are side by side, lowest on the left). Drag a bar to change one note. Hold Shift to change the whole step.
   const laneDrag = useRef<{ id: string; step: number } | null>(null);
   const [velInfo, setVelInfo] = useState('');
   const barAt = (clientX: number, clientY: number): { id: string; step: number; v: number; label: string } | null => {

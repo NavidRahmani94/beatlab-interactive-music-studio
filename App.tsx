@@ -1,9 +1,14 @@
+// FILE: The main page. It keeps the whole project in React state (tracks, patterns, playlist, mixer, tempo) and connects every panel to the sound engine.
+// It also handles: play / stop, undo / redo, saving and opening files, MIDI input, the computer-keyboard piano and the hand-gesture controls.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BeatLabEngine } from './engine';
 import { Instrument, clampBpm, toggleStep } from './pattern';
 import { DRUMS_TAB, DRUM_IDS, KIND_DEFAULT_INSTRUMENT, MAX_TRACKS, TRACK_KINDS, TRACK_KIND_IDS, TrackDef, TrackKind, addTrack, removeTrack, renameTrackLive, trackAccent, trackById, updateTrack } from './tracks';
 import DrumPanel from './DrumPanel';
 import MixerPanel from './MixerPanel';
+import HandPanel from './HandPanel';
+import ShapeLab from './ShapeLab';
+import type { HandAction } from './handControl';
 import PlaylistPanel from './PlaylistPanel';
 import ProjectBar from './ProjectBar';
 import TrackPanel from './TrackPanel';
@@ -17,9 +22,9 @@ import { MidiMsg, drumForNote, heldSteps, quantizePosition } from './midiLive';
 import { MidiData, drumsToGrid, encodeMidi, foldToRange, barsOf, notesToGrid, sourceNotes } from './midiFile';
 import { mergeNotes } from './chords';
 import { loadLite, saveLite } from './useInView';
-import { DEFAULT_OCTAVE, clampOctave, keyToMidi, keyToPad, nextStep, octaveShift } from './keyboardPiano';
+import { DEFAULT_OCTAVE, clampOctave, isTypingTarget, keyToMidi, pianoKey, keyToPad, nextStep, octaveShift } from './keyboardPiano';
 import { Section, clampSections, clearSlot, copySlot, insertSlot, moveSlot, removeSlot } from './arrangement';
-import { MelodyNote, ScaleName, easyRoot, midiToNote, remapToScale, transposeNotes } from './melody';
+import { MelodyNote, ScaleName, easyRoot, midiToNote, remapToScale, scaleRows, transposeNotes } from './melody';
 import { ChannelName, Channels, ChannelSettings, MasterSettings, patchChannel, patchMaster, syncChannels } from './mixer';
 import { DrumKitId, MelodyInstrumentId } from './instruments';
 import { ArpSettings } from './arp';
@@ -58,7 +63,7 @@ export default function App() {
   const [playlist, setPlaylist] = useState<Playlist>(initial.playlist);
   const [current, setCurrent] = useState(0);
   const [mode, setMode] = useState<PlayMode>('song');
-  const [view, setView] = useState<string>(initial.tracks[0]?.id ?? DRUMS_TAB);   // 'drums', a track id, or 'lab' (Synth Lab)
+  const [view, setView] = useState<string>(initial.tracks[0]?.id ?? DRUMS_TAB);   // 'drums', a track id, or 'lab' (the Synth Lab tab)
   const [addOpen, setAddOpen] = useState(false);
   const [synthId, setSynthId] = useState<string | null>(initial.synths[0]?.id ?? null);
   const [tracks, setTracks] = useState<TrackDef[]>(initial.tracks);
@@ -105,13 +110,15 @@ export default function App() {
   const dirty = useMemo(() => serializeProject(project) !== savedJson, [project, savedJson]);
 
   const engine = useRef<BeatLabEngine | null>(null);
-  const frameRef = useRef<{ frame: Frame; at: number } | null>(null);   // the last step the player reported (for recording from a MIDI keyboard)
+  const frameRef = useRef<{ frame: Frame; at: number } | null>(null);   // the last step that the player reported (used when recording from a keyboard)
+  const shapeVoicesRef = useRef<{ instrument: string; volumeDb: number }[]>([]);
   const latest = useRef({ bpm, playing, song: { patterns, playlist, mode, current: cur } });
   latest.current = { bpm, playing, song: { patterns, playlist, mode, current: cur } };
 
   useEffect(() => {
     const instance = new BeatLabEngine(latest.current.song, f => { frameRef.current = { frame: f, at: performance.now() }; setFrame(f); });
     engine.current = instance;
+    instance.setShapeVoices(shapeVoicesRef.current);   // a child's effect (SHAPE LAB) runs before this one, so its sounds were kept in a ref
     return () => { instance.dispose(); engine.current = null; };
   }, []);
   useEffect(() => { engine.current?.setSong({ patterns, playlist, mode, current: cur }); }, [patterns, playlist, mode, cur]);
@@ -222,7 +229,7 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
       const el = e.target as HTMLElement | null;
-      if (el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && /^(text|search|)$/.test((el as HTMLInputElement).type)))) return; // let text fields undo their own typing
+      if (el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && /^(text|search|)$/.test((el as HTMLInputElement).type)))) return; // text fields keep their own undo
       const k = e.key.toLowerCase();
       if (k === 'z') { e.preventDefault(); stepRef.current(e.shiftKey ? 'redo' : 'undo'); }
       else if (k === 'y') { e.preventDefault(); stepRef.current('redo'); }
@@ -322,7 +329,7 @@ export default function App() {
     if (!how) return;
     const fr = frameRef.current;
     const where = (): { pattern: number; step: number } | null => {
-      if (L.rec && !L.playing) return { pattern: L.cur, step: cursorRef.current };   // step entry: notes go to the highlighted step
+      if (L.rec && !L.playing) return { pattern: L.cur, step: cursorRef.current };   // step entry: the note goes to the highlighted step
       if (!L.rec || !fr) return null;
       const q = quantizePosition(fr.frame, (performance.now() - fr.at) / (60000 / L.bpm / 4), L.playlist, L.mode, L.cur);
       return q.pattern === null ? null : { pattern: q.pattern, step: q.step };
@@ -333,7 +340,7 @@ export default function App() {
       eng.liveDrum(inst, m.velocity);
       const at = where();
       if (at) setPatterns(ps => ps.map((p, i) => (i === at.pattern ? { ...p, drums: { ...p.drums, [inst]: p.drums[inst].map((v, s) => (s === at.step ? true : v)) } } : p)));
-      if (at && !L.playing) { window.clearTimeout(drumTimer.current); drumTimer.current = window.setTimeout(() => setStepCursor(c => nextStep(c)), 220); }  // pads hit together share one step
+      if (at && !L.playing) { window.clearTimeout(drumTimer.current); drumTimer.current = window.setTimeout(() => setStepCursor(c => nextStep(c)), 220); }  // pads that are hit at the same time use the same step
       return;
     }
     if (how.kind === 'audition') void eng.auditionDown(how.patch, name); else eng.liveDown(how.id, name, m.velocity);
@@ -353,21 +360,26 @@ export default function App() {
   const octaveRef = useRef(octave); octaveRef.current = octave;
   useEffect(() => {
     if (!keysOn) return;
-    const typing = (el: EventTarget | null) => { const t = el as HTMLElement | null; return !!t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable); };
+    const typing = (el: EventTarget | null) => isTypingTarget(el as HTMLInputElement | null);
     const down = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey || typing(e.target)) return;
-      const L = live.current;
+      const L = live.current; const k = pianoKey(e);   // physical key, so it works with any keyboard language (Persian, Arabic, …)
       if (L.rec && !L.playing && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { e.preventDefault(); setStepCursor(c => nextStep(c, e.key === 'ArrowRight' ? 1 : -1)); return; }
       if (e.repeat) return;
-      const shift = L.view === DRUMS_TAB ? 0 : octaveShift(e.key);
+      const shift = L.view === DRUMS_TAB ? 0 : octaveShift(k);
       if (shift) { setOctave(o => clampOctave(o + shift)); return; }
-      const note = L.view === DRUMS_TAB ? keyToPad(e.key) : keyToMidi(e.key, octaveRef.current);
-      if (note === null || keyHeld.current.has(e.key.toLowerCase())) return;
-      keyHeld.current.set(e.key.toLowerCase(), note);
-      void engine.current?.prepare().then(() => onMidi({ kind: 'on', note, velocity: 0.8 } as MidiMsg));
+      const note = L.view === DRUMS_TAB ? keyToPad(k) : keyToMidi(k, octaveRef.current);
+      if (note === null || keyHeld.current.has(k)) return;
+      if ((e.target as HTMLElement | null)?.tagName === 'SELECT') e.preventDefault();   // stop the letter from jumping to a list entry (it would change the instrument)
+      keyHeld.current.set(k, note);
+      // The first key press has to wait for the audio engine. If the key was already released by then, play a short note, otherwise the note would hang forever (the "off" had nothing to stop).
+      void engine.current?.prepare().then(() => {
+        onMidi({ kind: 'on', note, velocity: 0.8 } as MidiMsg);
+        if (!keyHeld.current.has(k)) window.setTimeout(() => onMidi({ kind: 'off', note, velocity: 0 } as MidiMsg), 180);
+      });
     };
     const up = (e: KeyboardEvent) => {
-      const k = e.key.toLowerCase(); const note = keyHeld.current.get(k);
+      const k = pianoKey(e); const note = keyHeld.current.get(k);
       if (note === undefined) return;
       keyHeld.current.delete(k);
       onMidi({ kind: 'off', note, velocity: 0 } as MidiMsg);
@@ -377,18 +389,76 @@ export default function App() {
   }, [keysOn, onMidi]);
   // clicking a note name in the piano roll plays it with that track's sound
   const previewHeld = useRef(new Set<string>());
-  const previewNote = useCallback((trackId: string, midi: number, down: boolean) => {
+  const previewNote = useCallback((trackId: string, midi: number, down: boolean, vel = 0.8) => {
     const eng = engine.current; if (!eng) return;
     const name = midiToNote(midi); const key = `${trackId}:${midi}`;
     if (down) {
       previewHeld.current.add(key);
       void eng.prepare().then(() => {
-        eng.liveDown(trackId, name, 0.8);
+        eng.liveDown(trackId, name, vel);
         // released before the audio engine was ready (first click): let the note ring briefly instead of hanging
         if (!previewHeld.current.has(key)) window.setTimeout(() => eng.liveUp(trackId, name), 250);
       });
     } else if (previewHeld.current.delete(key)) eng.liveUp(trackId, name);
   }, []);
+  // AIR CONTROL (hand gestures): actions that come from the camera panel. The refs keep the latest values, so the camera loop never uses old ones.
+  const transportRef = useRef({ play, stop }); transportRef.current = { play, stop };
+  const handCtx = useRef({ view, tracks, channels, patternCount: patterns.length });
+  handCtx.current = { view, tracks, channels, patternCount: patterns.length };
+  const airTrack = (view !== DRUMS_TAB && view !== 'lab' && tracks.some(t => t.id === view)) ? view : (tracks[0]?.id ?? '');
+  const airTrackRef = useRef(airTrack); airTrackRef.current = airTrack;
+  const airNotes = useMemo(() => { const r = scaleRows(keyPc, scale); const low = r.slice(0, -1); return [...low, ...low.map(m => m + 12), r[r.length - 1] + 12]; }, [keyPc, scale]);
+  const scaleRowsNow = useMemo(() => scaleRows(keyPc, scale), [keyPc, scale]);
+  // SHAPE LAB: every shape has its own sound (inside the audio engine), so it does not depend on the open track or tab.
+  const onShapeNote = useCallback((layer: number, midi: number, vel: number, seconds: number) => {
+    const eng = engine.current; if (!eng) return;
+    void eng.prepare().then(() => eng.shapeShot(layer, midiToNote(midi), seconds, vel));
+  }, []);
+  const onShapeVoices = useCallback((voices: { instrument: string; volumeDb: number }[]) => { shapeVoicesRef.current = voices; engine.current?.setShapeVoices(voices); }, []);
+  // "CONVERT TO PATTERN": the notes of one shape become a new melody track, named after the open pattern. The notes start in the open pattern; a longer progression continues in the next patterns (new ones are added when needed).
+  const onShapeConvert = (lists: MelodyNote[][], instrument: string, label: string): string => {
+    const start = Math.min(current, patterns.length - 1);
+    const base = patterns[start]?.name ?? 'PATTERN';
+    const next = addTrack(tracks, 'melody', { name: `${base} · ${label}`, instrument });
+    if (next === tracks) { const text = `You can have at most ${MAX_TRACKS} tracks. Delete one first.`; setStatus({ kind: 'error', text }); return text; }
+    const made = next[next.length - 1];
+    setTracks(next); setChannels(c => syncChannels(c, next));
+    let added = 0;
+    setPatterns(ps => {
+      let out = ps;
+      lists.forEach((notes, k) => {
+        const idx = start + k;
+        while (idx >= out.length) { const more = addPattern(out); if (more === out) return out; out = more; added++; }
+        out = out.map((p, i) => (i === idx ? withNotes(p, made.id, notes) : p));
+      });
+      return out;
+    });
+    setView(made.id);
+    const text = `Made the melody track “${made.name}” from the shape (${lists.reduce((n, l) => n + l.length, 0)} notes${lists.length > 1 ? `, in ${lists.length} patterns` : ''}). Open it to edit the notes.`;
+    setStatus({ kind: 'info', text }); return text;
+  };
+  const onHand = useCallback((a: HandAction) => {
+    const c = handCtx.current;
+    switch (a.type) {
+      case 'play': if (!latest.current.playing) void transportRef.current.play(); break;
+      case 'stop': if (latest.current.playing) transportRef.current.stop(); break;
+      case 'tempo': setBpm(b => clampBpm(b + a.delta)); break;
+      case 'volume': setMaster(m => patchMaster(m, { volumeDb: a.db })); break;
+      case 'tone': setMaster(m => patchMaster(m, { eqHigh: a.db })); break;
+      case 'reverb': setMaster(m => patchMaster(m, { reverbMix: a.mix })); break;
+      case 'pattern': setMode('pattern'); setCurrent(i => (Math.min(i, c.patternCount - 1) + a.delta + c.patternCount) % c.patternCount); break;
+      case 'mute': {
+        const names: ChannelName[] = c.view === DRUMS_TAB ? ['kick', 'snare', 'hat', 'clap'] : c.tracks.some(t => t.id === c.view) ? [c.view] : [];
+        if (names.length === 0) break;
+        const to = !names.every(n => c.channels[n]?.muted);
+        names.forEach(n => setChannels(ch => patchChannel(ch, n, { muted: to })));
+        break;
+      }
+      case 'airOn': if (airTrackRef.current) previewNote(airTrackRef.current, a.midi, true); break;
+      case 'airOff': if (airTrackRef.current) previewNote(airTrackRef.current, a.midi, false); break;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewNote]);
   const midiTarget = view === DRUMS_TAB ? 'DRUMS (pads: GM notes 36 kick, 38 snare, 42 hat, 39 clap)' : view === 'lab' ? (synths.find(x => x.id === synthId)?.name ?? 'no synth selected') : (trackById(tracks, view)?.name ?? '—');
   function exportMidi() {
     const bytes = encodeMidi({ bpm, patterns, playlist, tracks, mode, pattern: cur, name });
@@ -496,7 +566,7 @@ export default function App() {
     engine.current?.setSong({ patterns, playlist, mode: 'pattern', current: i });
     if (!latest.current.playing) void play();
   }
-  // listen to ONE track of the selected pattern on its own (uses the mixer's solo; press again to hear everything again)
+  // Listen to one track of the selected pattern alone (this uses the mixer's solo). Press again to hear everything.
   const trackChannels = (t: string): ChannelName[] => t === DRUMS_TAB ? [...DRUM_IDS] : [t];
   const soloedNow = (Object.keys(channels) as ChannelName[]).filter(n => channels[n].solo);
   const aloneActive = soloedNow.length === trackChannels(view).length && trackChannels(view).every(n => channels[n].solo);
@@ -519,7 +589,7 @@ export default function App() {
   const bars = mode === 'song' ? playlist.length : 1;
 
   return <main className="shell" style={{ ['--bar-s' as string]: `${(STEPS * 15) / bpm}s` }}>
-    <header><div><div className="eyebrow">INTERACTIVE MUSIC STUDIO</div><h1><span>BEAT</span>LAB<span className="dot">.</span></h1></div><div className="head-right"><button className={'theme-btn' + (lite ? ' on' : '')} aria-pressed={lite} aria-label="Lite mode" title="Lite mode: stops the decorative animation and draws the visualiser less often. Helps slow computers and phones." onClick={() => { setLite(l => { saveLite(!l); return !l; }); }}>{lite ? '🍃 LITE ON' : '🍃 LITE'}</button><button className={'theme-btn' + (sysOpen ? ' on' : '')} aria-pressed={sysOpen} aria-label="System monitor" title="Show CPU / audio load and memory use" onClick={() => setSysOpen(o => !o)}>📊 STATS</button><button className="theme-btn" aria-label="Colour theme" title="Switch between automatic, dark and light" onClick={() => setTheme(nextTheme(theme))}>{THEME_LABEL[theme]}</button><div className="phase">PHASE 01–10 <span>• V0.18.21 TEST BUILD</span></div></div></header>
+    <header><div><div className="eyebrow">INTERACTIVE MUSIC STUDIO</div><h1><span>BEAT</span>LAB<span className="dot">.</span></h1></div><div className="head-right"><button className={'theme-btn' + (lite ? ' on' : '')} aria-pressed={lite} aria-label="Lite mode" title="Lite mode: stops the decorative animation and draws the visualiser less often. Helps slow computers and phones." onClick={() => { setLite(l => { saveLite(!l); return !l; }); }}>{lite ? '🍃 LITE ON' : '🍃 LITE'}</button><button className={'theme-btn' + (sysOpen ? ' on' : '')} aria-pressed={sysOpen} aria-label="System monitor" title="Show CPU / audio load and memory use" onClick={() => setSysOpen(o => !o)}>📊 STATS</button><button className="theme-btn" aria-label="Colour theme" title="Switch between automatic, dark and light" onClick={() => setTheme(nextTheme(theme))}>{THEME_LABEL[theme]}</button><div className="phase">PHASE 01–10 <span>• V0.22.0 TEST BUILD</span></div></div></header>
     <SystemMonitor open={sysOpen} onClose={() => setSysOpen(false)} playing={playing} getHealth={getHealth} />
     <section className="intro hero"><div className="hero-text"><div className="eyebrow">YOUR FIRST SONG</div><h2>Make some noise.</h2><p>Ambient. Drums. Melody. Arpeggio. Mix. Master. Arrange. Export WAV / MP3.</p></div><HeroArt playing={playing} bpm={bpm} lite={lite} /></section>
     {pendingRestore && <div className="restore-banner" role="alert">
@@ -540,6 +610,9 @@ export default function App() {
       <Timeline mode={mode} playlist={playlist} sections={sections} current={cur} bpm={bpm} playing={playing} startStep={startStep} getPlayhead={getPlayhead} onSeek={seek} /></section>
     <Visualizer lite={lite} getHealth={getHealth} playing={playing} getSpectrum={getSpectrum} getWaveform={getWaveform} step={playFrame?.step ?? -1} bar={playFrame?.bar ?? 0} bars={bars} />
 
+    <HandPanel onAction={onHand} airNotes={airNotes} />
+    <ShapeLab rows={scaleRowsNow} bpm={bpm} keyPc={keyPc} lite={lite} patternName={pattern.name} onNote={onShapeNote} onVoices={onShapeVoices} onConvert={onShapeConvert} playing={playing} songStep={playFrame?.songStep ?? -1}
+      pulseKey={playFrame && playFrame.pattern !== null && patterns[playFrame.pattern]?.drums.kick?.[playFrame.step] ? `${playFrame.bar}:${playFrame.step}` : ''} />
     <MidiPanel supported={midiSupported()} connected={midi.connected} devices={midi.devices} deviceId={midi.deviceId} message={midi.message} rec={rec} playing={playing} target={midiTarget}
       exportUnit={mode === 'pattern' ? pattern.name : 'song'} onConnect={connectMidi} onDevice={id => { conn.current?.select(id); setMidi(s => ({ ...s, deviceId: id })); }}
       onRec={setRec} onExport={exportMidi} onImport={importMidi} keysOn={keysOn} onKeys={setKeysOn} octave={octave} onOctave={o => setOctave(clampOctave(o))}

@@ -1,10 +1,14 @@
+// FILE: The live player. It uses one Tone.Transport clock and tells the Rig (rig.ts) which notes to play on every step.
+// App.tsx talks only to this class, never to Tone.js directly.
 import * as Tone from 'tone';
+import { audioStart } from './audioMode';
 import { Instrument, clampBpm } from './pattern';
 import { Channels, MasterSettings, defaultMaster } from './mixer';
 import { DrumKitId } from './instruments';
 import { TrackDef } from './tracks';
 import { Frame, PatternData, PlayMode, Playlist, frameAt } from './song';
 import { Rig } from './rig';
+import { loadWorklet } from './workletSynth';
 import { Groove, defaultGroove } from './groove';
 import { Tuning, defaultTuning } from './tuning';
 import { SynthPatch, SynthSlot } from './synth';
@@ -62,6 +66,7 @@ export class BeatLabEngine {
   }
   /** Builds the audio graph the first time it is needed (a click or key press is required by the browser). */
   private async ensureRig(generation: number): Promise<Rig | null> {
+    await loadWorklet();   // sound engine 2 (AudioWorklet); when it cannot load, the old sounds are used
     if (this.rig) return this.rig;
     const rig = new Rig();
     this.rig = rig;
@@ -71,6 +76,7 @@ export class BeatLabEngine {
     rig.setGroove(this.groove);
     rig.setTuning(this.tuning);
     rig.setTracks(this.trackDefs);
+    rig.setShapeVoices(this.shapeCfg);
     rig.setMaster(this.master);
     rig.setChannels(this.channels);
     rig.setTempo(this.bpm);
@@ -79,21 +85,26 @@ export class BeatLabEngine {
   }
   /** Synth Lab keyboard: key down / key up on a patch, even while the song is stopped. */
   async auditionDown(patch: SynthPatch, note: string): Promise<void> {
-    await Tone.start();
+    await audioStart();
     const rig = await this.ensureRig(this.generation);
     rig?.auditionDown(patch, note);
   }
   auditionUp(patch: SynthPatch, note: string): void { this.rig?.auditionUp(patch, note); }
   auditionStop(): void { this.rig?.auditionStop(); }
   /** Starts the audio engine (call from a click) so that a MIDI keyboard can be heard right away. */
-  async prepare(): Promise<void> { await Tone.start(); await this.ensureRig(this.generation); }
+  async prepare(): Promise<void> { await audioStart(); await this.ensureRig(this.generation); }
   liveDown(trackId: string, note: string, velocity: number): void { this.rig?.liveDown(trackId, note, velocity); }
   liveUp(trackId: string, note: string): void { this.rig?.liveUp(trackId, note); }
+  liveShot(trackId: string, note: string, seconds: number, velocity: number): void { this.rig?.liveShot(trackId, note, seconds, velocity); }
+  /** SHAPE LAB: the sound of each shape (stored, so it is also used when the audio engine starts later). */
+  private shapeCfg: { instrument: string; volumeDb: number }[] = [];
+  setShapeVoices(cfgs: { instrument: string; volumeDb: number }[]): void { this.shapeCfg = cfgs; this.rig?.setShapeVoices(cfgs); }
+  shapeShot(i: number, note: string, seconds: number, velocity: number): void { this.rig?.shapeShot(i, note, seconds, velocity); }
   liveDrum(inst: Instrument, velocity: number): void { this.rig?.liveDrum(inst, velocity); }
   async start(bpm: number): Promise<void> {
     if (this.active) return;
     const generation = ++this.generation;
-    await Tone.start();
+    await audioStart();
     if (generation !== this.generation) return;
     await this.ensureRig(generation);
     if (generation !== this.generation) return;

@@ -1,3 +1,5 @@
+// FILE: Notes for melody tracks: the note type, scales and keys, adding / moving / resizing notes, slide notes, and ready-made melodies (presets).
+// Everything here is pure logic (no audio, no React), so it is easy to test.
 import { LEGACY_STEPS, STEPS } from './pattern';
 import { MelodyInstrumentId } from './instruments';
 

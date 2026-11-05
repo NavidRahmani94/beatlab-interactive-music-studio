@@ -417,3 +417,73 @@ h1,h2,h3{font-weight:700}
 
 /* v0.18.18b: the meter box is layout-contained, so moving the bars never re-lays-out the page */
 .lvl-bar>span{contain:strict}
+
+/* v0.19.0: AIR CONTROL (hand gestures with the camera) */
+.hand-top{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:14px 24px 6px}
+.hand-switch{display:inline-flex;align-items:center;gap:12px;border:2px solid var(--line2);background:var(--surface);border-radius:999px;padding:8px 18px 8px 8px;font-family:'Space Grotesk',Arial,sans-serif;font-weight:700;font-size:12px;letter-spacing:1.2px;color:var(--text)}
+.hand-switch .knob{width:26px;height:26px;border-radius:50%;background:var(--text3);transition:background .15s}
+.hand-switch.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 18%,var(--surface))}
+.hand-switch.on .knob{background:var(--accent)}
+.hand-privacy{font-size:11px;color:var(--text3);max-width:520px;line-height:1.45}
+.hand-error{margin:6px 24px;padding:10px 14px;border-radius:8px;border:1px solid #e5484d;background:color-mix(in srgb,#e5484d 10%,var(--surface));color:var(--text);font-size:13px}
+.hand-body{display:grid;grid-template-columns:1fr;gap:20px;padding:12px 24px 22px}
+.hand-body.live{grid-template-columns:minmax(300px,420px) 1fr;align-items:start}
+.hand-video{position:relative;aspect-ratio:4/3;border-radius:12px;overflow:hidden;background:#111;border:2px solid var(--line2)}
+.hand-video video,.hand-video canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+.hand-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:16px;color:#fff;background:rgba(0,0,0,.55);font-size:13px}
+.hand-status{margin-top:10px;display:flex;flex-direction:column;gap:6px}
+.hand-gesture{display:flex;justify-content:space-between;align-items:baseline;font-family:'Space Grotesk',Arial,sans-serif;font-size:16px;font-weight:700}
+.hand-gesture span{font-family:'DM Mono',monospace;font-size:11px;font-weight:500;color:var(--text3)}
+.hand-bar{height:8px;border-radius:4px;background:var(--raised);overflow:hidden}
+.hand-bar i{display:block;height:100%;background:var(--accent);transition:width .08s linear}
+.hand-hint{font-size:12px;color:var(--text2);min-height:18px}
+.hand-last{font-family:'DM Mono',monospace;font-size:11px;color:var(--text3)}
+.hand-last b{color:var(--text);font-weight:700}
+.hand-help-title{font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1.4px;color:var(--text3);margin-bottom:8px}
+.hand-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.hand-list li{display:grid;grid-template-columns:22px 70px 1fr;gap:10px;align-items:start;padding:8px 10px;border:1px solid var(--raised);border-radius:8px}
+.hand-list li.off{opacity:.45}
+.hand-list li b{font-family:'Space Grotesk',Arial,sans-serif;font-size:12px;letter-spacing:1px}
+.hand-list li p{margin:2px 0 0;font-size:12px;line-height:1.45;color:var(--text2)}
+.hand-icon{font-size:18px;line-height:1.3;white-space:nowrap}
+.hand-check input{width:16px;height:16px;accent-color:var(--accent-text)}
+.hand-tips{margin-top:12px;font-size:12px;line-height:1.5;color:var(--text2)}
+.hand-tips b{font-family:'DM Mono',monospace;letter-spacing:1.2px;margin-right:6px}
+@media(max-width:800px){.hand-body.live{grid-template-columns:1fr}.hand-top{padding:12px 14px 4px}.hand-body{padding:10px 14px 18px}.hand-list li{grid-template-columns:22px 56px 1fr}}
+
+/* v0.20.0: SHAPE LAB (3D balls that make music) */
+.shape-body{display:grid;grid-template-columns:minmax(300px,1.4fr) minmax(240px,1fr);gap:20px;padding:12px 24px 22px;align-items:start}
+.shape-stage{position:relative;aspect-ratio:4/3;border-radius:12px;overflow:hidden;border:2px solid var(--line2);background:radial-gradient(circle at 50% 40%,color-mix(in srgb,var(--accent) 10%,var(--surface)),var(--surface))}
+.shape-stage canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:grab}
+.shape-btns{display:flex;flex-wrap:wrap;gap:8px}
+.shape-btns .theme-btn:disabled{opacity:.4}
+.shape-stats{margin:12px 0 8px;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px;color:var(--text3)}
+.shape-stats b{color:var(--text)}
+.shape-list{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;font-size:12px;line-height:1.4;color:var(--text2)}
+@media(max-width:800px){.shape-body{grid-template-columns:1fr;padding:10px 14px 18px}.shape-list{grid-template-columns:1fr}}
+
+/* v0.21.0: SHAPE LAB with chords and arpeggios (replaces the v0.20 balls) */
+.shape-body{grid-template-columns:minmax(300px,1.1fr) minmax(320px,1fr)}
+.shape-left{display:flex;flex-direction:column;gap:10px}
+.shape-run{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.shape-stage{aspect-ratio:16/11}
+.shape-tabs,.shape-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:10px}
+.shape-row>span{font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1.2px;color:var(--text3);min-width:64px}
+.shape-val{font-family:'DM Mono',monospace;font-size:12px;min-width:84px;text-align:center}
+.shape-title{margin:14px 0 8px;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1.4px;color:var(--text)}
+.shape-title em{font-style:normal;color:var(--text3);letter-spacing:.4px;margin-left:8px}
+.shape-prog{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px;margin-bottom:10px}
+.shape-slot{display:flex;flex-direction:column;gap:3px;padding:6px 8px;border:1px solid var(--raised);border-radius:8px}
+.shape-slot span{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;color:var(--text3)}
+.shape-slot.now{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,var(--surface))}
+.shape-slot select,.shape-row select{font:inherit;font-size:12px;padding:4px;border-radius:6px;border:1px solid var(--line2);background:var(--surface);color:var(--text)}
+.shape-pat{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin-bottom:10px}
+.shape-cell{position:relative;height:42px;border:2px solid var(--line2);border-radius:8px;background:var(--surface);color:var(--text);font-family:'Space Grotesk',Arial,sans-serif;font-weight:700;font-size:13px}
+.shape-cell small{position:absolute;top:2px;left:4px;font-size:9px;font-weight:500;color:var(--text3)}
+.shape-cell.on{background:color-mix(in srgb,var(--accent) 30%,var(--surface));border-color:var(--accent)}
+.shape-cell.now{outline:3px solid var(--text);outline-offset:1px}
+@media(max-width:800px){.shape-body{grid-template-columns:1fr}.shape-pat{grid-template-columns:repeat(8,1fr)}}
+
+/* v0.21.2: audio buffer switch in the system monitor */
+.sys-mode{font:inherit;font-size:10px;letter-spacing:1px;padding:2px 7px;border-radius:6px;border:1px solid var(--line2);background:var(--surface);color:var(--text)}
+.sys-mode.on{background:var(--accent);color:#1b2200;border-color:var(--accent)}

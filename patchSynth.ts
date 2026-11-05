@@ -1,3 +1,4 @@
+// FILE: A synthesizer made from a "patch" (two oscillators, noise, filter, envelopes, effects). It is used by the Synth Lab and by the built-in factory sounds.
 import * as Tone from 'tone';
 import { OscSettings, SynthPatch } from './synth';
 
@@ -43,10 +44,13 @@ function makeOsc(o: OscSettings, p: SynthPatch): Tone.OmniOscillator<any> {
 /**
  * A polyphonic synthesizer built from a SynthPatch:
  *   osc1 + osc2 + noise -> filter (with its own envelope) -> amp envelope -> velocity -> [tremolo] -> [drive] -> [chorus] -> volume
- * Voices are created on demand (up to 16) and sources are only running while a note sounds, so it is cheap when idle.
+ * Voices are created when needed (up to 16). The sound sources run only while a note plays, so it uses little CPU when idle.
  * All timing uses explicit audio times, so live playback and the offline export behave identically.
  */
 export class PatchSynth implements NoteSynth {
+  /** For tests and diagnostics: how many times a busy voice had to be taken over, and the voice limit that is used. */
+  static steals = 0;
+  static maxVoices = MAX_VOICES;
   readonly volume: { value: number };
   private patch: SynthPatch;
   private voices: Voice[] = [];
@@ -58,7 +62,7 @@ export class PatchSynth implements NoteSynth {
 
   constructor(patch: SynthPatch) {
     this.patch = patch;
-    this.ctx = Tone.getContext(); // voices are created later, while notes are scheduled (in the offline export the global context has already moved on)
+    this.ctx = Tone.getContext(); // voices are created later, when notes are scheduled (during an offline export the global context may already be another one)
     this.bus = new Tone.Gain(1);
     this.out = new Tone.Volume(patch.volumeDb);
     this.volume = { get value() { return 0; }, set value(_v: number) { /* the patch's own volume is used */ } };
@@ -89,7 +93,7 @@ export class PatchSynth implements NoteSynth {
     const vel = new Tone.Gain(1);
     osc1.connect(g1); osc2.connect(g2); noise.connect(gn);
     g1.connect(filter); g2.connect(filter); gn.connect(filter);
-    // pulse / PWM waves are not centred on zero: the offset turns every note start and end into a click, so it is filtered out before the envelope
+    // Pulse and PWM waves are not centred on zero. This offset would make a click at the start and end of every note, so we filter it out before the envelope.
     const dcb = (p.osc1.wave === 'pulse' || p.osc1.wave === 'pwm' || p.osc2.wave === 'pulse' || p.osc2.wave === 'pwm') ? new Tone.Filter({ type: 'highpass', frequency: 20, Q: 0.5 }) : null;
     if (dcb) { filter.connect(dcb); dcb.connect(aenv); } else filter.connect(aenv);
     aenv.connect(vel);
@@ -121,8 +125,9 @@ export class PatchSynth implements NoteSynth {
     let free: Voice | undefined;
     for (const v of this.voices) if (v.busyUntil <= time && (!free || v.busyUntil < free.busyUntil)) free = v;
     if (free) return free;
-    if (this.voices.length < MAX_VOICES) { const v = this.createVoice(); this.voices.push(v); return v; }
+    if (this.voices.length < PatchSynth.maxVoices) { const v = this.createVoice(); this.voices.push(v); return v; }
     // everybody is busy: take over the voice that would finish first (it is cut a few ms before the new note)
+    PatchSynth.steals++;
     const steal = this.voices.reduce((a, b) => (b.busyUntil < a.busyUntil ? b : a));
     for (const key of [...this.held.keys()]) if (this.held.get(key) === steal) this.held.delete(key);
     const cut = Math.max(0, time - 0.004);
@@ -159,12 +164,12 @@ export class PatchSynth implements NoteSynth {
     v.busyUntil = end + 0.01;
   }
 
-  /** `glide`: keyframes (seconds from the start, cents from the start pitch) – the pitch follows them (a slide note). */
+  /** `glide`: a list of points (time in seconds from the note start, pitch change in cents). The pitch follows these points (a slide note). */
   triggerAttackRelease(note: string, duration: number, time: number = Tone.now(), velocity = 0.8, glide: { at: number; cents: number }[] = []): this {
     const v = this.allocate(time);
     this.startVoice(v, note, time, velocity);
     if (glide.length > 0) {
-      // ramp the FREQUENCY (not the detune): an LFO that adds vibrato is wired into the detune and would make Tone ignore the ramp
+      // We change the FREQUENCY, not the detune. The vibrato LFO is connected to the detune, and then Tone would ignore the ramp.
       const p = this.patch; const f = Tone.Frequency(note).transpose(p.transpose).toFrequency();
       glide.forEach(k => {
         const t = time + Math.max(0, k.at); const ratio = Math.pow(2, k.cents / 1200);

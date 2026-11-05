@@ -1,3 +1,4 @@
+// FILE: The drum tab: the step grid for kick, snare, hi-hat and clap, the groove settings and the drum kit choice.
 import { useRef } from 'react';
 import { INSTRUMENTS, DrumPattern, Instrument, STEPS } from './pattern';
 import { useFollowPlayhead } from './useFollow';

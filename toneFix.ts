@@ -1,10 +1,11 @@
+// FILE: A fix for a problem in Tone.js: finished notes were cleaned up too late while music plays, so the CPU use grew slowly. It is applied once, before any audio object is created.
 import * as Tone from 'tone';
 
 /**
- * Tone.js frees every finished one-shot source (each note's oscillator, each sample play) with requestIdleCallback.
- * While music plays the page is never idle (animation + the step counter), so those callbacks can starve and the finished
- * oscillators pile up inside the audio graph: the CPU load grows the longer the song plays until the sound crackles.
- * We free them with a plain timer instead.
+ * Tone.js removes every finished sound source (each note's oscillator, each sample) with requestIdleCallback.
+ * While music plays, the page is never idle (animation and the step counter keep it busy), so these clean-up calls may wait for a very long time.
+ * The finished oscillators then stay in the audio graph, and the CPU load grows the longer the song plays, until the sound crackles.
+ * We do the clean-up with a normal timer instead.
  */
 let applied = false;
 export function applyToneFix(): void {

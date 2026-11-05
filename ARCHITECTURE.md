@@ -157,3 +157,63 @@ Removed `maxPolyphony` caps from `makeVoice` (Tone drops new notes over the cap,
 - New **MOVE ALL NOTES ▼ OCT / ▲ OCT**: moves every note of the track by an octave (disabled when a note would leave the range; notes are never wrapped around).
 - Note range widened from C3–C6 to **C2–C7** (MIN_MIDI 36, MAX_MIDI 96). Older saved projects load unchanged. ADVANCED shows the full range. The MIDI import folds notes into the new range (test updated).
 - Checked: 303 unit tests, `e2e-v1821.cjs` in a real browser (rows move by 12, the hint, the moved note appears in the octave above, selector hidden in ADVANCED). Not checked: by ear. The CHORD BUILDER still places chords in its own register (it switches to ADVANCED if they fall outside the EASY view).
+
+## v0.19.0 — AIR CONTROL: control BeatLab with your hands (camera, beta)
+- New panel **AIR CONTROL**. The camera is OFF until the person clicks the switch; the instructions (what each hand gesture does, each with a tick box) are shown before and, next to the camera picture, while it is on. Switching off stops the camera and the model.
+- How it works: the camera picture is analysed in the browser by MediaPipe **Hand Landmarker** (21 points per hand, `handTracker.ts`); nothing is sent or saved. The library (`@mediapipe/tasks-vision@0.10.21`, from jsDelivr) and the model (~8 MB, from Google storage) are downloaded only when the switch is turned on, so the offline standalone file keeps working without them. First use needs internet; camera needs https:// or localhost.
+- Gestures are decided from the landmarks (`handGestures.ts`, pure and unit-tested): open palm, fist, thumb up / down, index up, victory, L-shape, OK sign. `handControl.ts` (pure, injected clock) turns them into actions: ✋ hold = PLAY · ✊ hold = STOP · 👍/👎 tempo ±1 repeating · ☝️ hand height = master volume · 👆👍 L opening = master treble (brightness) · second hand (left) open palm height = reverb · fast flat-hand swipe = next / previous pattern (switches to PATTERN mode) · ✌️ hold 1 s = mute / unmute the open track (drums tab: the four drums) · 👌 OK sign = AIR PIANO (note by left ↔ right from the key + scale, 2 octaves, volume by height, played with the open track's sound).
+- Safety: gestures have to be held ~0.5 s, a moving palm restarts the hold, a swipe never starts the music, continuous controls wait 0.25 s; every function can be unticked (saved in the browser).
+- Tests: `hand.test.ts` (16, synthetic hands incl. rotation / size), `e2e-v190.cjs` (fake camera + fake tracker: panel, camera on/off, play, tempo, volume, stop, mute, untick, camera released).
+- **Not tested here:** the real MediaPipe model with a real hand (this sandbox has no camera and cannot reach the CDN), so thresholds may need tuning from real use. The panel shows the recognised gesture live to help with that.
+
+## v0.19.1 — AIR CONTROL: only PLAY / STOP for now
+- First real test by the user: PLAY (open palm) and STOP (fist) worked well, the other gestures (tempo, volume, brightness, reverb, patterns, mute, air piano) did not. So the panel now offers only PLAY / STOP. The code of the others stays in `handControl.ts` (`ALL_HAND_FEATURES` / `EXPERIMENTAL_FEATURES`) and in the unit tests, switched off, so they can be fixed one by one later with real feedback.
+- Tests: `hand.test.ts` (17; new: other gestures do nothing by default), `e2e-v190.cjs` updated (thumb up does nothing, play / stop / untick, camera released).
+
+## v0.19.2 — computer-keyboard piano keeps working after touching a slider or list
+- Bug: the piano keys (A W S E D F …) were ignored whenever ANY input, slider or drop-down had focus, e.g. after moving the volume / tempo slider or choosing an instrument, until the person clicked somewhere else. Now only real text fields (names, number boxes) block the keys (`isTypingTarget` in `keyboardPiano.ts`, unit-tested). With a drop-down focused, a piano key no longer jumps to a list entry, so it cannot change the instrument by accident.
+- Checked in a real browser with real key presses and an audio tap (`e2e-v192.cjs`): keys play on the melody tab, with the instrument list focused (instrument unchanged), with a slider focused, not in a text field, and as drum pads on the DRUMS tab. A MIDI hardware keyboard was also simulated (fake Web MIDI input): notes, chords, drums, note-off, channel 6, active-sensing / pedal / pitch-bend messages all work (`midikbd.cjs`); the CONNECT KEYBOARD button is inside the collapsed 🎹 MIDI panel (click "▸ 🎹 MIDI" first).
+- Not tested: a real hardware keyboard.
+
+## v0.19.3 — piano keys work with any keyboard layout (Persian, Arabic, Russian …)
+- Bug: the computer-keyboard piano read the typed LETTER (`event.key`). With a Persian (or other non-Latin) layout the A key types "ش", so no key matched and the piano was silent, even with KEYBOARD PIANO ON. Now the PHYSICAL key is used (`event.code`, `pianoKey()` in `keyboardPiano.ts`), the same keys as on a US keyboard (A W S E D F T G Y H U J K, Z / X for the octave, A S D F = drum pads). The letter is used only as a fallback when the browser gives no code.
+- Tests: unit tests for `pianoKey`; `e2e-v193.cjs` sends key events as a Persian layout does (key "ش", code "KeyA"): melody and drum pads play, a non-piano key stays silent, the US layout still works.
+- Not tested: a real Persian keyboard layout (key events were created with the same key/code pair the browser reports).
+
+## v0.19.4 — code explained in simple English (no behaviour change)
+- For the international team: every source file now starts with a `// FILE:` line that says in simple English what the file is for. Long or difficult comments (mainly in `rig.ts`, `App.tsx`, `PianoRoll.tsx`, `project.ts`, `patchSynth.ts`, `SystemMonitor.tsx`) were rewritten with short sentences and common words, and one outdated comment in `song.ts` was corrected.
+- New **CODE_GUIDE.md**: what BeatLab is, how to run and test it, how the parts work together, the rules for the code, one line per file, and the words used in the code (step, pattern, track, strip, rig, patch, slide note).
+- Only comments and documents were changed. Checked by compiling every file with all comments removed and comparing with the previous version: 76 files, 0 code differences. Unit tests and browser tests were run again.
+
+## v0.20.0 — SHAPE LAB
+- `shapePhysics.ts`: pure physics (World, balls, wall and ball bounces, hit events with a 0.12 s gap per pair, `pitchFor`, `velocityFor`, `speedForBpm`). No graphics, fully unit tested.
+- `shapeScene.ts`: three.js drawing (box lines, sphere meshes, flash on hit, pulse, picking and drag plane). Only used by the panel.
+- `ShapeLab.tsx`: the panel, the loop, mouse handling. App passes `notes` (same list as AIR PIANO), `bpm`, `keyPc`, `pulseKey` (changes on each kick step), `onNote`.
+- Notes are played with `previewNote(track, midi, down, velocity)` on the open melody track (200 ms long). They are live notes: they are not written into the song.
+- Test hook: `window.__BEATLAB_SHAPELAB__ = { world, scene }` while the panel is open.
+
+## v0.20.1 — fixed-length live notes
+`Rig.liveShot(track, note, seconds, velocity)` uses `triggerAttackRelease`. Use it for any live note whose end is known in advance. `liveDown`/`liveUp` are only for keys that are really held. Note: Tone's PolySynth gives every attack its own voice but a release frees only one voice of that pitch, so an attack must not be repeated without its own release.
+
+## v0.21.0 — SHAPE LAB v2
+- `shapeMusic.ts`: pure rules: `chordNotes` (stacked thirds inside the scale rows), `chordName`, `tickEvents(layer, progression, tick, rows)`, patterns and presets, `noteSeconds`.
+- `shapeScene.ts`: three.js: one view per shape, spheres at the corners (height = pitch), sprites with note names and the chord name.
+- `ShapeLab.tsx`: panel, two clocks (synced to `songStep`, or a 10 ms interval when the song is stopped), builders. Notes go out through `onNote(midi, velocity, seconds)` → `Rig.liveShot`.
+- `shapePhysics.ts` (balls) was removed. Test hook: `window.__BEATLAB_SHAPELAB__ = { scene, log, shown }` (log has the tick, the time and the notes of every event).
+
+## v0.21.1
+- `Rig.setShapeVoices([{instrument, volumeDb}])` / `Rig.shapeShot(i, note, seconds, velocity)`: one voice + one Volume per shape, straight into `masterIn` (no strip, no sends, not part of the offline render). `makeVoice(def, to?)` got an optional output node.
+- `BeatLabEngine` stores the shape sounds, so they are applied whenever the Rig is created. `App` keeps them in `shapeVoicesRef` for the same reason (child effects run before parent effects).
+- `shapeToPatterns(layer, progression, rows)` in `shapeMusic.ts`: pure; one list of notes per 32-step pattern. `App.onShapeConvert` makes the track and writes the notes (`addTrack`, `withNotes`, `addPattern`).
+
+## v0.22.0
+`Rig.makeVoice` uses `WorkletSynth` for every live voice (tracks, shape voices) when engine 2 is loaded and the context is not an `OfflineContext` (`isOfflineContext()`), so `Tone.Offline` (export) keeps `PatchSynth`/Tone. Basic instruments come from `legacyPatches.ts`. Slide notes: `glide` points are sent with the note; the worklet interpolates cents between points.
+
+## v0.21.3
+Sound engine 2: `voiceWorklet.js` (AudioWorkletProcessor `beatlab-synth`, up to 24 voices, notes arrive as messages `{t:'note', id, start, dur, freq, vel}` with an audio-clock start time, `rel` for held keys) loaded by `workletSynth.ts` (`loadWorklet` via a Blob URL from the `?raw` import, so it also works in the single-file build; uses `rawContext.audioWorklet.addModule` because Tone keeps only the first module of a context). `Rig.makeVoice` uses `WorkletSynth` only for SHAPE LAB voices (`maxRelease` set) when the worklet is loaded; everything else (tracks, export, offline rendering) stays on `PatchSynth` / Tone.
+
+## v0.21.2
+- `audioMode.ts`: `configureAudio()` makes the Tone context with a `latencyHint` (FAST `interactive`, SMOOTH `playback`, SAFE 0.08 s) before the first sound node; `audioStart()` replaces `Tone.start()`. Tone's own `lookAhead` stays 0.1 s. The mode is in localStorage `beatlab.audiomode` and is read once per page load.
+- `Rig.makeVoice(def, to?, maxRelease?)`: shape voices use a release of at most `SHAPE_MAX_RELEASE` (0.45 s). Tone.PolySynth sounds get it through `capRelease`, patch sounds through a copied patch.
+- `PatchSynth.steals` / `PatchSynth.maxVoices`: diagnostics for the voice limit.
+- The first key of the keyboard piano waits for `engine.prepare()`; a key released before that gets a 180 ms note.

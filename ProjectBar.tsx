@@ -1,3 +1,4 @@
+// FILE: The top bar of the project: name, new / open / save, samples, and export.
 import { useRef } from 'react';
 import { SAMPLE_PROJECTS } from './project';
 import { EXPORT_FORMATS, ExportFormat, isExportFormat } from './exporter';

@@ -1,3 +1,4 @@
+// FILE: The time line of the whole song with the playhead. You can click or drag it to jump to another time.
 import { KeyboardEvent, PointerEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Section, sectionIndexAt } from './arrangement';
 import { Playlist } from './song';
@@ -18,7 +19,7 @@ type Props = {
 };
 const SECTION_COLORS = ['#7cf0c2', '#9db4ff', '#ffb86b', '#ff8fb1', '#c8a1ff', '#89d7ff'];
 
-/** The whole track as a time line in seconds: click or drag to jump, arrow keys to nudge. The playhead is moved on the DOM directly (no re-render per frame). */
+/** The whole song as a time line in seconds. Click or drag to jump, use the arrow keys to move a little. The playhead is moved directly in the DOM (no React redraw on every frame). */
 export default function Timeline({ mode, playlist, sections, current, bpm, playing, startStep, getPlayhead, onSeek }: Props) {
   const total = mode === 'song' ? Math.max(1, playlist.length) * STEPS : STEPS;
   const totalSec = stepsToSeconds(total, bpm);

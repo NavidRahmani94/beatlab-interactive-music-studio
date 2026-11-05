@@ -1,3 +1,4 @@
+// FILE: The chord builder panel (user interface). The chord logic itself is in chords.ts.
 import { Dispatch, SetStateAction, useState } from 'react';
 import { CHORD_STYLES, ChordStyle, REGISTERS, Register, chordNotes, diatonicChords, mergeNotes, progressionNotes, progressionsFor, suggestNext, voiceChord } from './chords';
 import { MelodyNote, DEFAULT_VELOCITY, midiToNote, scaleRows } from './melody';

@@ -3,6 +3,8 @@
 A browser music studio with four tracks – **Ambient, Drums, Melody, Arpeggio** – a 7-channel mixer feeding one mastering chain, notes you can stretch to any length, a pattern **playlist** for songs longer than one bar, a live **visualiser**, Save/Open and real WAV export.
 React + TypeScript + Vite + Tone.js. No backend.
 
+> New to the code? Read **CODE_GUIDE.md** (simple English: what each file does and how the parts fit together).
+
 ## Start
 ```bash
 npm install
@@ -18,6 +20,7 @@ Needs Node.js 20.19+ (or 22.12+) and a modern desktop browser. **All files are i
 | **Transport** | Play / Stop (also **Space**), BPM 60–200 changeable while playing |
 | **Four tabs** | **AMBIENT** (long pads/drones), **DRUMS** (unchanged: 4 voices × 32 steps, 3 kits, ON/OFF each), **MELODY**, **ARPEGGIO** – each has its own mixer channel |
 | **Notes of any length** | Click = new note. **Drag sideways** on empty cells = a note of any length. Drag the end of a note to stretch/shrink it. Click a note to remove it. Connected cells show the length |
+| **AIR CONTROL (beta)** | Control PLAY / STOP with your hand, through the camera (opt-in; the other gestures are switched off for now) |
 | **Melody – Easy / Advanced** | Easy: only notes of the chosen Key + Scale. Advanced: full piano roll C2–C7. Easy has an OCTAVE − / + selector and MOVE ALL NOTES ▼▲ OCT |
 | **Instruments (11)** | Soft Synth, Electric Piano, Pluck, Warm Pad, Bell, Lead, Bass, **Strings, Air Pad, Glass Pad, Drone** – any instrument on any melodic track |
 | **Moods / presets** | Melody: 9 moods + ✦ Auto Melody. Ambient: Drift, Abyss, Shimmer, Space. Arpeggio: Minor chord, Major chord, Two chords, Bell arp |
@@ -223,3 +226,72 @@ All 81 built-in sounds were rendered one by one and measured (peak, DC offset, l
 - New **MOVE ALL NOTES ▼ OCT / ▲ OCT**: moves every note of the track by an octave (disabled when a note would leave the range; notes are never wrapped around).
 - Note range widened from C3–C6 to **C2–C7** (MIN_MIDI 36, MAX_MIDI 96). Older saved projects load unchanged. ADVANCED shows the full range. The MIDI import folds notes into the new range (test updated).
 - Checked: 303 unit tests, `e2e-v1821.cjs` in a real browser (rows move by 12, the hint, the moved note appears in the octave above, selector hidden in ADVANCED). Not checked: by ear. The CHORD BUILDER still places chords in its own register (it switches to ADVANCED if they fall outside the EASY view).
+
+## v0.19.0 — AIR CONTROL: control BeatLab with your hands (camera, beta)
+- New panel **AIR CONTROL**. The camera is OFF until the person clicks the switch; the instructions (what each hand gesture does, each with a tick box) are shown before and, next to the camera picture, while it is on. Switching off stops the camera and the model.
+- How it works: the camera picture is analysed in the browser by MediaPipe **Hand Landmarker** (21 points per hand, `handTracker.ts`); nothing is sent or saved. The library (`@mediapipe/tasks-vision@0.10.21`, from jsDelivr) and the model (~8 MB, from Google storage) are downloaded only when the switch is turned on, so the offline standalone file keeps working without them. First use needs internet; camera needs https:// or localhost.
+- Gestures are decided from the landmarks (`handGestures.ts`, pure and unit-tested): open palm, fist, thumb up / down, index up, victory, L-shape, OK sign. `handControl.ts` (pure, injected clock) turns them into actions: ✋ hold = PLAY · ✊ hold = STOP · 👍/👎 tempo ±1 repeating · ☝️ hand height = master volume · 👆👍 L opening = master treble (brightness) · second hand (left) open palm height = reverb · fast flat-hand swipe = next / previous pattern (switches to PATTERN mode) · ✌️ hold 1 s = mute / unmute the open track (drums tab: the four drums) · 👌 OK sign = AIR PIANO (note by left ↔ right from the key + scale, 2 octaves, volume by height, played with the open track's sound).
+- Safety: gestures have to be held ~0.5 s, a moving palm restarts the hold, a swipe never starts the music, continuous controls wait 0.25 s; every function can be unticked (saved in the browser).
+- Tests: `hand.test.ts` (16, synthetic hands incl. rotation / size), `e2e-v190.cjs` (fake camera + fake tracker: panel, camera on/off, play, tempo, volume, stop, mute, untick, camera released).
+- **Not tested here:** the real MediaPipe model with a real hand (this sandbox has no camera and cannot reach the CDN), so thresholds may need tuning from real use. The panel shows the recognised gesture live to help with that.
+
+## v0.19.1 — AIR CONTROL: only PLAY / STOP for now
+- First real test by the user: PLAY (open palm) and STOP (fist) worked well, the other gestures (tempo, volume, brightness, reverb, patterns, mute, air piano) did not. So the panel now offers only PLAY / STOP. The code of the others stays in `handControl.ts` (`ALL_HAND_FEATURES` / `EXPERIMENTAL_FEATURES`) and in the unit tests, switched off, so they can be fixed one by one later with real feedback.
+- Tests: `hand.test.ts` (17; new: other gestures do nothing by default), `e2e-v190.cjs` updated (thumb up does nothing, play / stop / untick, camera released).
+
+## v0.19.2 — computer-keyboard piano keeps working after touching a slider or list
+- Bug: the piano keys (A W S E D F …) were ignored whenever ANY input, slider or drop-down had focus, e.g. after moving the volume / tempo slider or choosing an instrument, until the person clicked somewhere else. Now only real text fields (names, number boxes) block the keys (`isTypingTarget` in `keyboardPiano.ts`, unit-tested). With a drop-down focused, a piano key no longer jumps to a list entry, so it cannot change the instrument by accident.
+- Checked in a real browser with real key presses and an audio tap (`e2e-v192.cjs`): keys play on the melody tab, with the instrument list focused (instrument unchanged), with a slider focused, not in a text field, and as drum pads on the DRUMS tab. A MIDI hardware keyboard was also simulated (fake Web MIDI input): notes, chords, drums, note-off, channel 6, active-sensing / pedal / pitch-bend messages all work (`midikbd.cjs`); the CONNECT KEYBOARD button is inside the collapsed 🎹 MIDI panel (click "▸ 🎹 MIDI" first).
+- Not tested: a real hardware keyboard.
+
+## v0.19.3 — piano keys work with any keyboard layout (Persian, Arabic, Russian …)
+- Bug: the computer-keyboard piano read the typed LETTER (`event.key`). With a Persian (or other non-Latin) layout the A key types "ش", so no key matched and the piano was silent, even with KEYBOARD PIANO ON. Now the PHYSICAL key is used (`event.code`, `pianoKey()` in `keyboardPiano.ts`), the same keys as on a US keyboard (A W S E D F T G Y H U J K, Z / X for the octave, A S D F = drum pads). The letter is used only as a fallback when the browser gives no code.
+- Tests: unit tests for `pianoKey`; `e2e-v193.cjs` sends key events as a Persian layout does (key "ش", code "KeyA"): melody and drum pads play, a non-piano key stays silent, the US layout still works.
+- Not tested: a real Persian keyboard layout (key events were created with the same key/code pair the browser reports).
+
+## v0.19.4 — code explained in simple English (no behaviour change)
+- For the international team: every source file now starts with a `// FILE:` line that says in simple English what the file is for. Long or difficult comments (mainly in `rig.ts`, `App.tsx`, `PianoRoll.tsx`, `project.ts`, `patchSynth.ts`, `SystemMonitor.tsx`) were rewritten with short sentences and common words, and one outdated comment in `song.ts` was corrected.
+- New **CODE_GUIDE.md**: what BeatLab is, how to run and test it, how the parts work together, the rules for the code, one line per file, and the words used in the code (step, pattern, track, strip, rig, patch, slide note).
+- Only comments and documents were changed. Checked by compiling every file with all comments removed and comparing with the previous version: 76 files, 0 code differences. Unit tests and browser tests were run again.
+
+## v0.20.0 — SHAPE LAB (beta, first toy)
+A new panel under AIR CONTROL: **SHAPE LAB**. Click *OPEN SHAPE LAB* to get a 3D box with bouncing balls (three.js). When two balls touch, a note of the key and scale of the open track is played. Height of the touch = pitch, size = volume, the kick drum makes the balls pulse, tempo sets the speed, the key sets the colours. Drag a ball to move it, drag empty space to turn the box, double-click a ball (or DELETE) to remove it, ADD BALL / RESET, SOUND on/off. Max 12 balls. The loop pauses when the tab or the panel is not visible, and LITE mode draws at 30 fps. Not yet: other shapes, gravity, recording touches into the piano roll (ideas for step 2 and 3).
+
+## v0.20.1 — SHAPE LAB: stuck notes fixed
+Some SHAPE LAB notes did not stop. Cause: the same note hit again within 200 ms got a second synth voice, but a "release" only frees one voice. Now SHAPE LAB notes are played with a fixed length (start and end planned together, new `liveShot` in rig.ts / engine.ts), so they cannot hang.
+
+## v0.21.0 — SHAPE LAB rebuilt: shapes = chords and arpeggios on the beat
+The bouncing balls (v0.20) are gone. Now a shape with 3–6 corners is a chord with 3–6 notes (triad, 7th, 9th, 11th), built from the key and scale of the open track, so it is always in key. Every corner shows its note name, and the chord name (for example Am7) is drawn above the shape. A shape can play as an ARP (one corner after another), as a CHORD (all corners together) or be OFF. Speed 1/4, 1/8 or 1/16. Up to 3 shapes play together (octave −1/0/+1 each).
+- **Chord progression builder:** 1–8 bars, one chord (I…VII) per bar, with presets (I–V–vi–IV, ii–V–I…). It is shared by all shapes and repeats.
+- **Arpeggio pattern builder:** 8 or 16 steps; click a step to choose which corner plays (or a rest). Presets UP / DOWN / UP-DOWN / SKIP / RANDOM / RHYTHM. In CHORD mode the same grid is the chord rhythm.
+- **On the beat:** when the song plays, the shapes follow its 16th-note counter (the chord changes on the bar line). When the song is stopped, PLAY THE SHAPES uses its own beat at the song tempo.
+- Click a corner to hear its note. Settings are remembered in the browser.
+
+## v0.21.1 — SHAPE LAB: own sound per shape + CONVERT TO PATTERN
+- **Every shape has its own SOUND** (the same instrument library as the tracks) and its own VOLUME (−30…0 dB). The shapes no longer use the open track: they keep playing when you change the tab or the track. They stay live-only: they are not in the song and not in the WAV / MP3 export.
+- **⇪ CONVERT TO PATTERN** writes the selected shape (the whole chord progression, as arpeggio or chord) as real notes into a **new melody track** named after the open pattern, for example “Intro · SHAPE 1”. The track gets the sound of the shape. A pattern has 2 bars, so a 4-bar progression fills 2 patterns (missing patterns are added; the playlist is not changed). The new track is opened, and you can edit the notes in the piano roll.
+- Fixed while testing: on a fresh page load the sound settings of the shapes could be lost (the panel starts before the audio engine object exists). They are kept in a ref and given to the engine when it is made.
+
+## v0.22.0 — two sound engines: engine 2 now plays ALL live sound
+Engine 2 (AudioWorklet, see v0.21.3) now also plays the **tracks of the song, the keyboard and live MIDI**, not only SHAPE LAB. Slide notes (glide) work in it too. Switch: STATS → SOUND ENGINE → ENGINE 2 / OLD (used after a reload; the choice is remembered). Drums, the mixer and the master chain are the same for both engines.
+- **The export (WAV/MP3) still uses the original engine**, so an exported file sounds as before. (Engine 2 for the export needs the note list of the song to be given to the worklet before the offline render; planned.) Because of this, with ENGINE 2 on, the live sound and the export can differ slightly in colour.
+- Measured on the demo song: loudness within 4 % of the old engine (RMS 0.0588 vs 0.0565).
+- ENGINE 2 needs a web address (npm run dev or a web host); the single HTML file opened directly uses OLD.
+
+## v0.21.3 — sound engine 2 (AudioWorklet) for SHAPE LAB
+**Why:** the crackle ("khor khor") was CPU load: every note of the old engine builds about 10 Web Audio nodes. **What:** `voiceWorklet.js` is a synthesizer that runs inside one AudioWorklet node per sound (all voices are calculated in plain code on the audio thread, sample-accurate start times). `workletSynth.ts` connects it to the Rig. It plays the same synth patches (waves, FM, unison, filter 12/24 dB, envelopes, LFO, drive, chorus).
+- **Measured (offline, same chords, `wbench.cjs`):** 6-note chord on every 1/16 with a pad: 0.95 → 0.04 of real time (about 26×), supersaw 2.26 → 0.06 (about 39×); all 11 basic and about 70 factory sounds are 6–40× cheaper. The old engine's number includes the master chain, so the true factor of the voices alone is somewhat smaller; it is still far above the 3× we asked for.
+- **Used for:** the live SHAPE LAB sounds only. The song, the tracks and the export keep the old engine, so a saved song and its export sound exactly as before. Switch in STATS: SHAPE SOUND ENGINE (ENGINE 2 / OLD), used after a reload. If the browser cannot load an AudioWorklet, the old engine is used automatically. **Important:** Chrome cannot load a worklet when the HTML file is opened directly (file://); the standalone file then uses the old engine (STATS says so). Engine 2 works with `npm run dev` (localhost) or any web host (e.g. GitHub Pages).
+- **Loudness:** engine 2 is not bit-identical to the old one. `workletTrim.ts` holds a dB correction per sound (measured), `legacyPatches.ts` has patches for the 11 basic instruments (electric piano, warm pad, ...). Some sounds will differ in character; tell us which and we tune them by ear.
+
+## v0.21.2 — crackle ("khor khor") investigation + fixes
+**What was measured** (offline render of dense chords through the same Rig; `costshape.cjs`, `costshape2.cjs`, `clicks.cjs`):
+- **Not the mixer / master:** an idle rig costs about 5 % of real time. The peaks of dense chords are only 0.05–0.4, so nothing clips, and there are no clicks (largest jump between two samples 0.017) and no voice stealing.
+- **It is CPU load of the voices.** A 4-note pad chord on every 1/8 note costs about 70 % of real time on the test machine; three shapes with chords at 1/8 cost 110 % (more than the machine can do in real time), so the audio thread falls behind and crackles. The main thread (JavaScript) is only 1–5 % of that, so moving the engine to another thread would not help: the sound is already made on the browser's audio thread. The work is the number of oscillators, filters and envelopes that fade out at the same time (long release tails).
+- The heaviest sounds are the pads and supersaw-like patches (cinematic, supersaw, ensemblePad, brassSection …: 1.3–2.3 × real time for a 6-note chord on every 16th); the lightest are pluck, bass and chip sounds (0.3–0.6).
+
+**What changed**
+- **AUDIO BUFFER switch in STATS:** FAST (about 10 ms, the old setting), SMOOTH (about 23 ms, the new default) and SAFE (80 ms, the most protection). It is used after a reload. STATS also shows the real AUDIO DELAY.
+- **Shape sounds have a shorter tail** (at most 0.45 s): about 30 % less CPU for chords (0.67 → 0.42, 1.11 → 0.79 in the test). Only the live shape sounds; the tracks of the song are unchanged.
+- **Hanging note fixed (found while testing):** a very quick first tap on the computer-keyboard piano (before the audio engine was ready) made the note hang forever, because the key-up had nothing to stop. Now a key that was released early plays a short note.
+- **Honest limit:** very dense setups (several shapes with 5–6 note chords at 1/16 on a pad) are still too heavy for a slow computer. Use fewer corners, a slower speed, a lighter sound (pluck, bass, chip) or the SAFE buffer. The real cure would be a new, lighter synth engine written for the browser's AudioWorklet (a big job, not done yet).

@@ -1,12 +1,17 @@
+// FILE: All the audio objects: the instruments, the channel strips, the master effects. The same Rig is used for live playback and for the offline export.
+// It also plays single steps (triggerStep) and live notes from a keyboard.
 import { applyToneFix } from './toneFix';
 import * as Tone from 'tone';
 import { Instrument } from './pattern';
 import { MelodyNote } from './melody';
 import { ChannelName, Channels, DRUM_CHANNELS, MasterSettings, REVERB_SIZES, compressorSettings, defaultChannel, defaultMaster, delaySeconds, effectiveMuted } from './mixer';
 import { DrumKitId, MelodyInstrumentId } from './instruments';
-import { KIND_DEFAULT_INSTRUMENT, TrackDef } from './tracks';
+import { KIND_DEFAULT_INSTRUMENT, TrackDef, makeTrack } from './tracks';
 import { FACTORY_SOUNDS, SynthPatch, SynthSlot, customId, isCustomRef, isFactorySound } from './synth';
 import { NoteSynth, PatchSynth } from './patchSynth';
+import { WorkletSynth, isOfflineContext, workletReady } from './workletSynth';
+import { workletTrim } from './workletTrim';
+import { LEGACY_PATCHES } from './legacyPatches';
 import { arpAt } from './arp';
 import { Tuning, tuningTotal } from './tuning';
 import { isSlideTarget, slidePath } from './melody';
@@ -19,9 +24,10 @@ type Strip = { vol: Tone.Volume; pan: Tone.Panner; split: Tone.Split; meterL: To
 
 /** One insert effect. `amount` (0..1) is how much of it you hear; 0 sounds like the dry signal. */
 /**
- * Lets a built-in PolySynth glide single notes. Tone gives a voice to a note only when its time comes, so we wrap the internal attack:
- * right after the voice is chosen for a note that is waiting in `__slides`, its detune is ramped over the note. A voice that slid before
- * is set back to 0 when it plays its next note.
+ * Lets a built-in PolySynth glide (slide) single notes.
+ * Tone picks a voice for a note only at the moment the note starts. So we wrap Tone's internal "attack" step:
+ * after the voice is picked for a note that waits in `__slides`, we change that voice's pitch (detune) step by step during the note.
+ * A voice that slid before is set back to 0 when it plays its next note.
  */
 function hookSlides(synth: unknown): void {
   const s = synth as { _triggerAttack?: (notes: string[], time: number, velocity?: number) => void; _activeVoices?: { midi: number; voice: { detune?: Tone.Signal<'cents'> } }[]; __slides?: unknown[] };
@@ -219,10 +225,11 @@ type TrackRuntime = { def: TrackDef; voice: Voice };
 export function notesStartingAt(notes: MelodyNote[], step: number): MelodyNote[] { return notes.filter(n => n.step === step); }
 
 /**
- * The complete sound path:
- *   instruments -> channel strips (volume, pan, mute/solo; 4 drums + one per track) -> [reverb send / delay send buses] -> ONE master in
- *   -> EQ (low/mid/high) -> compressor -> master reverb -> master volume -> limiter -> output (+ meter, analyser)
- * The SAME class is used for live playback and for the offline WAV render, so both sound identical.
+ * The whole sound path, from the instruments to the speakers:
+ *   instruments -> channel strips (volume, pan, mute/solo; 4 drums + one strip per track)
+ *   -> reverb send and delay send (shared effects) -> master input
+ *   -> EQ (low / mid / high) -> compressor -> master reverb -> master volume -> limiter -> output (+ level meter and analyser)
+ * The SAME class is used for live playback and for the offline WAV export, so both sound the same.
  * Create it while the Tone context you want (live or offline) is the active one.
  */
 applyToneFix();
@@ -235,10 +242,19 @@ export function softClip(x: number): number {
 }
 
 /**
- * Tone.PolySynth builds a new voice (dozens of audio nodes) whenever it has none free, and every second throws idle voices away again.
- * Doing that while music plays costs main-thread time exactly when notes start (small stalls), and each thrown-away voice leaves audio nodes behind.
- * So the voices are built once, up front, and kept.
+ * A Tone.PolySynth creates a new voice (many audio nodes) when no voice is free, and removes idle voices again after about a second.
+ * Doing this while music plays costs time exactly when notes start, which can cause small stalls.
+ * So we create the voices once, at the start, and keep them.
  */
+/** A short tail for live shape sounds: a voice that is still fading out costs as much CPU as a playing one, so long tails of fast chords pile up and crackle. */
+export const SHAPE_MAX_RELEASE = 0.45;
+function capRelease(synth: NoteSynth, max: number): void {
+  if (!(synth instanceof Tone.PolySynth)) return;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cur = (synth as any).get()?.envelope?.release; if (typeof cur === 'number' && cur > max) (synth as any).set({ envelope: { release: max } });
+  } catch { /* keep the original tail */ }
+}
 function pinVoices(synth: NoteSynth, count: number): void {
   if (!(synth instanceof Tone.PolySynth)) return;
   try {
@@ -269,6 +285,7 @@ export class Rig {
   private hat: Tone.MetalSynth;
   private clap: Tone.NoiseSynth;
   private tracks = new Map<string, TrackRuntime>();
+  private shapeVoices = new Map<number, { sig: string; vol: Tone.Volume; voice: Voice }>();   // SHAPE LAB: each shape has its own live sound
   private custom = new Map<string, SynthSlot>();
   private audition: { sig: string; synth: PatchSynth } | null = null;
   private auditionOut: Tone.Volume;
@@ -279,7 +296,7 @@ export class Rig {
   private channels: Channels = {};
   private tuneSemis = 0;
   private bpm = 120;
-  // The hi-hat (a Tone.MetalSynth: 12 FM oscillators per hit) was by far the most expensive voice: it is rendered ONCE per kit into a buffer and then only played back.
+  // The hi-hat (a Tone.MetalSynth with 12 FM oscillators per hit) is the most expensive voice. So we render it once per drum kit into a buffer and then only play the buffer.
   private hatOut!: Tone.Volume;
   private hatBuf: Tone.ToneAudioBuffer | null = null;
   private hatReady: Promise<void> = Promise.resolve();
@@ -293,8 +310,8 @@ export class Rig {
     this.masterReverb = new Tone.Reverb({ decay: REVERB_SIZES.hall.seconds, preDelay: 0.01 });
     this.masterVol = new Tone.Volume(0);
     this.limiter = new Tone.Limiter(-3);
-    // Safety stage after the limiter: untouched up to 0.9, then a smooth curve that never reaches 1.0, so loud passages can not clip
-    // (digital clipping is a harsh crackle that appears as layers pile up). Quiet material passes through unchanged.
+    // Safety stage after the limiter. Quiet sound (up to 0.9) is not changed. Louder sound is bent with a smooth curve that never reaches 1.0,
+    // so loud parts cannot clip (clipping is a harsh crackle that can happen when many layers play together).
     this.safety = new Tone.WaveShaper(softClip, 4096);
     this.safety.oversample = '2x';
     this.limiter.connect(this.safety);
@@ -306,7 +323,7 @@ export class Rig {
     this.masterIn.chain(this.eq, this.comp, this.masterReverb, this.masterVol, this.limiter);
     this.safety.connect(this.meter);
     this.safety.connect(this.spectrum);
-    this.limiter.connect(this.wave);                       // the picture and the CLIP detector look at the signal BEFORE the safety stage
+    this.limiter.connect(this.wave);                       // the waveform picture and the CLIP detector read the signal BEFORE the safety stage
 
     this.sendReverb = new Tone.Reverb({ decay: 2.2, preDelay: 0.01 });
     this.sendReverb.wet.value = 1;
@@ -379,12 +396,20 @@ export class Rig {
     return p ? `${ref}|${JSON.stringify(p)}` : ref;
   }
 
-  private makeVoice(def: TrackDef): Voice {
+  private makeVoice(def: TrackDef, to?: Tone.ToneAudioNode, maxRelease?: number): Voice {
     // a deleted user synth falls back to the kind's default sound instead of silence
     const wanted = def.instrument;
     const ref = isCustomRef(wanted) && !this.custom.has(customId(wanted)) ? KIND_DEFAULT_INSTRUMENT[def.kind] : wanted;
-    const patch = this.patchFor(ref);
-    const out = this.strips[def.id].vol;
+    let patch = this.patchFor(ref);
+    if (patch && maxRelease !== undefined) patch = { ...patch, ampEnv: { ...patch.ampEnv, r: Math.min(patch.ampEnv.r, maxRelease) }, filterEnv: { ...patch.filterEnv, r: Math.min(patch.filterEnv.r, maxRelease) } };
+    const out = to ?? this.strips[def.id].vol;
+    // Live sounds (SHAPE LAB, tracks, keyboard) run in the AudioWorklet (engine 2) when it is on and loaded: much less CPU for chords.
+    // The offline export still uses the original engine (until it gets the note list), so it sounds as before.
+    if (workletReady() && !isOfflineContext()) {
+      let wp = patch ?? LEGACY_PATCHES[ref] ?? null;
+      if (wp && !patch && maxRelease !== undefined) wp = { ...wp, ampEnv: { ...wp.ampEnv, r: Math.min(wp.ampEnv.r, maxRelease) }, filterEnv: { ...wp.filterEnv, r: Math.min(wp.filterEnv.r, maxRelease) } };
+      if (wp) { const synth = new WorkletSynth(wp, workletTrim(ref)); synth.connect(out); return { sig: this.signature(wanted), synth, filter: null, shift: 0 }; }
+    }
     if (patch) {
       const synth = new PatchSynth(patch);
       synth.connect(out);
@@ -392,6 +417,7 @@ export class Rig {
     }
     const m = buildMelody(ref);
     m.synth.volume.value = m.volume;
+    if (maxRelease !== undefined) capRelease(m.synth, maxRelease);   // before the voices are made, so they start with the short tail
     pinVoices(m.synth, def.kind === 'ambient' ? 6 : 4);
     hookSlides(m.synth);
     if (m.filter) { m.synth.connect(m.filter); m.filter.connect(out); } else m.synth.connect(out);
@@ -400,8 +426,9 @@ export class Rig {
   private disposeVoice(v: Voice): void { v.synth.releaseAll(); v.synth.dispose(); v.filter?.dispose(); }
 
   /**
-   * Makes the audio graph match the track list: new tracks get a strip and an instrument, deleted tracks are removed,
-   * and a track whose instrument (or user synth patch) changed gets a fresh voice.
+   * Makes the audio graph match the track list:
+   * a new track gets a strip and an instrument, a deleted track is removed,
+   * and a track whose instrument (or synth patch) changed gets a new voice.
    */
   setTracks(defs: TrackDef[]): void {
     const wanted = new Set(defs.map(d => d.id));
@@ -460,7 +487,7 @@ export class Rig {
     });
   }
 
-  /** Keeps the insert effects of one strip in step with the settings: the chain is rebuilt only when effects are added, removed, reordered, switched on/off or changed type; knob moves just set the amount. */
+  /** Keeps the insert effects of one strip equal to the settings. The effect chain is rebuilt only when an effect is added, removed, moved, switched on or off, or changed to another type. Turning a knob only sets the amount. */
   private applyFx(strip: Strip, list: FxSlot[] | undefined): void {
     const active = (list ?? []).filter(f => f.on);
     const sig = fxSignature(list);
@@ -481,7 +508,7 @@ export class Rig {
     this.masterVol.volume.value = master.volumeDb;
     this.masterReverb.wet.value = master.reverbMix;
     const decay = REVERB_SIZES[master.reverbSize].seconds;
-    if (Math.abs(Number(this.masterReverb.decay) - decay) > 1e-6) this.masterReverb.decay = decay; // regenerates the impulse response
+    if (Math.abs(Number(this.masterReverb.decay) - decay) > 1e-6) this.masterReverb.decay = decay; // this makes Tone build the reverb sound again
     this.delay.feedback.value = master.delayFeedback;
     this.eq.low.value = master.eqLow;
     this.eq.mid.value = master.eqMid;
@@ -498,11 +525,11 @@ export class Rig {
   setGroove(g: Groove): void { this.groove = g; }
   /** Global pitch for every track and the Synth Lab keyboard (not the drums). */
   setTuning(t: Tuning): void { this.tuneSemis = tuningTotal(t); }
-  /** A note name moved by the track's own shift plus the global tuning. With no shift at all the note name is returned untouched; otherwise an exact frequency such as "432.1hz". */
+  /** Moves a note name by the track's own shift plus the global tuning. With no shift the note name is returned as it is. Otherwise the result is a note name or an exact frequency such as "432.1hz". */
   /**
-   * Plays one note. `cents` ≠ 0 makes the pitch glide by that amount over the note (a "slide" note).
-   * The patch synth does it itself; for the built-in PolySynths the voice that is given to the note is found through a small hook
-   * on the synth (see makeVoice) and its detune is ramped.
+   * Plays one note. If `glide` is not empty, the pitch follows these points during the note (a "slide" note).
+   * The patch synth does this by itself. For the built-in PolySynths we find the voice that Tone gave to the note
+   * (with a small hook, see makeVoice) and change its detune.
    */
   private playNote(voice: Voice, pitch: string, duration: number, time: number, velocity: number, glide: { at: number; cents: number }[]): void {
     if (glide.length > 0) {
@@ -528,10 +555,10 @@ export class Rig {
     this.kickNote = kit.kickNote ?? 'C1';
   }
 
-  /** Renders one hi-hat hit of this kit with the real MetalSynth (same sound as before), synchronously inside a private offline context. */
+  /** Renders one hi-hat hit of this drum kit with the real MetalSynth, inside a separate offline audio context. */
   private buildHat(kit: (typeof KITS)[DrumKitId]): void {
     const gen = ++this.hatGen;
-    this.hatBuf = null;                                  // until the buffer exists the MetalSynth plays (same sound, just heavier)
+    this.hatBuf = null;                                  // until the buffer is ready, the MetalSynth plays (same sound, but it uses more CPU)
     const dur = kit.dur.hat + Number(kit.hat.envelope?.release ?? 0.3) + Number(kit.hat.envelope?.decay ?? 0.1) + 0.1;
     const previous = Tone.getContext();
     const sr = previous.sampleRate;
@@ -563,13 +590,13 @@ export class Rig {
 
   /**
    * Plays everything that sits on one 16th-note step of one pattern at an explicit audio time.
-   * `pattern` is null for an empty playlist bar. Durations of drum hits are fixed seconds, so timbre never depends on BPM.
-   * `tick` (global step counter) feeds the arpeggiator's random mode and the repeatable randomness of the groove.
+   * `pattern` is null for an empty playlist bar. Drum hits have a fixed length in seconds, so the drum sound does not change with the BPM.
+   * `tick` (the global step counter) is used by the arpeggiator's random mode and by the groove's random values, so they repeat in the same way every time.
    */
   triggerStep(step: number, time: number, pattern: PatternData | null, tick: number, stepSeconds: number): void {
     if (!pattern) return;
     const g = this.groove;
-    const base = time + swingDelay(step, stepSeconds, g.swing);        // swing moves the whole odd step, drums and notes together
+    const base = time + swingDelay(step, stepSeconds, g.swing);        // swing delays every odd step, for drums and notes together
     drumHits(pattern.drums, step, tick, g).forEach(({ inst, delay, velocity }) => {
       if (!this.muted[inst]) this.playDrum(inst, base + delay, velocity);
     });
@@ -601,7 +628,7 @@ export class Rig {
     const d = this.kitDur;
     if (inst === 'kick') this.kick.triggerAttackRelease(this.kickNote, d.kick, t, velocity);
     else if (inst === 'snare') this.snare.triggerAttackRelease(d.snare, t, velocity);
-    // the first argument of a Tone.MetalSynth is its pitch (260 Hz, as set in the constructor); the old call put the duration there, which made the hats nearly silent
+    // The first argument of a Tone.MetalSynth is its pitch (260 Hz, set in the constructor). An old version passed the duration here, which made the hats almost silent.
     else if (inst === 'hat') {
       if (this.hatBuf) { const src = new Tone.ToneBufferSource({ context: this.hatOut.context, url: this.hatBuf, onended: () => src.dispose() }); src.connect(this.hatOut); src.start(t, 0, undefined, velocity); }
       else this.hat.triggerAttackRelease(HAT_HZ, d.hat, t, velocity);
@@ -616,24 +643,47 @@ export class Rig {
     return { synth: rt.voice.synth, pitch: this.pitchOf(note, rt.voice.shift) };
   }
   /**
-   * While the song plays, the transport has already handed some notes to the same voices a few ms ahead, and Tone refuses events that go back in time,
-   * so live notes start a little later then. When stopped they start almost at once.
+   * While the song plays, the transport has already given some notes to the same voices a few milliseconds ahead, and Tone does not accept events in the past.
+   * So live notes start a little later while playing. When the song is stopped they start almost at once.
    */
   private liveTime(): number { return Tone.now() + (Tone.getTransport().state === 'started' ? 0.06 : 0.005); }
-  private safe(fn: () => void): void { try { fn(); } catch { /* a key press must never break playback */ } }
+  private safe(fn: () => void): void { try { fn(); } catch { /* a key press must never stop the music */ } }
   liveDown(id: string, note: string, velocity: number): void { const v = this.liveSynth(id, note); this.safe(() => v?.synth.triggerAttack?.(v.pitch, this.liveTime(), Math.max(0.05, velocity))); }
   liveUp(id: string, note: string): void { const v = this.liveSynth(id, note); this.safe(() => v?.synth.triggerRelease?.(v.pitch, this.liveTime() + 0.01)); }
+  /** SHAPE LAB sounds: one voice per shape, with its own volume. They are only for live playing (they are not part of the song or the export). */
+  setShapeVoices(cfgs: { instrument: string; volumeDb: number }[]): void {
+    for (const [i, s] of [...this.shapeVoices]) if (i >= cfgs.length) { this.disposeVoice(s.voice); s.vol.dispose(); this.shapeVoices.delete(i); }
+    cfgs.forEach((c, i) => {
+      const sig = this.signature(c.instrument); const have = this.shapeVoices.get(i);
+      const def = makeTrack(`shape${i}`, `SHAPE ${i + 1}`, 'melody', c.instrument);
+      if (!have) { const vol = new Tone.Volume(c.volumeDb); vol.connect(this.masterIn); this.shapeVoices.set(i, { sig, vol, voice: this.makeVoice(def, vol, SHAPE_MAX_RELEASE) }); return; }
+      have.vol.volume.value = c.volumeDb;
+      if (have.sig !== sig) { this.disposeVoice(have.voice); have.voice = this.makeVoice(def, have.vol, SHAPE_MAX_RELEASE); have.sig = sig; }
+    });
+  }
+  /** A note of fixed length on the sound of one shape. */
+  shapeShot(i: number, note: string, seconds: number, velocity: number): void {
+    const s = this.shapeVoices.get(i); if (!s) return;
+    this.safe(() => s.voice.synth.triggerAttackRelease?.(this.pitchOf(note, s.voice.shift), seconds, this.liveTime(), Math.max(0.05, velocity)));
+  }
+  /** A note with a fixed length: start and end are planned together, so it can never hang (used by SHAPE LAB). */
+  liveShot(id: string, note: string, seconds: number, velocity: number): void {
+    const v = this.liveSynth(id, note);
+    this.safe(() => v?.synth.triggerAttackRelease?.(v.pitch, seconds, this.liveTime(), Math.max(0.05, velocity)));
+  }
   liveDrum(inst: Instrument, velocity: number): void { this.safe(() => this.playDrum(inst, this.liveTime(), Math.max(0.05, velocity))); }
 
   releaseAll(): void {
     this.kick.triggerRelease();
     this.tracks.forEach(t => t.voice.synth.releaseAll());
+    this.shapeVoices.forEach(s => s.voice.synth.releaseAll());
   }
 
   dispose(): void {
     this.releaseAll();
     this.tracks.forEach(t => this.disposeVoice(t.voice));
     this.tracks.clear();
+    this.shapeVoices.forEach(s => { this.disposeVoice(s.voice); s.vol.dispose(); }); this.shapeVoices.clear();
     [this.kick, this.snare, this.hat, this.hatOut, this.clap, this.sendReverb, this.delay, this.eq, this.comp, this.masterReverb, this.masterVol, this.limiter, this.safety, this.meter, this.spectrum, this.wave, this.masterIn].forEach(n => n.dispose());
     this.audition?.synth.dispose();
     this.auditionOut.dispose();

@@ -1,3 +1,4 @@
+// FILE: The panel of one melodic track: instrument, key and scale, easy / advanced piano roll, chord builder and arpeggio settings.
 import { SynthSlot, customRef, isCustomRef } from './synth';
 import { Dispatch, SetStateAction, useState } from 'react';
 import {
