@@ -1,6 +1,7 @@
 // FILE: The live picture of the sound (frequency bars, waveform and a beat bar), drawn on a canvas.
 import { useEffect, useRef, useState } from 'react';
 import { useInView } from './useInView';
+import { watchCanvas } from './canvasWatch';
 import { BeatPulse, VIZ_LABEL, VIZ_MODES, VizMode, attackRelease, bandsOf, dbToUnit, isVizMode } from './vizMath';
 
 const MODE_KEY = 'beatlab.viz.v1';
@@ -48,19 +49,19 @@ export default function Visualizer({ playing, getSpectrum, getWaveform, step, ba
     const beat = new BeatPulse(); const parts: Particle[] = []; let glow = 0; let t0 = performance.now(); let phase = 0;
     const calm = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
     let last = 0;
+    const watch = watchCanvas(canvas, ['--viz-a', '--viz-b', '--viz-grid']);
     const draw = (ts = 0) => {
       // not on screen: draw nothing. Otherwise about 30 frames a second (15 in LITE mode): half the cost, still smooth for a meter
       if (!seenRef.current || ts - last < (liteRef.current ? 60 : 30)) { raf = requestAnimationFrame(draw); return; }
       last = ts;
       const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-      const w = canvas.clientWidth, h = canvas.clientHeight;
+      const w = watch.w, h = watch.h;
       if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) { canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr); }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);
-      const style = getComputedStyle(canvas);
-      const accent = style.getPropertyValue('--viz-a').trim() || '#d9ff71';
-      const accent2 = style.getPropertyValue('--viz-b').trim() || '#7cf0c2';
-      const grid = style.getPropertyValue('--viz-grid').trim() || '#272b37';
+      const accent = watch.color('--viz-a', '#d9ff71');
+      const accent2 = watch.color('--viz-b', '#7cf0c2');
+      const grid = watch.color('--viz-grid', '#272b37');
 
       const now = performance.now(); const dt = Math.min(0.1, (now - t0) / 1000); t0 = now;
       const spec = playing ? getSpectrum() : null;
@@ -168,7 +169,7 @@ export default function Visualizer({ playing, getSpectrum, getWaveform, step, ba
       raf = requestAnimationFrame(draw);
     };
     raf = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(raf);
+    return () => { cancelAnimationFrame(raf); watch.stop(); };
   }, [playing, getSpectrum, getWaveform]);
 
   return <section className="panel viz" aria-label="Playback visualiser">

@@ -92,7 +92,7 @@ describe('MP3 encoder', () => {
   it('format table and encodeAudio agree', async () => {
     expect(isExportFormat('mp3_320')).toBe(true); expect(isExportFormat('flac')).toBe(false); expect(isExportFormat('toString')).toBe(false);
     for (const f of Object.keys(EXPORT_FORMATS) as (keyof typeof EXPORT_FORMATS)[]) {
-      const blob = encodeAudio([sine(4410), sine(4410)], 44100, f);
+      const blob = await encodeAudio([sine(4410), sine(4410)], 44100, f);
       expect(blob.type).toBe(EXPORT_FORMATS[f].mime); expect(blob.size).toBeGreaterThan(1000);
     }
   });
