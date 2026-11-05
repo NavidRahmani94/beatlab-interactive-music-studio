@@ -1,4 +1,5 @@
 const { chromium } = require('playwright');
-(async () => { const b = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] }); const p = await b.newPage({ viewport: { width: 1280, height: 900 } });
- await p.goto(process.argv[2]); await p.waitForTimeout(1500); await p.getByRole('button', { name: /^play/i }).first().click(); await p.waitForTimeout(3000);
- await p.locator('.mixer').scrollIntoViewIfNeeded(); await p.locator('.mixer').screenshot({ path: '../mixer_lvl.png' }); await b.close(); })();
+(async () => { const b = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] }); const p = await (await b.newContext({ viewport: { width: 1280, height: 1000 }, deviceScaleFactor: 1 })).newPage();
+  await p.goto('http://localhost:5199/'); await p.waitForTimeout(1200); await p.locator('[role=tab]:has-text("MELODY")').first().click(); await p.waitForTimeout(300);
+  for (const [k, c] of [['a', 'KeyA'], ['d', 'KeyD']]) await p.evaluate(([k, c]) => window.dispatchEvent(new KeyboardEvent('keydown', { key: k, code: c, bubbles: true })), [k, c]);
+  await p.waitForTimeout(500); await p.locator('.roll-wrap').first().scrollIntoViewIfNeeded(); await p.locator('.roll-wrap').first().screenshot({ path: '../live.png' }); await b.close(); })();

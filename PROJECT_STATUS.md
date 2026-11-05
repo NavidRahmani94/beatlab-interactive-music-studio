@@ -174,6 +174,9 @@ Beta panel with 3D bouncing balls that play notes of the key and scale. three.js
 
 ## v0.21.1 — SHAPE LAB: own sound + volume per shape, CONVERT TO PATTERN. Next: DJ MODE.
 
+## v0.22.1 — live notes light up in the piano roll
+Bug report from the user (keyboard / MIDI playing was not shown). Fixed in one place (`onMidi`), so MIDI and keyboard behave the same. Not verified with a real MIDI device (the MIDI path is the same function as the keyboard).
+
 ## v0.22.0 — engine 2 plays all live sound (switchable)
 Tracks, keyboard and SHAPE LAB use the AudioWorklet engine; the switch in STATS returns to the old one. Export is unchanged (old engine). Not verified: by ear / real device / long songs on a slow computer. Next: user listens and names sounds to tune; engine 2 for the export; then DJ MODE.
 

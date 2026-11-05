@@ -206,6 +206,9 @@ Removed `maxPolyphony` caps from `makeVoice` (Tone drops new notes over the cap,
 - `BeatLabEngine` stores the shape sounds, so they are applied whenever the Rig is created. `App` keeps them in `shapeVoicesRef` for the same reason (child effects run before parent effects).
 - `shapeToPatterns(layer, progression, rows)` in `shapeMusic.ts`: pure; one list of notes per 32-step pattern. `App.onShapeConvert` makes the track and writes the notes (`addTrack`, `withNotes`, `addPattern`).
 
+## v0.22.1
+`App` keeps `liveNotes` (state, list of MIDI notes sounding now), set by `onMidi` (keyboard and MIDI both go through it), by the keyboard `keydown` handler (immediately, before the audio engine is ready) and by `previewNote`. It goes `TrackPanel` → `PianoRoll` (`liveNotes`) → `Row` (`live` prop, part of the memo comparison, so only changed rows redraw).
+
 ## v0.22.0
 `Rig.makeVoice` uses `WorkletSynth` for every live voice (tracks, shape voices) when engine 2 is loaded and the context is not an `OfflineContext` (`isOfflineContext()`), so `Tone.Offline` (export) keeps `PatchSynth`/Tone. Basic instruments come from `legacyPatches.ts`. Slide notes: `glide` points are sent with the note; the worklet interpolates cents between points.
 

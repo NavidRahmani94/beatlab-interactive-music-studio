@@ -305,8 +305,12 @@ export default function App() {
     }
     return L.tracks.some(t => t.id === L.view) ? { kind: 'track', id: L.view } : null;
   };
+  // notes that are sounding right now from a keyboard (computer or MIDI) or a click on a note name: the piano roll lights their rows
+  const [liveNotes, setLiveNotes] = useState<number[]>([]);
+  const lightNote = useCallback((note: number, on: boolean) => setLiveNotes(l => (on ? (l.includes(note) ? l : [...l, note]) : l.includes(note) ? l.filter(x => x !== note) : l)), []);
   const onMidi = useCallback((m: MidiMsg) => {
     const eng = engine.current; const L = live.current;
+    if (m.kind === 'on') lightNote(m.note, true); else if (m.kind === 'off') lightNote(m.note, false);
     if (!eng || m.kind === 'other') return;
     const name = midiToNote(m.note);
     if (m.kind === 'off') {
@@ -345,7 +349,7 @@ export default function App() {
     }
     if (how.kind === 'audition') void eng.auditionDown(how.patch, name); else eng.liveDown(how.id, name, m.velocity);
     held.current.set(m.note, { t0: performance.now(), how, vel: Math.max(0.05, m.velocity), at: how.kind === 'track' ? where() : null, entry: how.kind === 'track' && L.rec && !L.playing });
-  }, []);
+  }, [lightNote]);
   async function connectMidi() {
     try {
       await engine.current?.prepare();
@@ -372,6 +376,7 @@ export default function App() {
       if (note === null || keyHeld.current.has(k)) return;
       if ((e.target as HTMLElement | null)?.tagName === 'SELECT') e.preventDefault();   // stop the letter from jumping to a list entry (it would change the instrument)
       keyHeld.current.set(k, note);
+      if (L.view !== DRUMS_TAB) lightNote(note, true);   // the row lights up at once, even while the audio engine is still starting
       // The first key press has to wait for the audio engine. If the key was already released by then, play a short note, otherwise the note would hang forever (the "off" had nothing to stop).
       void engine.current?.prepare().then(() => {
         onMidi({ kind: 'on', note, velocity: 0.8 } as MidiMsg);
@@ -386,12 +391,13 @@ export default function App() {
     };
     window.addEventListener('keydown', down); window.addEventListener('keyup', up);
     return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); keyHeld.current.forEach(n => onMidi({ kind: 'off', note: n, velocity: 0 } as MidiMsg)); keyHeld.current.clear(); };
-  }, [keysOn, onMidi]);
+  }, [keysOn, onMidi, lightNote]);
   // clicking a note name in the piano roll plays it with that track's sound
   const previewHeld = useRef(new Set<string>());
   const previewNote = useCallback((trackId: string, midi: number, down: boolean, vel = 0.8) => {
     const eng = engine.current; if (!eng) return;
     const name = midiToNote(midi); const key = `${trackId}:${midi}`;
+    lightNote(midi, down);
     if (down) {
       previewHeld.current.add(key);
       void eng.prepare().then(() => {
@@ -533,7 +539,7 @@ export default function App() {
   const renderTrack = (t: TrackDef) => <TrackPanel key={t.id} track={t} accent={trackAccent(tracks.indexOf(t))} onRename={n => renameTrack(t.id, n)} onDelete={() => deleteTrack(t.id)}
     synths={synths} notes={notesFor(pattern, t.id)} onNotes={setTrackNotes(t.id)} enabled={!(channels[t.id]?.muted)}
     onEnabled={on => changeChannel(t.id, { muted: !on })} solo={!!channels[t.id]?.solo} onSolo={solo => changeChannel(t.id, { solo })} keyPc={keyPc} scale={scale} onKeyChange={changeKey} onScaleChange={changeScale}
-    onInstrument={(id: MelodyInstrumentId) => setInstrument(t.id, id)} onArp={patch => setTrackArp(t.id, patch)} playingStep={stepHere} onPreview={(m, d) => previewNote(t.id, m, d)} cursor={rec && !playing && view === t.id ? stepCursor : -1} />;
+    onInstrument={(id: MelodyInstrumentId) => setInstrument(t.id, id)} onArp={patch => setTrackArp(t.id, patch)} playingStep={stepHere} onPreview={(m, d) => previewNote(t.id, m, d)} liveNotes={liveNotes} cursor={rec && !playing && view === t.id ? stepCursor : -1} />;
 
   // key and scale are shared by all tracks and all patterns, so changing them moves the whole song together
   const changeKey = (next: number) => { setPatterns(ps => mapNotes(ps, n => transposeNotes(n, easyRoot(next) - easyRoot(keyPc)))); setKeyPc(next); };
@@ -589,7 +595,7 @@ export default function App() {
   const bars = mode === 'song' ? playlist.length : 1;
 
   return <main className="shell" style={{ ['--bar-s' as string]: `${(STEPS * 15) / bpm}s` }}>
-    <header><div><div className="eyebrow">INTERACTIVE MUSIC STUDIO</div><h1><span>BEAT</span>LAB<span className="dot">.</span></h1></div><div className="head-right"><button className={'theme-btn' + (lite ? ' on' : '')} aria-pressed={lite} aria-label="Lite mode" title="Lite mode: stops the decorative animation and draws the visualiser less often. Helps slow computers and phones." onClick={() => { setLite(l => { saveLite(!l); return !l; }); }}>{lite ? '🍃 LITE ON' : '🍃 LITE'}</button><button className={'theme-btn' + (sysOpen ? ' on' : '')} aria-pressed={sysOpen} aria-label="System monitor" title="Show CPU / audio load and memory use" onClick={() => setSysOpen(o => !o)}>📊 STATS</button><button className="theme-btn" aria-label="Colour theme" title="Switch between automatic, dark and light" onClick={() => setTheme(nextTheme(theme))}>{THEME_LABEL[theme]}</button><div className="phase">PHASE 01–10 <span>• V0.22.0 TEST BUILD</span></div></div></header>
+    <header><div><div className="eyebrow">INTERACTIVE MUSIC STUDIO</div><h1><span>BEAT</span>LAB<span className="dot">.</span></h1></div><div className="head-right"><button className={'theme-btn' + (lite ? ' on' : '')} aria-pressed={lite} aria-label="Lite mode" title="Lite mode: stops the decorative animation and draws the visualiser less often. Helps slow computers and phones." onClick={() => { setLite(l => { saveLite(!l); return !l; }); }}>{lite ? '🍃 LITE ON' : '🍃 LITE'}</button><button className={'theme-btn' + (sysOpen ? ' on' : '')} aria-pressed={sysOpen} aria-label="System monitor" title="Show CPU / audio load and memory use" onClick={() => setSysOpen(o => !o)}>📊 STATS</button><button className="theme-btn" aria-label="Colour theme" title="Switch between automatic, dark and light" onClick={() => setTheme(nextTheme(theme))}>{THEME_LABEL[theme]}</button><div className="phase">PHASE 01–10 <span>• V0.22.1 TEST BUILD</span></div></div></header>
     <SystemMonitor open={sysOpen} onClose={() => setSysOpen(false)} playing={playing} getHealth={getHealth} />
     <section className="intro hero"><div className="hero-text"><div className="eyebrow">YOUR FIRST SONG</div><h2>Make some noise.</h2><p>Ambient. Drums. Melody. Arpeggio. Mix. Master. Arrange. Export WAV / MP3.</p></div><HeroArt playing={playing} bpm={bpm} lite={lite} /></section>
     {pendingRestore && <div className="restore-banner" role="alert">

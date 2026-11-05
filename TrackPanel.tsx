@@ -14,6 +14,7 @@ import ChordBuilder from './ChordBuilder';
 
 type Props = {
   onPreview?: (midi: number, down: boolean) => void;
+  liveNotes?: readonly number[];
   cursor?: number;
   track: TrackDef;
   accent: string;
@@ -174,7 +175,7 @@ export default function TrackPanel(p: Props) {
       <button className={touchDraw ? 'sel' : ''} aria-pressed={touchDraw} onClick={() => setTouchDraw(true)}>✏ DRAW (drag = long note)</button>
     </div>}
     <PianoRoll slide={track.kind !== 'arp'} notes={p.notes} onNotes={p.onNotes} advanced={advanced} octave={oct} keyPc={p.keyPc} scale={p.scale} defaultLength={length} velocity={velocity}
-      enabled={p.enabled} playingStep={p.playingStep} accent={p.accent} touchDraw={touchDraw} onPreview={p.onPreview} cursor={p.cursor} />
+      enabled={p.enabled} playingStep={p.playingStep} accent={p.accent} touchDraw={touchDraw} onPreview={p.onPreview} liveNotes={p.liveNotes} cursor={p.cursor} />
     <div className="grid-footer">
       <span>CLICK = NEW NOTE · DRAG SIDEWAYS = ANY LENGTH · DRAG A NOTE'S END TO STRETCH · CLICK A NOTE TO REMOVE IT</span>
       <button onClick={() => p.onNotes([])}>CLEAR {name.toUpperCase()} ↗</button>

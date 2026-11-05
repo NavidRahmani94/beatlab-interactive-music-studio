@@ -487,3 +487,8 @@ h1,h2,h3{font-weight:700}
 /* v0.21.2: audio buffer switch in the system monitor */
 .sys-mode{font:inherit;font-size:10px;letter-spacing:1px;padding:2px 7px;border-radius:6px;border:1px solid var(--line2);background:var(--surface);color:var(--text)}
 .sys-mode.on{background:var(--accent);color:#1b2200;border-color:var(--accent)}
+
+/* v0.22.1: the row of a note that is being played (computer keyboard, MIDI keyboard, click on a note name) lights up in the piano roll (easy and advanced) */
+.mrow.live .mlabel{background:var(--accent,var(--mint));color:var(--onaccent,#fff);font-weight:700;border-radius:4px;box-shadow:0 0 10px color-mix(in srgb,var(--accent,var(--mint)) 70%,transparent)}
+.mrow.live .mcell:not(.on){background:color-mix(in srgb,var(--accent,var(--mint)) 38%,var(--raised));border-color:var(--accent,var(--mint))}
+.mrow.live .mcell.on{filter:brightness(1.18);box-shadow:0 0 8px color-mix(in srgb,var(--accent,var(--mint)) 80%,transparent)}

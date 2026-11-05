@@ -272,6 +272,9 @@ The bouncing balls (v0.20) are gone. Now a shape with 3–6 corners is a chord w
 - **⇪ CONVERT TO PATTERN** writes the selected shape (the whole chord progression, as arpeggio or chord) as real notes into a **new melody track** named after the open pattern, for example “Intro · SHAPE 1”. The track gets the sound of the shape. A pattern has 2 bars, so a 4-bar progression fills 2 patterns (missing patterns are added; the playlist is not changed). The new track is opened, and you can edit the notes in the piano roll.
 - Fixed while testing: on a fresh page load the sound settings of the shapes could be lost (the panel starts before the audio engine object exists). They are kept in a ref and given to the engine when it is made.
 
+## v0.22.1 — the piano roll shows the notes you play
+When you play with the computer keyboard, a MIDI keyboard, or click a note name, the **row of that note lights up** in the piano roll (labels glow, the row is tinted), in both EASY and ADVANCED mode. A chord lights several rows. A note outside the shown range lights the row with the same note name. Lights go out when you release the key.
+
 ## v0.22.0 — two sound engines: engine 2 now plays ALL live sound
 Engine 2 (AudioWorklet, see v0.21.3) now also plays the **tracks of the song, the keyboard and live MIDI**, not only SHAPE LAB. Slide notes (glide) work in it too. Switch: STATS → SOUND ENGINE → ENGINE 2 / OLD (used after a reload; the choice is remembered). Drums, the mixer and the master chain are the same for both engines.
 - **The export (WAV/MP3) still uses the original engine**, so an exported file sounds as before. (Engine 2 for the export needs the note list of the song to be given to the worklet before the offline render; planned.) Because of this, with ENGINE 2 on, the live sound and the export can differ slightly in colour.

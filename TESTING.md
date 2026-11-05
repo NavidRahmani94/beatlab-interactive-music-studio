@@ -199,6 +199,9 @@ Audit script (not shipped): every built-in sound rendered offline on 7 notes; be
 - Unit: 4 new tests in `shape.test.ts` (default sounds, volume limits, convert: 4 bars → 2 patterns with the right notes, chord mode, ranges). 341 tests in total.
 - Browser: `e2e-v211.cjs <url>` (15 checks): own sound and volume controls, a different default sound per shape, heard with the DRUMS tab open (not tied to the open track), −30 dB much quieter than 0 dB, another sound plays, silence after stop, CONVERT makes a track named “Intro · SHAPE 1” with notes and 2 patterns, the song plays with it, settings remembered after reload. `e2e-v210.cjs` still passes (30 checks); it found the lost-settings bug on a fresh load.
 
+## v0.22.1
+- `e2e-v221.cjs`: a key lights one row, two keys two rows, the lights go out after release, works in ADVANCED, a click on a note name lights it, no errors.
+
 ## v0.22.0
 - `e2e-v220.cjs`: with ENGINE 2 on the track voices are `WorkletSynth`, the demo song plays with sound, stop leaves silence, a held key sounds and is silent after release; the same with the engine OFF. Old suites (v14/v17/v19/v21.x) re-run: all pass (`e2e-full.cjs` is an old test with outdated expectations: tab names).
 

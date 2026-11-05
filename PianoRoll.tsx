@@ -18,6 +18,7 @@ type Props = {
   playingStep: number;      // -1 when this pattern is not being played right now
   accent: string;           // CSS colour of this track
   onPreview?: (midi: number, down: boolean) => void; // press / release a note name to hear it
+  liveNotes?: readonly number[];   // notes that are being played right now (computer keyboard, MIDI keyboard, a click on a note name): their rows light up
   cursor?: number;          // step-entry position (highlighted column), -1 = none
   octave?: number;          // EASY mode: shifts the shown octave by this many octaves
   slide?: boolean;          // show the SLIDE lane (not for arpeggio tracks, whose notes are chords)
@@ -33,12 +34,12 @@ type Drag =
 
 type CellInfo = { start: boolean; end: boolean; v: number; sl: boolean };
 type RowProps = {
-  midi: number; name: string; inKey: boolean; isRoot: boolean; advanced: boolean; cursor: number; sig: string; row: (CellInfo | undefined)[];
+  midi: number; name: string; inKey: boolean; isRoot: boolean; live: boolean; advanced: boolean; cursor: number; sig: string; row: (CellInfo | undefined)[];
   onPreview?: (midi: number, down: boolean) => void; onKey: (midi: number, step: number, detail: number) => void;
 };
 /** One row of the piano roll. It is redrawn only when its own cells change (it is compared by a short text signature of its cells), so a change redraws only the rows that changed. */
-const Row = memo(function Row({ midi, name, inKey, isRoot, advanced, cursor, row, onPreview, onKey }: RowProps) {
-  return <div className={'mrow' + (name.includes('#') ? ' black' : '') + (inKey ? ' inkey' : '') + (isRoot ? ' root' : '')}>
+const Row = memo(function Row({ midi, name, inKey, isRoot, live, advanced, cursor, row, onPreview, onKey }: RowProps) {
+  return <div className={'mrow' + (name.includes('#') ? ' black' : '') + (inKey ? ' inkey' : '') + (isRoot ? ' root' : '') + (live ? ' live' : '')}>
     <span className={'mlabel' + (onPreview ? ' key' : '')} role={onPreview ? 'button' : undefined} aria-label={onPreview ? `Hear ${name}` : undefined} title={onPreview ? `Click to hear ${name}` : undefined}
       onPointerDown={onPreview ? e => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); onPreview(midi, true); } : undefined}
       onPointerUp={onPreview ? () => onPreview(midi, false) : undefined} onPointerCancel={onPreview ? () => onPreview(midi, false) : undefined}>{name}</span>
@@ -49,13 +50,13 @@ const Row = memo(function Row({ midi, name, inKey, isRoot, advanced, cursor, row
         aria-label={`${name} step ${s + 1}`} aria-pressed={!!cell} onClick={e => onKey(midi, s, e.detail)} />;
     })}
   </div>;
-}, (a, b) => a.sig === b.sig && a.cursor === b.cursor && a.advanced === b.advanced && a.inKey === b.inKey && a.isRoot === b.isRoot && a.midi === b.midi && a.onPreview === b.onPreview && a.onKey === b.onKey);
+}, (a, b) => a.sig === b.sig && a.cursor === b.cursor && a.advanced === b.advanced && a.inKey === b.inKey && a.isRoot === b.isRoot && a.live === b.live && a.midi === b.midi && a.onPreview === b.onPreview && a.onKey === b.onKey);
 
 /**
  * Piano roll. CLICK an empty cell = new note (default length). DRAG sideways from an empty cell = a note of any length.
  * DRAG sideways from a cell of an existing note = stretch / shrink it. CLICK an existing note = remove it.
  */
-export default function PianoRoll({ octave = 0, slide = true, notes, onNotes, advanced, keyPc, scale, defaultLength, velocity, enabled, playingStep, accent, touchDraw, onPreview, cursor = -1 }: Props) {
+export default function PianoRoll({ octave = 0, slide = true, notes, onNotes, advanced, keyPc, scale, defaultLength, velocity, enabled, playingStep, accent, touchDraw, onPreview, liveNotes, cursor = -1 }: Props) {
   const rollRef = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);
   const laneDragging = useRef(false);
@@ -92,6 +93,16 @@ export default function PianoRoll({ octave = 0, slide = true, notes, onNotes, ad
   }, [notes]);
   const emptyRow = useMemo<(CellInfo | undefined)[]>(() => Array(STEPS).fill(undefined), []);
 
+  // the row that lights up for a played note: the same pitch; a note outside the shown range is folded to the row with the same note name (like recording does)
+  const liveRows = useMemo(() => {
+    const set = new Set<number>();
+    (liveNotes ?? []).forEach(m => {
+      if (rows.includes(m)) { set.add(m); return; }
+      const same = rows.filter(r => ((r - m) % 12 + 12) % 12 === 0);
+      if (same.length) set.add(same.reduce((a, b) => (Math.abs(b - m) < Math.abs(a - m) ? b : a)));
+    });
+    return set;
+  }, [liveNotes, rows]);
   const hidden = advanced ? 0 : notes.filter(n => !rows.includes(noteToMidi(n.pitch) ?? -1)).length;
 
   useEffect(() => {
@@ -198,7 +209,8 @@ export default function PianoRoll({ octave = 0, slide = true, notes, onNotes, ad
         <div className="mrow mhead"><span />{Array.from({ length: STEPS }, (_, i) => <span key={i} className={(i === 16 ? 'bar2' : '') + (i === cursor ? ' stepcur' : '')}>{i + 1}</span>)}</div>
         {rows.map(midi => {
           const d = rowData.get(midi);
-          return <Row key={midi} midi={midi} name={midiToNote(midi)} inKey={inScale(midi, keyPc, scale)} isRoot={((midi - keyPc) % 12 + 12) % 12 === 0} advanced={advanced} cursor={cursor}
+          const isLive = liveRows.has(midi);
+          return <Row key={midi} midi={midi} name={midiToNote(midi)} inKey={inScale(midi, keyPc, scale)} isRoot={((midi - keyPc) % 12 + 12) % 12 === 0} live={isLive} advanced={advanced} cursor={cursor}
             sig={d ? d.sig : ''} row={d ? d.row : emptyRow} onPreview={stablePreview} onKey={onKey} />;
         })}
         <div className="mrow vel-lane" title="Drag a bar up/down to set the velocity (loudness) of that note. The notes of a chord are side by side. Shift = the whole step."
