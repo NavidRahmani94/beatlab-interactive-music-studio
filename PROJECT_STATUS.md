@@ -76,7 +76,7 @@ Dynamic tracks: synth note track, rename / add / delete tracks, schema 5 with au
 - Looked at in a desktop screenshot only; the phone layout (<700 px) has its own smaller header rule and was not viewed on a real phone.
 
 ## v0.18.8 — Fun Sized heading font
-- The logo, the big intro title, every section header (PROJECT, MIXER ...), MASTER and the mixer group names use the **Fun Sized** font (`funsized.css`, embedded as base64 so it also works in the standalone file and offline). It only has capital letters and digits; any other symbol falls back to Space Grotesk. Small text keeps the readable fonts.
+- The logo, the big intro title, every section header (PROJECT, MIXER ...), MASTER and the mixer group names use the **Fun Sized** font (`FunSized.woff2`, loaded by `funsized.css`; since v0.22.2 it is a separate file so it is cached and does not block the CSS — a hand-made single-file build must inline it again). It only has capital letters and digits; any other symbol falls back to Space Grotesk. Small text keeps the readable fonts.
 - Licence: Fun Sized is CC BY-NC 4.0 (Xerographer Fonts / Max Infeld): **non-commercial use only and credit required**. The credit is in the footer and the licence text is `FunSized-LICENSE.txt`. Using BeatLab commercially would need a licence from the designer.
 
 ## v0.18.9 — Dat Box interface font (test)
@@ -184,3 +184,10 @@ Tracks, keyboard and SHAPE LAB use the AudioWorklet engine; the switch in STATS 
 Built after the crackle diagnosis and the user's OK. Live SHAPE LAB sounds only; song/export unchanged (so they cannot change). Not verified: listening by ear, real audio device. Known: sound is close but not identical to the old engine (loudness trims are measured; character may differ, e.g. FM index is static); chord-heavy setups should now be playable on slow computers. Next: tell us which sounds to tune; then decide whether the song tracks should use engine 2 too (needs offline rendering for the export) and DJ MODE.
 
 ## v0.21.2 — crackle investigation: it is CPU load (not mixer, not clipping). AUDIO BUFFER switch, shorter shape tails, hanging first key fixed.
+
+## v0.22.2 — faster first load
+- three.js (SHAPE LAB 3D) is downloaded only when SHAPE LAB is opened; the MP3 encoder (lamejs) only when an MP3 is exported (`import()` in `ShapeLab.tsx` and `exporter.ts`; `encodeAudio` is now async).
+- The Fun Sized font is a separate `FunSized.woff2` instead of base64 inside `funsized.css`.
+- Canvas loops (Visualizer, Synth Lab scope, Timeline playhead) no longer read layout / computed style every frame (`canvasWatch.ts`: ResizeObserver + theme MutationObserver).
+- Result: main JS 1368 → 710 kB (gzip 393 → 211 kB), CSS gzip 89 → 10 kB. Checked: 348 unit tests, build, headless Chromium (play, open SHAPE LAB, MP3 export of one pattern, theme switch, no console errors). Not checked: real phone, Firefox/Safari.
+- Note: the build now has more than one JS file plus a font file. A hand-made single-file / file:// build must inline those too.

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { DIV, Layer, MAX_LAYERS, MAX_PROG, MAX_SIDES, MAX_VOL_DB, MIN_SIDES, MIN_VOL_DB, Mode, PATTERN_KINDS, PROG_PRESETS, Progression, ROMAN, Rate, SIDES_NAME, chordName, chordNotes, clampSides, clampVolDb, defaultLayer, makePattern, noteLabel, noteSeconds, pcName, shapeToPatterns, tickEvents } from './shapeMusic';
 import { MELODY_INSTRUMENTS, instrumentGroups } from './instruments';
 import type { MelodyNote } from './melody';
-import { ShapeScene } from './shapeScene';
+import type { ShapeScene } from './shapeScene';   // type only: three.js is loaded on demand when the lab is opened (keeps it out of the first download)
 
 type Props = {
   rows: number[];                                   // scaleRows(): the notes of the key and scale, with the octave on top
@@ -117,8 +117,11 @@ export default function ShapeLab({ rows, bpm, keyPc, pulseKey, lite, patternName
   useEffect(() => {
     if (!on) return;
     const cv = canvas.current, box = wrap.current; if (!cv || !box) return;
+    let cancelled = false; let cleanup: (() => void) | null = null;
+    import('./shapeScene').then(({ ShapeScene: Scene }) => {
+    if (cancelled) return;
     let sc: ShapeScene;
-    try { sc = new ShapeScene(cv); } catch { setError('This browser cannot draw 3D (WebGL is off). SHAPE LAB needs WebGL.'); setOn(false); return; }
+    try { sc = new Scene(cv); } catch { setError('This browser cannot draw 3D (WebGL is off). SHAPE LAB needs WebGL.'); setOn(false); return; }
     setError(''); scene.current = sc;
     const resize = () => sc.resize(box.clientWidth, box.clientHeight);
     resize(); const ro = new ResizeObserver(resize); ro.observe(box);
@@ -149,11 +152,13 @@ export default function ShapeLab({ rows, bpm, keyPc, pulseKey, lite, patternName
     };
     raf = requestAnimationFrame(frame);
     (window as unknown as { __BEATLAB_SHAPELAB__?: unknown }).__BEATLAB_SHAPELAB__ = { scene: sc, get log() { return log.current; }, get shown() { return shown.current; } };   // getters: the arrays are replaced sometimes
-    return () => {
+    cleanup = () => {
       cancelAnimationFrame(raf); ro.disconnect(); io.disconnect();
       cv.removeEventListener('pointerdown', down); cv.removeEventListener('pointermove', move); cv.removeEventListener('pointerup', up);
       sc.dispose(); scene.current = null; delete (window as unknown as { __BEATLAB_SHAPELAB__?: unknown }).__BEATLAB_SHAPELAB__;
     };
+    }).catch(() => { if (!cancelled) { setError('Could not load the 3D engine. Check the connection and try again.'); setOn(false); } });
+    return () => { cancelled = true; cleanup?.(); };
   }, [on]);
 
   const cur = layers[Math.min(sel, layers.length - 1)];

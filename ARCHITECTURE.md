@@ -96,7 +96,7 @@ Removed `maxPolyphony` caps from `makeVoice` (Tone drops new notes over the cap,
 - Looked at in a desktop screenshot only; the phone layout (<700 px) has its own smaller header rule and was not viewed on a real phone.
 
 ## v0.18.8 — Fun Sized heading font
-- The logo, the big intro title, every section header (PROJECT, MIXER ...), MASTER and the mixer group names use the **Fun Sized** font (`funsized.css`, embedded as base64 so it also works in the standalone file and offline). It only has capital letters and digits; any other symbol falls back to Space Grotesk. Small text keeps the readable fonts.
+- The logo, the big intro title, every section header (PROJECT, MIXER ...), MASTER and the mixer group names use the **Fun Sized** font (`FunSized.woff2`, loaded by `funsized.css`; since v0.22.2 it is a separate file so it is cached and does not block the CSS — a hand-made single-file build must inline it again). It only has capital letters and digits; any other symbol falls back to Space Grotesk. Small text keeps the readable fonts.
 - Licence: Fun Sized is CC BY-NC 4.0 (Xerographer Fonts / Max Infeld): **non-commercial use only and credit required**. The credit is in the footer and the licence text is `FunSized-LICENSE.txt`. Using BeatLab commercially would need a licence from the designer.
 
 ## v0.18.9 — Dat Box interface font (test)

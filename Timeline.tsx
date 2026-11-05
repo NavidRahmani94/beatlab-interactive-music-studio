@@ -28,8 +28,8 @@ export default function Timeline({ mode, playlist, sections, current, bpm, playi
   const timeRef = useRef<HTMLSpanElement>(null);
   const [width, setWidth] = useState(900);
   const dragging = useRef(false);
-  const live = useRef({ total, bpm, playing, startStep, getPlayhead });
-  live.current = { total, bpm, playing, startStep, getPlayhead };
+  const live = useRef({ total, bpm, playing, startStep, getPlayhead, width });
+  live.current = { total, bpm, playing, startStep, getPlayhead, width };   // width comes from the ResizeObserver below, so the playhead loop never reads layout
 
   useEffect(() => {
     const el = trackRef.current; if (!el) return;
@@ -50,7 +50,7 @@ export default function Timeline({ mode, playlist, sections, current, bpm, playi
       if (L.playing) { const h = L.getPlayhead(); if (h) pos = positionSteps(h.songStep, performance.now() - h.at, L.bpm); }
       pos = Math.max(0, Math.min(L.total, pos));
       // transform (not left) so the browser does not lay the page out again for every frame
-      if (headRef.current) headRef.current.style.transform = `translateX(${(pos / L.total) * (trackRef.current?.clientWidth ?? 0)}px)`;
+      if (headRef.current) headRef.current.style.transform = `translateX(${(pos / L.total) * L.width}px)`;
       const text = formatTime(stepsToSeconds(pos, L.bpm), 1);
       if (timeRef.current && text !== lastText) { timeRef.current.textContent = text; lastText = text; }
     };

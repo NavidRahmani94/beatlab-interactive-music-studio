@@ -4,7 +4,6 @@ import { Rig } from './rig';
 import { frameAt, usedBars } from './song';
 import { BeatLabProject } from './project';
 import { encodeWav } from './wav';
-import { encodeMp3 } from './mp3';
 import { STEPS } from './pattern';
 import { MasterSettings, REVERB_SIZES } from './mixer';
 
@@ -24,14 +23,17 @@ export const isExportFormat = (v: unknown): v is ExportFormat => typeof v === 's
 export type ExportResult = { blob: Blob; seconds: number; loops: number; bars: number; format: ExportFormat; ext: string; detail: string };
 export type ExportOptions = { mode: 'song' | 'pattern'; pattern: number; format?: ExportFormat };
 
-/** Turns rendered audio into the bytes of the chosen file format. */
-export function encodeAudio(channels: Float32Array[], sampleRate: number, format: ExportFormat): Blob {
+/** Turns rendered audio into the bytes of the chosen file format. The MP3 encoder (lamejs) is loaded only when an MP3 is made. */
+export async function encodeAudio(channels: Float32Array[], sampleRate: number, format: ExportFormat): Promise<Blob> {
   const f = EXPORT_FORMATS[format];
   switch (format) {
     case 'wav16': return new Blob([encodeWav(channels, sampleRate, 16)], { type: f.mime });
     case 'wav24': return new Blob([encodeWav(channels, sampleRate, 24)], { type: f.mime });
-    case 'mp3_192': return new Blob([encodeMp3(channels, sampleRate, 192)], { type: f.mime });
-    case 'mp3_320': return new Blob([encodeMp3(channels, sampleRate, 320)], { type: f.mime });
+    case 'mp3_192':
+    case 'mp3_320': {
+      const { encodeMp3 } = await import('./mp3');
+      return new Blob([encodeMp3(channels, sampleRate, format === 'mp3_192' ? 192 : 320)], { type: f.mime });
+    }
   }
 }
 
@@ -85,6 +87,6 @@ export async function renderProjectToWav(project: BeatLabProject, loops: number,
   const audio = buffer.get();
   if (!audio) throw new Error('The browser did not return rendered audio.');
   const format = options.format ?? 'wav16';
-  const blob = encodeAudio([audio.getChannelData(0), audio.getChannelData(1)], audio.sampleRate, format);
+  const blob = await encodeAudio([audio.getChannelData(0), audio.getChannelData(1)], audio.sampleRate, format);
   return { blob, seconds, loops, bars, format, ext: EXPORT_FORMATS[format].ext, detail: EXPORT_FORMATS[format].detail };
 }

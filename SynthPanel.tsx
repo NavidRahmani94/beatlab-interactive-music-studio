@@ -6,6 +6,7 @@ import {
 } from './synth';
 import { ReactNode } from 'react';
 import { MAX_TRACKS, TrackDef } from './tracks';
+import { watchCanvas } from './canvasWatch';
 
 type Props = {
   synths: SynthSlot[];
@@ -93,17 +94,17 @@ function Scope({ getWaveform }: { getWaveform: () => Float32Array | null }) {
     const ctx = canvas?.getContext('2d');
     if (!canvas || !ctx) return;
     let raf = 0;
+    const watch = watchCanvas(canvas, ['--viz-a', '--viz-grid']);
     const draw = () => {
       const dpr = window.devicePixelRatio || 1;
-      const w = canvas.clientWidth, h = canvas.clientHeight;
+      const w = watch.w, h = watch.h;
       if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) { canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr); }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);
-      const style = getComputedStyle(canvas);
-      ctx.strokeStyle = style.getPropertyValue('--viz-grid').trim() || '#444';
+      ctx.strokeStyle = watch.color('--viz-grid', '#444');
       ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
       const wave = getWaveform();
-      ctx.strokeStyle = style.getPropertyValue('--viz-a').trim() || '#d9ff71';
+      ctx.strokeStyle = watch.color('--viz-a', '#d9ff71');
       ctx.lineWidth = 2;
       ctx.beginPath();
       if (wave && wave.length) wave.forEach((v, i) => { const px = (i / (wave.length - 1)) * w, py = h / 2 - Math.max(-1, Math.min(1, v * 1.6)) * (h / 2 - 3); if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); });
@@ -112,7 +113,7 @@ function Scope({ getWaveform }: { getWaveform: () => Float32Array | null }) {
       raf = requestAnimationFrame(draw);
     };
     raf = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(raf);
+    return () => { cancelAnimationFrame(raf); watch.stop(); };
   }, [getWaveform]);
   return <canvas ref={ref} className="viz-canvas scope" aria-label="Oscilloscope" />;
 }
