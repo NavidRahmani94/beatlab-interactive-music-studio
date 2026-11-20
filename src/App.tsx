@@ -114,12 +114,14 @@ export default function App() {
   const engine = useRef<BeatLabEngine | null>(null);
   const frameRef = useRef<{ frame: Frame; at: number } | null>(null);   // the last step that the player reported (used when recording from a keyboard)
   const shapeVoicesRef = useRef<{ instrument: string; volumeDb: number }[]>([]);
+  const shapeClockRef = useRef<((tick: number, time: number) => void) | null>(null);
   const latest = useRef({ bpm, playing, song: { patterns, playlist, mode, current: cur } });
   latest.current = { bpm, playing, song: { patterns, playlist, mode, current: cur } };
 
   useEffect(() => {
     const instance = new BeatLabEngine(latest.current.song, f => { frameRef.current = { frame: f, at: performance.now() }; setFrame(f); });
     engine.current = instance;
+    instance.setShapeClock((tick, time) => shapeClockRef.current?.(tick, time));
     instance.setShapeVoices(shapeVoicesRef.current);   // a child's effect (SHAPE LAB) runs before this one, so its sounds were kept in a ref
     return () => { instance.dispose(); engine.current = null; };
   }, []);
@@ -423,10 +425,12 @@ export default function App() {
   const airNotes = useMemo(() => { const r = scaleRows(keyPc, scale); const low = r.slice(0, -1); return [...low, ...low.map(m => m + 12), r[r.length - 1] + 12]; }, [keyPc, scale]);
   const scaleRowsNow = useMemo(() => scaleRows(keyPc, scale), [keyPc, scale]);
   // SHAPE LAB: every shape has its own sound (inside the audio engine), so it does not depend on the open track or tab.
-  const onShapeNote = useCallback((layer: number, midi: number, vel: number, seconds: number) => {
+  const onShapeNote = useCallback((layer: number, midi: number, vel: number, seconds: number, time?: number) => {
     const eng = engine.current; if (!eng) return;
+    if (time !== undefined) { eng.shapeShot(layer, midiToNote(midi), seconds, vel, time); return; }   // exact audio time of a song step
     void eng.prepare().then(() => eng.shapeShot(layer, midiToNote(midi), seconds, vel));
   }, []);
+  const onShapeClock = useCallback((fn: ((tick: number, time: number) => void) | null) => { shapeClockRef.current = fn; }, []);
   const onShapeVoices = useCallback((voices: { instrument: string; volumeDb: number }[]) => { shapeVoicesRef.current = voices; engine.current?.setShapeVoices(voices); }, []);
   // "CONVERT TO PATTERN": the notes of one shape become a new melody track, named after the open pattern. The notes start in the open pattern; a longer progression continues in the next patterns (new ones are added when needed).
   const onShapeConvert = (lists: MelodyNote[][], instrument: string, label: string): string => {
@@ -602,7 +606,7 @@ export default function App() {
   const bars = mode === 'song' ? playlist.length : 1;
 
   return <main className="shell" style={{ ['--bar-s' as string]: `${(STEPS * 15) / bpm}s` }}>
-    <header><div><div className="eyebrow">INTERACTIVE MUSIC STUDIO</div><h1><span>BEAT</span>LAB<span className="dot">.</span></h1></div><div className="head-right"><button className={'theme-btn' + (lite ? ' on' : '')} aria-pressed={lite} aria-label="Lite mode" title="Lite mode: stops the decorative animation and draws the visualiser less often. Helps slow computers and phones." onClick={() => { setLite(l => { saveLite(!l); return !l; }); }}>{lite ? '🍃 LITE ON' : '🍃 LITE'}</button><button className={'theme-btn insp-toggle' + (inspect ? ' on' : '')} aria-pressed={inspect} aria-label="Inspect mode" title="Inspect: click any part of the page to see which file and line of code it comes from, what it runs and how it connects" onClick={() => setInspect(i => !i)}>🔍 INSPECT</button><button className={'theme-btn' + (sysOpen ? ' on' : '')} aria-pressed={sysOpen} aria-label="System monitor" title="Show CPU / audio load and memory use" onClick={() => setSysOpen(o => !o)}>📊 STATS</button><button className="theme-btn" aria-label="Colour theme" title="Switch between automatic, dark and light" onClick={() => setTheme(nextTheme(theme))}>{THEME_LABEL[theme]}</button><div className="phase">PHASE 01–10 <span>• V0.24.0 TEST BUILD</span></div></div></header>
+    <header><div><div className="eyebrow">INTERACTIVE MUSIC STUDIO</div><h1><span>BEAT</span>LAB<span className="dot">.</span></h1></div><div className="head-right"><button className={'theme-btn' + (lite ? ' on' : '')} aria-pressed={lite} aria-label="Lite mode" title="Lite mode: stops the decorative animation and draws the visualiser less often. Helps slow computers and phones." onClick={() => { setLite(l => { saveLite(!l); return !l; }); }}>{lite ? '🍃 LITE ON' : '🍃 LITE'}</button><button className={'theme-btn insp-toggle' + (inspect ? ' on' : '')} aria-pressed={inspect} aria-label="Inspect mode" title="Inspect: click any part of the page to see which file and line of code it comes from, what it runs and how it connects" onClick={() => setInspect(i => !i)}>🔍 INSPECT</button><button className={'theme-btn' + (sysOpen ? ' on' : '')} aria-pressed={sysOpen} aria-label="System monitor" title="Show CPU / audio load and memory use" onClick={() => setSysOpen(o => !o)}>📊 STATS</button><button className="theme-btn" aria-label="Colour theme" title="Switch between automatic, dark and light" onClick={() => setTheme(nextTheme(theme))}>{THEME_LABEL[theme]}</button><div className="phase">PHASE 01–10 <span>• V0.24.1 TEST BUILD</span></div></div></header>
     {inspect && <Suspense fallback={null}><Inspector onClose={() => setInspect(false)} /></Suspense>}
     <SystemMonitor open={sysOpen} onClose={() => setSysOpen(false)} playing={playing} getHealth={getHealth} />
     <section className="intro hero"><div className="hero-text"><div className="eyebrow">YOUR FIRST SONG</div><h2>Make some noise.</h2><p>Ambient. Drums. Melody. Arpeggio. Mix. Master. Arrange. Export WAV / MP3.</p></div><HeroArt playing={playing} bpm={bpm} lite={lite} /></section>
@@ -625,7 +629,7 @@ export default function App() {
     <Visualizer lite={lite} getHealth={getHealth} playing={playing} getSpectrum={getSpectrum} getWaveform={getWaveform} step={playFrame?.step ?? -1} bar={playFrame?.bar ?? 0} bars={bars} />
 
     <HandPanel onAction={onHand} airNotes={airNotes} />
-    <ShapeLab rows={scaleRowsNow} bpm={bpm} keyPc={keyPc} lite={lite} patternName={pattern.name} onNote={onShapeNote} onVoices={onShapeVoices} onConvert={onShapeConvert} playing={playing} songStep={playFrame?.songStep ?? -1}
+    <ShapeLab rows={scaleRowsNow} bpm={bpm} keyPc={keyPc} lite={lite} patternName={pattern.name} onNote={onShapeNote} onClock={onShapeClock} onVoices={onShapeVoices} onConvert={onShapeConvert} playing={playing} songStep={playFrame?.songStep ?? -1}
       pulseKey={playFrame && playFrame.pattern !== null && patterns[playFrame.pattern]?.drums.kick?.[playFrame.step] ? `${playFrame.bar}:${playFrame.step}` : ''} />
     <MidiPanel supported={midiSupported()} connected={midi.connected} devices={midi.devices} deviceId={midi.deviceId} message={midi.message} rec={rec} playing={playing} target={midiTarget}
       exportUnit={mode === 'pattern' ? pattern.name : 'song'} onConnect={connectMidi} onDevice={id => { conn.current?.select(id); setMidi(s => ({ ...s, deviceId: id })); }}

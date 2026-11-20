@@ -205,3 +205,9 @@ Built after the crackle diagnosis and the user's OK. Live SHAPE LAB sounds only;
 - Made at build time: `vite-plugins/inspect.mjs` (a Babel plugin that writes `data-src="file:line"` and `data-on="onClick={…}"` onto every page element, and a virtual module with the map of the source files). The panel is `src/inspect/Inspector.tsx`, loaded only when switched on (about 28 kB, 7.5 kB zipped). The first download grows by about 37 kB (6.5 kB zipped) for the file and line marks.
 - Tests: `src/inspect/inspect.test.ts` (8 unit tests: marks, source map) and `tools/e2e-v240.cjs` (panel, click blocked, slider not moved, file jump, hover box, Escape).
 - Limits: "what it runs" shows the handler as written in the code, not a live call trace. Elements made by libraries without a mark (for example the 3D canvas content) show the nearest marked parent.
+
+## v0.24.1 — SHAPE LAB plays in time with the track
+- Bug: the shapes started and ran a little behind the track. Their notes went through the screen (frame → React state → effect → note) and were started "now + a few ms", while the track is placed on the audio clock itself.
+- Fix: the audio engine now gives every song step to SHAPE LAB together with its exact audio time (`setShapeClock` in `src/audio/engine.ts`); the shapes place their notes on that time (`shapeShot(..., time)` in `src/audio/rig.ts`). So the first shape note starts with the first step of the track and they never drift. The 3D flash and the bar highlight still follow the screen frames.
+- When the song is stopped, the shapes keep their own beat as before (free clock); the free clock stays silent while the song's clock drives the shapes.
+- Test: `tools/e2e-v241.cjs <url>` (shape notes sit exactly on step times, first note together with the first step, free clock after stop).

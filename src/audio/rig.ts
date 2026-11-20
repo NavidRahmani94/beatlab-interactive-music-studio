@@ -663,9 +663,9 @@ export class Rig {
     });
   }
   /** A note of fixed length on the sound of one shape. */
-  shapeShot(i: number, note: string, seconds: number, velocity: number): void {
+  shapeShot(i: number, note: string, seconds: number, velocity: number, time?: number): void {
     const s = this.shapeVoices.get(i); if (!s) return;
-    this.safe(() => s.voice.synth.triggerAttackRelease?.(this.pitchOf(note, s.voice.shift), seconds, this.liveTime(), Math.max(0.05, velocity)));
+    this.safe(() => s.voice.synth.triggerAttackRelease?.(this.pitchOf(note, s.voice.shift), seconds, time ?? this.liveTime(), Math.max(0.05, velocity)));
   }
   /** A note with a fixed length: start and end are planned together, so it can never hang (used by SHAPE LAB). */
   liveShot(id: string, note: string, seconds: number, velocity: number): void {

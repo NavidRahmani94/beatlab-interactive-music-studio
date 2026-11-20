@@ -15,7 +15,8 @@ type Props = {
   patternName: string;                              // the pattern that is open now (the new track is named after it)
   playing: boolean;                                 // the song is playing: the shapes follow its beat
   songStep: number;                                 // 16th-note counter of the song (-1 when stopped)
-  onNote: (layer: number, midi: number, velocity: number, seconds: number) => void;   // plays on the own sound of that shape
+  onNote: (layer: number, midi: number, velocity: number, seconds: number, time?: number) => void;   // plays on the own sound of that shape
+  onClock: (fn: ((tick: number, time: number) => void) | null) => void;            // the audio engine calls this on every song step with the exact audio time
   onVoices: (voices: { instrument: string; volumeDb: number }[]) => void;           // tells the audio engine the sound of every shape
   onConvert: (notesPerPattern: MelodyNote[][], instrument: string, label: string) => string;   // writes a new melody track, returns a message
 };
@@ -36,7 +37,7 @@ function load(): Saved {
 const RATES: Rate[] = ['1/16', '1/8', '1/4'];
 const MODES: { id: Mode; label: string }[] = [{ id: 'arp', label: 'ARP' }, { id: 'chord', label: 'CHORD' }, { id: 'off', label: 'OFF' }];
 
-export default function ShapeLab({ rows, bpm, keyPc, pulseKey, lite, patternName, playing, songStep, onNote, onVoices, onConvert }: Props) {
+export default function ShapeLab({ rows, bpm, keyPc, pulseKey, lite, patternName, playing, songStep, onNote, onClock, onVoices, onConvert }: Props) {
   const init = useRef(load()).current;
   const [on, setOn] = useState(false);
   const [layers, setLayers] = useState<Layer[]>(init.layers);
@@ -72,29 +73,39 @@ export default function ShapeLab({ rows, bpm, keyPc, pulseKey, lite, patternName
   if (shown.current.length !== layers.length) shown.current = idle;
 
   /** One tick of the 16th-note clock: every shape may play. */
-  const tick = (t: number) => {
+  const tick = (t: number, what: 'both' | 'audio' | 'visual' = 'both', time?: number) => {
     const c = live.current;
     c.layers.forEach((l, li) => {
       const ev = tickEvents(l, c.prog, t, c.rows); if (!ev) return;
-      shown.current[li] = { chord: ev.chord, name: ev.name, roman: ROMAN[ev.degree % 7] };
-      scene.current?.flash(li, ev.vertices);
-      if (ev.play.length) {
+      if (what !== 'visual' && ev.play.length) {
         const accent = t % 16 === 0 ? 0.15 : 0;
-        ev.play.forEach(m => c.onNote(li, m, Math.min(1, (l.mode === 'chord' ? 0.55 : 0.7) + accent), noteSeconds(c.bpm, l.rate, l.mode)));
-        setLastNotes(ev.play.map(noteLabel).join(' '));
+        ev.play.forEach(m => c.onNote(li, m, Math.min(1, (l.mode === 'chord' ? 0.55 : 0.7) + accent), noteSeconds(c.bpm, l.rate, l.mode), time));
         log.current.push({ t, at: performance.now(), layer: li, play: ev.play, name: ev.name }); if (log.current.length > 400) log.current.shift();
       }
+      if (what === 'audio') return;
+      shown.current[li] = { chord: ev.chord, name: ev.name, roman: ROMAN[ev.degree % 7] };
+      scene.current?.flash(li, ev.vertices);
+      if (ev.play.length) setLastNotes(ev.play.map(noteLabel).join(' '));
       if (li === c.sel) { setBar(ev.bar % c.prog.length); setSlotNow((t / DIV[l.rate]) % l.pattern.length); }
     });
   };
+
+  // the sound follows the song on the audio clock itself: every song step is given to the shapes with its exact audio time,
+  // so they start and stay together with the tracks (the picture follows a moment later, from the screen frames)
+  const engineAt = useRef(0);
+  useEffect(() => {
+    onClock((t, time) => { if (!live.current.running) return; engineAt.current = performance.now(); tick(t, 'audio', time); });
+    return () => onClock(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onClock]);
 
   // synced clock: follow the song's beat
   const lastSync = useRef(-1);
   useEffect(() => {
     if (!running || !playing || songStep < 0) { lastSync.current = -1; return; }
     const last = lastSync.current;
-    if (last < 0 || songStep < last || songStep - last > 8) tick(songStep);
-    else for (let t = last + 1; t <= songStep; t++) tick(t);
+    if (last < 0 || songStep < last || songStep - last > 8) tick(songStep, 'visual');
+    else for (let t = last + 1; t <= songStep; t++) tick(t, 'visual');
     lastSync.current = songStep;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [songStep, running, playing]);
@@ -105,7 +116,7 @@ export default function ShapeLab({ rows, bpm, keyPc, pulseKey, lite, patternName
     let t = 0; let next = performance.now() + 60;
     const id = window.setInterval(() => {
       const now = performance.now(); const ms = 60000 / live.current.bpm / 4;
-      let guard = 0; while (now >= next && guard++ < 4) { tick(t++); next += ms; }
+      let guard = 0; while (now >= next && guard++ < 4) { if (performance.now() - engineAt.current > 300) tick(t, 'both'); t++; next += ms; }
       if (guard >= 4) next = now + ms;
     }, 10);
     return () => window.clearInterval(id);

@@ -99,7 +99,10 @@ export class BeatLabEngine {
   /** SHAPE LAB: the sound of each shape (stored, so it is also used when the audio engine starts later). */
   private shapeCfg: { instrument: string; volumeDb: number }[] = [];
   setShapeVoices(cfgs: { instrument: string; volumeDb: number }[]): void { this.shapeCfg = cfgs; this.rig?.setShapeVoices(cfgs); }
-  shapeShot(i: number, note: string, seconds: number, velocity: number): void { this.rig?.shapeShot(i, note, seconds, velocity); }
+  shapeShot(i: number, note: string, seconds: number, velocity: number, time?: number): void { this.rig?.shapeShot(i, note, seconds, velocity, time); }
+  /** SHAPE LAB: called on every song step with the exact audio time of that step, so the shapes play sample-aligned with the tracks. */
+  private shapeClock: ((tick: number, time: number) => void) | null = null;
+  setShapeClock(fn: ((tick: number, time: number) => void) | null): void { this.shapeClock = fn; }
   liveDrum(inst: Instrument, velocity: number): void { this.rig?.liveDrum(inst, velocity); }
   async start(bpm: number): Promise<void> {
     if (this.active) return;
@@ -123,6 +126,7 @@ export class BeatLabEngine {
       const frame = frameAt(tick, playlist, mode, current);
       const pattern = frame.pattern === null ? null : patterns[frame.pattern] ?? null;
       this.rig?.triggerStep(frame.step, time, pattern, tick, 60 / transport.bpm.value / 4);
+      try { this.shapeClock?.(tick, time); } catch { /* the shapes must never stop the song */ }
       Tone.getDraw().schedule(() => { if (this.active) this.frameCallback(frame); }, time);
     }, '16n', 0);
     this.active = true;
