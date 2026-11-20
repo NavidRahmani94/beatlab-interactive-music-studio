@@ -1,4 +1,4 @@
-# BeatLab — Interactive Music Studio (v0.6, test build)
+# BeatLab — Interactive Music Studio
 
 A browser music studio with four tracks – **Ambient, Drums, Melody, Arpeggio** – a 7-channel mixer feeding one mastering chain, notes you can stretch to any length, a pattern **playlist** for songs longer than one bar, a live **visualiser**, Save/Open and real WAV export.
 React + TypeScript + Vite + Tone.js. No backend.
