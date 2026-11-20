@@ -3,7 +3,28 @@
 A browser music studio with four tracks – **Ambient, Drums, Melody, Arpeggio** – a 7-channel mixer feeding one mastering chain, notes you can stretch to any length, a pattern **playlist** for songs longer than one bar, a live **visualiser**, Save/Open and real WAV export.
 React + TypeScript + Vite + Tone.js. No backend.
 
-> New to the code? Read **CODE_GUIDE.md** (simple English: what each file does and how the parts fit together).
+> New to the code? Read **docs/CODE_GUIDE.md** (simple English: what each file does and how the parts fit together).
+
+
+## Where to change what
+
+All code lives in `src/`. Each folder has one job, and each test sits next to the file it tests (`chords.ts` and `chords.test.ts`).
+
+| I want to change… | Go to | Main files |
+|---|---|---|
+| How an instrument sounds, the sound engines, effects, mixer | `src/audio/` | `rig.ts`, `patchSynth.ts`, `voiceWorklet.js`, `synth.ts`, `fx.ts`, `mixer.ts`, `instruments.ts` |
+| Chords, melodies, arpeggiator, drum patterns, groove, scales | `src/music/` | `chords.ts`, `melody.ts`, `arp.ts`, `pattern.ts`, `groove.ts`, `tuning.ts` |
+| The project itself: tracks, song, timeline, undo, autosave, MIDI files | `src/project/` | `project.ts`, `song.ts`, `tracks.ts`, `timeline.ts`, `history.ts`, `midiFile.ts` |
+| Keyboard, MIDI keyboard and hand-tracking input | `src/input/` | `keyboardPiano.ts`, `midiInput.ts`, `midiLive.ts`, `handTracker.ts` |
+| Saving a song as WAV, MP3 or MIDI | `src/export/` | `exporter.ts`, `wav.ts`, `mp3.ts` |
+| The Shape Lab (shapes that make music) | `src/shape/` | `ShapeLab.tsx`, `shapeScene.ts`, `shapeMusic.ts` |
+| Screens and panels: piano roll, mixer, drums, timeline, theme | `src/ui/` | `PianoRoll.tsx`, `MixerPanel.tsx`, `DrumPanel.tsx`, `Timeline.tsx`, `theme.ts` |
+| Colours, fonts, page style | `src/styles/` | `main.css`, `funsized.css` |
+| The main page that connects everything | `src/` | `App.tsx`, `main.tsx` |
+| Benchmarks and browser test scripts | `tools/` | `e2e-*.cjs`, `bench*.cjs` |
+| Documentation | `docs/` | `CODE_GUIDE.md`, `ARCHITECTURE.md`, `TESTING.md` |
+
+Older notes in `docs/` mention files by name only. Look the name up in the table above to find its folder.
 
 ## Start
 ```bash
@@ -38,7 +59,7 @@ Needs Node.js 20.19+ (or 22.12+) and a modern desktop browser. **All files are i
 `App.tsx` UI state · `pattern.ts` drum logic · `melody.ts` note logic (scales, moods, auto-melody, velocity, resize) · `arp.ts` arpeggiator · `song.ts` patterns + playlist · `mixer.ts` mixer/master model ·
 `instruments.ts` instrument/kit/track catalogue · `rig.ts` the audio graph (shared by live playback and export) · `engine.ts` live Transport ·
 `exporter.ts` + `wav.ts` offline render + WAV encoder · `project.ts` project model + strict validation · UI: `DrumPanel.tsx`, `TrackPanel.tsx`, `PianoRoll.tsx`, `PlaylistPanel.tsx`, `Visualizer.tsx`, `MixerPanel.tsx`, `ProjectBar.tsx`.
-More: `ARCHITECTURE.md`, `TESTING.md`, `DEMO_SCRIPT.md`, `BeatLab_Project_Master_Plan.md`.
+More: `docs/ARCHITECTURE.md`, `docs/TESTING.md`, `docs/DEMO_SCRIPT.md`, `docs/BeatLab_Project_Master_Plan.md`.
 
 ## Verified (automatically)
 - 122 unit tests pass; `npm run build` succeeds.
@@ -47,7 +68,7 @@ More: `ARCHITECTURE.md`, `TESTING.md`, `DEMO_SCRIPT.md`, `BeatLab_Project_Master
 - Instrument levels measured and matched (8-step note at velocity 1, RMS between about −25 and −32 dBFS; Pluck is short so reads lower).
 
 ## Not verified / known limits
-- **Nobody has listened to it yet.** Taste (how good the sounds and presets are) needs your ears: run the manual checklist in `TESTING.md`.
+- **Nobody has listened to it yet.** Taste (how good the sounds and presets are) needs your ears: run the manual checklist in `docs/TESTING.md`.
 - Only Chromium was tested (not Firefox/Safari). The phone layout (≤700 px wide) was checked in Chromium phone emulation at 390 and 360 px (no sideways scrolling, taps work) but not on a real phone. On iPhones the silent switch can mute web audio.
 - A pattern is one bar (32 steps); longer songs use the playlist. Ambient notes that continue over several bars are re-triggered at each bar (a soft swell every bar).
 - Fonts load from Google Fonts (system fonts are used offline). Instruments are synthesised (no sample files).
@@ -254,7 +275,7 @@ All 81 built-in sounds were rendered one by one and measured (peak, DC offset, l
 
 ## v0.19.4 — code explained in simple English (no behaviour change)
 - For the international team: every source file now starts with a `// FILE:` line that says in simple English what the file is for. Long or difficult comments (mainly in `rig.ts`, `App.tsx`, `PianoRoll.tsx`, `project.ts`, `patchSynth.ts`, `SystemMonitor.tsx`) were rewritten with short sentences and common words, and one outdated comment in `song.ts` was corrected.
-- New **CODE_GUIDE.md**: what BeatLab is, how to run and test it, how the parts work together, the rules for the code, one line per file, and the words used in the code (step, pattern, track, strip, rig, patch, slide note).
+- New **docs/CODE_GUIDE.md**: what BeatLab is, how to run and test it, how the parts work together, the rules for the code, one line per file, and the words used in the code (step, pattern, track, strip, rig, patch, slide note).
 - Only comments and documents were changed. Checked by compiling every file with all comments removed and comparing with the previous version: 76 files, 0 code differences. Unit tests and browser tests were run again.
 
 ## v0.20.0 — SHAPE LAB (beta, first toy)
