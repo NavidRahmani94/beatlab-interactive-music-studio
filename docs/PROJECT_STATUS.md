@@ -211,3 +211,6 @@ Built after the crackle diagnosis and the user's OK. Live SHAPE LAB sounds only;
 - Fix: the audio engine now gives every song step to SHAPE LAB together with its exact audio time (`setShapeClock` in `src/audio/engine.ts`); the shapes place their notes on that time (`shapeShot(..., time)` in `src/audio/rig.ts`). So the first shape note starts with the first step of the track and they never drift. The 3D flash and the bar highlight still follow the screen frames.
 - When the song is stopped, the shapes keep their own beat as before (free clock); the free clock stays silent while the song's clock drives the shapes.
 - Test: `tools/e2e-v241.cjs <url>` (shape notes sit exactly on step times, first note together with the first step, free clock after stop).
+
+## v0.24.2 — colourful title
+- The big "Make some noise." title is lime with a pink and a blue shadow (one rule at the end of the title block in `src/styles/main.css`).

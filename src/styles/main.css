@@ -357,6 +357,8 @@ h1,h2,h3{font-weight:700}
 
 /* v0.18.11: Fun Sized only on the big "Make some noise." title; everything else keeps the normal fonts */
 .intro h2{font-family:'FunSized','Space Grotesk',Arial,sans-serif;font-weight:400;letter-spacing:1px}
+/* v0.24.2: colourful title (lime text with a pink and a blue shadow) */
+.intro h2{color:var(--accent);text-shadow:3px 3px 0 #ff6ec4,6px 6px 0 #89b6ff}
 
 /* v0.18.13: tempo style + global pitch */
 .style-pick{display:flex;align-items:center;gap:8px;margin-top:10px;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1.2px;color:var(--text3)}
