@@ -172,7 +172,9 @@ export default function App() {
     if (latest.current.playing) frameRef.current = { frame: frameAt(step, latest.current.song.playlist, latest.current.song.mode, latest.current.song.current), at: performance.now() };
   }
   const getPlayhead = useCallback(() => (frameRef.current ? { songStep: frameRef.current.frame.songStep, at: frameRef.current.at } : null), []);
-  function stop() { engine.current?.stop(); setStartStep(0); setRec(false); setPlaying(false); setFrame(null); setStatus(s => s.kind === 'error' ? s : { kind: 'info', text: 'Stopped.' }); }
+  // THIS PATTERN / LISTEN ALONE only borrow the PATTERN mode: when playback stops, the mode that was set before comes back (so PLAY plays the whole song again)
+  const modeBefore = useRef<PlayMode | null>(null);
+  function stop() { if (modeBefore.current) { setMode(modeBefore.current); modeBefore.current = null; } engine.current?.stop(); setStartStep(0); setRec(false); setPlaying(false); setFrame(null); setStatus(s => s.kind === 'error' ? s : { kind: 'info', text: 'Stopped.' }); }
 
   const toggleRef = useRef<() => void>(() => {});
   toggleRef.current = () => { if (latest.current.playing) stop(); else void play(); };
@@ -579,6 +581,7 @@ export default function App() {
   // listen to one pattern on its own: switch to PATTERN mode, loop it; press again to stop
   function audition(i: number) {
     if (latest.current.playing && mode === 'pattern' && cur === i) { stop(); return; }
+    if (mode === 'song') modeBefore.current = 'song';
     setCurrent(i); setMode('pattern');
     engine.current?.setSong({ patterns, playlist, mode: 'pattern', current: i });
     if (!latest.current.playing) void play();
@@ -591,6 +594,7 @@ export default function App() {
     if (aloneActive) { setChannels(c => (Object.keys(c) as ChannelName[]).reduce((acc, n) => patchChannel(acc, n, { solo: false }), c)); return; }
     const target = trackChannels(view);
     setChannels(c => (Object.keys(c) as ChannelName[]).reduce((acc, n) => patchChannel(acc, n, { solo: target.includes(n), muted: target.includes(n) ? false : acc[n].muted }), c));
+    if (mode === 'song') modeBefore.current = 'song';
     setMode('pattern');
     engine.current?.setSong({ patterns, playlist, mode: 'pattern', current: cur });
     if (!latest.current.playing) void play();
@@ -606,7 +610,7 @@ export default function App() {
   const bars = mode === 'song' ? playlist.length : 1;
 
   return <main className="shell" style={{ ['--bar-s' as string]: `${(STEPS * 15) / bpm}s` }}>
-    <header><div><div className="eyebrow">INTERACTIVE MUSIC STUDIO</div><h1><span>BEAT</span>LAB<span className="dot">.</span></h1></div><div className="head-right"><button className={'theme-btn' + (lite ? ' on' : '')} aria-pressed={lite} aria-label="Lite mode" title="Lite mode: stops the decorative animation and draws the visualiser less often. Helps slow computers and phones." onClick={() => { setLite(l => { saveLite(!l); return !l; }); }}>{lite ? '🍃 LITE ON' : '🍃 LITE'}</button><button className={'theme-btn insp-toggle' + (inspect ? ' on' : '')} aria-pressed={inspect} aria-label="Inspect mode" title="Inspect: click any part of the page to see which file and line of code it comes from, what it runs and how it connects" onClick={() => setInspect(i => !i)}>🔍 INSPECT</button><button className={'theme-btn' + (sysOpen ? ' on' : '')} aria-pressed={sysOpen} aria-label="System monitor" title="Show CPU / audio load and memory use" onClick={() => setSysOpen(o => !o)}>📊 STATS</button><button className="theme-btn" aria-label="Colour theme" title="Switch between automatic, dark and light" onClick={() => setTheme(nextTheme(theme))}>{THEME_LABEL[theme]}</button><div className="phase">PHASE 01–10 <span>• V0.25.3 TEST BUILD</span></div></div></header>
+    <header><div><div className="eyebrow">INTERACTIVE MUSIC STUDIO</div><h1><span>BEAT</span>LAB<span className="dot">.</span></h1></div><div className="head-right"><button className={'theme-btn' + (lite ? ' on' : '')} aria-pressed={lite} aria-label="Lite mode" title="Lite mode: stops the decorative animation and draws the visualiser less often. Helps slow computers and phones." onClick={() => { setLite(l => { saveLite(!l); return !l; }); }}>{lite ? '🍃 LITE ON' : '🍃 LITE'}</button><button className={'theme-btn insp-toggle' + (inspect ? ' on' : '')} aria-pressed={inspect} aria-label="Inspect mode" title="Inspect: click any part of the page to see which file and line of code it comes from, what it runs and how it connects" onClick={() => setInspect(i => !i)}>🔍 INSPECT</button><button className={'theme-btn' + (sysOpen ? ' on' : '')} aria-pressed={sysOpen} aria-label="System monitor" title="Show CPU / audio load and memory use" onClick={() => setSysOpen(o => !o)}>📊 STATS</button><button className="theme-btn" aria-label="Colour theme" title="Switch between automatic, dark and light" onClick={() => setTheme(nextTheme(theme))}>{THEME_LABEL[theme]}</button><div className="phase">PHASE 01–10 <span>• V0.25.4 TEST BUILD</span></div></div></header>
     {inspect && <Suspense fallback={null}><Inspector onClose={() => setInspect(false)} /></Suspense>}
     <SystemMonitor open={sysOpen} onClose={() => setSysOpen(false)} playing={playing} getHealth={getHealth} />
     <section className="intro hero"><div className="hero-text"><h2>Make some noise</h2></div><HeroArt playing={playing} bpm={bpm} lite={lite} /></section>
@@ -673,7 +677,7 @@ export default function App() {
       onSlot={paint} onBars={n => { const len = resizePlaylist(playlist, n).length; setPlaylist(pl => resizePlaylist(pl, n)); setSections(s => clampSections(s, len)); }}
       sections={sections} onSections={setSections} onBuild={(pl, sec) => { setPlaylist(pl); setSections(sec); setMode('song'); }}
       onDropPattern={(bar, pat) => setPlaylist(pl => setSlot(pl, bar, pat))} onMoveSlot={(from, to, copy) => setPlaylist(pl => (copy ? copySlot(pl, from, to) : moveSlot(pl, from, to)))} onClearSlot={bar => setPlaylist(pl => clearSlot(pl, bar))}
-      onInsertSlot={i => { setPlaylist(pl => insertSlot(pl, i)); }} onRemoveSlot={i => { setPlaylist(pl => removeSlot(pl, i)); setSections(s => clampSections(s, Math.max(1, playlist.length - 1))); }} onClearBars={() => setPlaylist(pl => pl.map(() => null))} onMode={setMode} />
+      onInsertSlot={i => { setPlaylist(pl => insertSlot(pl, i)); }} onRemoveSlot={i => { setPlaylist(pl => removeSlot(pl, i)); setSections(s => clampSections(s, Math.max(1, playlist.length - 1))); }} onClearBars={() => setPlaylist(pl => pl.map(() => null))} onMode={m => { modeBefore.current = null; setMode(m); }} />
     <MixerPanel tracks={tracks} channels={channels} master={master} onChannel={changeChannel} onMaster={changeMaster} getLevelDb={getLevelDb} getChannelLevels={getChannelLevels} setMetering={setMetering} playing={playing} />
     <div role={status.kind === 'error' ? 'alert' : 'status'} className={'status ' + status.kind}>{status.text}</div>
   </main>;

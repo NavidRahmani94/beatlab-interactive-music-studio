@@ -230,3 +230,7 @@ Built after the crackle diagnosis and the user's OK. Live SHAPE LAB sounds only;
 
 ## v0.25.3 — roomier LINK bar
 - The help text next to LINK is short now (the full hint of each style is its tooltip), and the buttons never wrap, so the style names are easy to read.
+
+## v0.25.4 — PLAY plays the whole song again
+- Bug: after THIS PATTERN or LISTEN TO … ALONE the play mode stayed on PATTERN, so the normal PLAY button (and Space) played only that one pattern until SONG was chosen by hand in the playlist.
+- Fix: those two buttons only borrow the PATTERN mode. When playback stops, the mode that was set before comes back (a mode chosen by hand with the PATTERN / SONG buttons is never changed). Code: `modeBefore` in `src/App.tsx`. Test: `tools/e2e-v254.cjs`.
