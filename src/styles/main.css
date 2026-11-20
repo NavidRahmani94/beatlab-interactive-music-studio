@@ -512,3 +512,5 @@ h1,h2,h3{font-weight:700}
 .roll-tools .seg button{padding:0 14px;font-size:11px}
 .roll-tools .link-btn{padding:0 14px;font-size:11px}
 .roll-tools .link-help{font-size:9px}
+.play-mode{flex:none}.play-mode button{height:40px;padding:0 16px;white-space:nowrap}
+.transport-controls{flex-wrap:wrap;gap:20px 28px}

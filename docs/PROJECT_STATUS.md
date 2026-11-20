@@ -234,3 +234,6 @@ Built after the crackle diagnosis and the user's OK. Live SHAPE LAB sounds only;
 ## v0.25.4 — PLAY plays the whole song again
 - Bug: after THIS PATTERN or LISTEN TO … ALONE the play mode stayed on PATTERN, so the normal PLAY button (and Space) played only that one pattern until SONG was chosen by hand in the playlist.
 - Fix: those two buttons only borrow the PATTERN mode. When playback stops, the mode that was set before comes back (a mode chosen by hand with the PATTERN / SONG buttons is never changed). Code: `modeBefore` in `src/App.tsx`. Test: `tools/e2e-v254.cjs`.
+
+## v0.25.5 — SONG / PATTERN in the TRANSPORT panel
+- The SONG / PATTERN switch is now also in the TRANSPORT panel next to PLAY (it is the same switch as in the playlist panel). On narrow screens the row wraps. Test: `tools/e2e-v254.cjs`.
