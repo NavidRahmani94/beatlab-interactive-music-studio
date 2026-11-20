@@ -213,4 +213,4 @@ Built after the crackle diagnosis and the user's OK. Live SHAPE LAB sounds only;
 - Test: `tools/e2e-v241.cjs <url>` (shape notes sit exactly on step times, first note together with the first step, free clock after stop).
 
 ## v0.24.2 — colourful title
-- The big "Make some noise." title is lime with a pink and a blue shadow (one rule at the end of the title block in `src/styles/main.css`).
+- The big "Make some noise." title is filled with a rainbow gradient (one rule at the end of the title block in `src/styles/main.css`).
