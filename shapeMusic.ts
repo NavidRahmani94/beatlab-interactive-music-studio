@@ -11,7 +11,6 @@ export type Layer = { sides: number; octave: number; rate: Rate; mode: Mode; pat
 export type Progression = number[];
 
 export const MIN_SIDES = 3, MAX_SIDES = 6, MAX_LAYERS = 3, MAX_PROG = 8;
-export const PATTERN_LENGTHS = [8, 16] as const;
 /** How many 16th-note ticks one arp step lasts. */
 export const DIV: Record<Rate, number> = { '1/16': 1, '1/8': 2, '1/4': 4 };
 export const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];

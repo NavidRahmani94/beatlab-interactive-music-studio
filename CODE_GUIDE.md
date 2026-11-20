@@ -133,7 +133,7 @@ npm run build      # makes the finished app in the "dist" folder
 ### Tests
 
 - `*.test.ts` are unit tests (run with `npm test`).
-- `e2e-*.cjs` are browser tests (Playwright). Start the dev server first, then run for example `node e2e-v182.cjs http://localhost:5173/`.
+- `e2e-*.cjs` are browser tests (Playwright). Start the dev server first, then run for example `node tools/e2e-v182.cjs http://localhost:5173/`.
 
 ## Words used in the code
 

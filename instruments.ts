@@ -1,5 +1,5 @@
 // Pure metadata (no audio code) so it can be validated and unit-tested without a browser.
-import { FACTORY_SOUNDS, SOUND_GROUPS, CUSTOM_PREFIX } from './synth';
+import { FACTORY_SOUNDS, SOUND_GROUPS } from './synth';
 
 // The older built-in sounds (kept so old project files sound the same) ...
 const CLASSIC_SOUNDS: Record<string, { label: string; hint: string; group: string }> = {
@@ -30,7 +30,6 @@ export const isMelodyInstrument = (v: unknown): v is MelodyInstrumentId => typeo
 export function instrumentGroups(): { group: string; ids: string[] }[] {
   return SOUND_GROUPS.map(group => ({ group, ids: MELODY_INSTRUMENT_IDS.filter(id => MELODY_INSTRUMENTS[id].group === group) })).filter(g => g.ids.length > 0);
 }
-export const isCustomInstrument = (v: string): boolean => v.startsWith(CUSTOM_PREFIX);
 
 export const DRUM_KITS = {
   classic: { label: 'Classic' },
