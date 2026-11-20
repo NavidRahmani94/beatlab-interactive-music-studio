@@ -194,3 +194,8 @@ Built after the crackle diagnosis and the user's OK. Live SHAPE LAB sounds only;
 
 ## v0.23.0 — engine 2 sounds like the old engine
 `voiceWorklet.js` copies Tone's envelope curves, FM (square modulator, carrier wave kept, FMSynth modulator envelope for the 3 FM basic instruments), unison spread/levels/phases, pink/brown noise, filter-envelope curve, drive and chorus. `workletTrim.ts` re-measured. Comparison tools: `tools/enginecmp.cjs`, `tools/enginecmp-basic.cjs`. Envelope difference 7.2 → 0.6 dB, spectrum 3.9 → 0.6 dB. 348 unit tests, build, live check in Chromium (engine-2 nodes play, no errors). Not verified: by ear, real device.
+
+## v0.23.1 — Space plays and stops from anywhere
+- Space now starts and stops the song also when a button, slider or menu still has the focus after a mouse click (before, it was ignored there, or it pressed that button again). Only real text fields keep their own Space.
+- Holding Space toggles only once. The header label now says V0.23.1.
+- Test: `tools/e2e-v231.cjs <url>` (focus on a tab button, on a slider, in a text field, held key).
