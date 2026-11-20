@@ -4,8 +4,8 @@ const { chromium } = require('playwright');
   p.on('pageerror', e => console.log('ERR', e)); 
   await p.goto('http://localhost:5199/'); await p.waitForTimeout(2000);
   const out = await p.evaluate(async () => {
-    const { renderProjectToWav, exportDurationSeconds } = await import('/exporter.ts');
-    const { SAMPLE_PROJECTS } = await import('/project.ts');
+    const { renderProjectToWav, exportDurationSeconds } = await import('/src/export/exporter.ts');
+    const { SAMPLE_PROJECTS } = await import('/src/project/project.ts');
     const res = {};
     const run = async (label, mut) => {
       const pr = SAMPLE_PROJECTS['Hip Hop Demo'](); mut && mut(pr);

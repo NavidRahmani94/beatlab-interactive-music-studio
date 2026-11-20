@@ -9,7 +9,7 @@ const { chromium } = require('playwright');
     const urls = performance.getEntriesByType('resource').map(r => r.name);
     const { Rig } = await import(urls.filter(n => /\/rig\.ts/.test(n)).pop()); const Tone = await import(urls.filter(n => /deps\/tone\.js/.test(n)).pop());
     const syn = await import(urls.filter(n => /\/synth\.ts/.test(n)).pop());
-    const src = await (await fetch('/voiceWorklet.js')).text(); const modUrl = URL.createObjectURL(new Blob([src], { type: 'application/javascript' }));
+    const src = await (await fetch('/src/audio/voiceWorklet.js')).text(); const modUrl = URL.createObjectURL(new Blob([src], { type: 'application/javascript' }));
     const midi = m => 440 * Math.pow(2, (m - 69) / 12);
     const chordMidi = { 4: [57, 60, 64, 67], 6: [57, 60, 64, 67, 71, 74] };
     const patches = { warmPad: { osc1: { wave: 'sawtooth', octave: 0, cents: 0, level: 0.7, fmIndex: 0, fmRatio: 1 }, osc2: { wave: 'sawtooth', octave: 0, cents: 0, level: 0, fmIndex: 0, fmRatio: 1 }, unison: 3, spread: 30, pulseWidth: 0.5, pwmRate: 2, noise: 0, noiseColor: 'white', filter: { type: 'lowpass', cutoff: 1400, resonance: 1, rolloff: 12, envAmount: 0 }, filterEnv: { a: 0.01, d: 0.3, s: 1, r: 0.3 }, ampEnv: { a: 0.35, d: 0.4, s: 0.7, r: 1.2 }, lfo: { target: 'off' }, drive: 0, chorus: 0, volumeDb: -6, transpose: 0 } };

@@ -9,11 +9,11 @@ const { chromium } = require('playwright');
   const res = await p.evaluate(async (only) => {
     const urls = performance.getEntriesByType('resource').map(r => r.name);
     const Tone = await import(urls.filter(n => /deps\/tone\.js/.test(n)).pop());
-    const { PatchSynth } = await import('/patchSynth.ts'); const syn = await import('/synth.ts');
-    const src = await (await fetch('/voiceWorklet.js?t=' + Date.now())).text(); const modUrl = URL.createObjectURL(new Blob([src], { type: 'application/javascript' }));
+    const { PatchSynth } = await import('/src/audio/patchSynth.ts'); const syn = await import('/src/audio/synth.ts');
+    const src = await (await fetch('/src/audio/voiceWorklet.js?t=' + Date.now())).text(); const modUrl = URL.createObjectURL(new Blob([src], { type: 'application/javascript' }));
     const SR = 44100, SECS = 3, NOTE = 57, DUR = 0.9, VEL = 0.8, T0 = 2176 / 44100;
     const hz = 440 * Math.pow(2, (NOTE - 69) / 12);
-    const rigm = await import('/rig.ts'); const lp = await import('/legacyPatches.ts');
+    const rigm = await import('/src/audio/rig.ts'); const lp = await import('/src/audio/legacyPatches.ts');
     const old = async id => (await Tone.Offline(async () => { const m = rigm.buildMelody(id); m.synth.volume.value = m.volume; if (m.filter) { m.synth.connect(m.filter); m.filter.toDestination(); } else m.synth.toDestination(); m.synth.triggerAttackRelease(Tone.Frequency(NOTE + m.shift, 'midi').toNote(), DUR, T0, VEL); }, SECS, 2, SR)).get();
     const neu = async patch => { const ctx = new OfflineAudioContext(2, SECS * SR, SR); await ctx.audioWorklet.addModule(modUrl);
       const node = new AudioWorkletNode(ctx, 'beatlab-synth', { numberOfInputs: 0, outputChannelCount: [2], processorOptions: { patch, notes: [{ id: 1, start: T0, dur: DUR, freq: hz, vel: VEL }] } }); node.connect(ctx.destination); return ctx.startRendering(); };

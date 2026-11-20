@@ -11,7 +11,7 @@ const { chromium } = require('playwright');
   await p.goto(process.argv[2]); await p.waitForTimeout(1200);
   await p.evaluate(async () => {
     window.__rec = { chunks: [] };
-    const rn = performance.getEntriesByType('resource').map(r => r.name).filter(n => /\/rig\.ts/.test(n)).pop(); const { Rig } = await import(rn || '/rig.ts');
+    const rn = performance.getEntriesByType('resource').map(r => r.name).filter(n => /\/rig\.ts/.test(n)).pop(); const { Rig } = await import(rn || '/src/audio/rig.ts');
     const ready = Rig.prototype.ready;
     Rig.prototype.ready = async function () { await ready.call(this); if (this.__tp) return; this.__tp = true; const ctx = this.safety.context;
       const src = 'class R extends AudioWorkletProcessor{process(i){const c=i[0];if(c&&c[0]){this.port.postMessage(c[0].slice());}return true;}}registerProcessor("rec-w",R);';

@@ -11,8 +11,8 @@ const { chromium } = require('playwright');
   const res = await p.evaluate(async (only) => {
     const urls = performance.getEntriesByType('resource').map(r => r.name);
     const Tone = await import(urls.filter(n => /deps\/tone\.js/.test(n)).pop());
-    const { PatchSynth } = await import('/patchSynth.ts'); const syn = await import('/synth.ts');
-    const src = await (await fetch('/voiceWorklet.js?t=' + Date.now())).text(); const modUrl = URL.createObjectURL(new Blob([src], { type: 'application/javascript' }));
+    const { PatchSynth } = await import('/src/audio/patchSynth.ts'); const syn = await import('/src/audio/synth.ts');
+    const src = await (await fetch('/src/audio/voiceWorklet.js?t=' + Date.now())).text(); const modUrl = URL.createObjectURL(new Blob([src], { type: 'application/javascript' }));
     const SR = 44100, SECS = 3, NOTE = 57, DUR = 0.9, VEL = 0.8, T0 = 2176 / 44100;
     const hz = 440 * Math.pow(2, (NOTE - 69) / 12);
     const old = async patch => (await Tone.Offline(async () => { const s = new PatchSynth(patch); s.connect(Tone.getDestination()); s.triggerAttackRelease(Tone.Frequency(NOTE, 'midi').toNote(), DUR, T0, VEL); }, SECS, 2, SR)).get();
