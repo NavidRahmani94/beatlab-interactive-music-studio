@@ -214,3 +214,8 @@ Built after the crackle diagnosis and the user's OK. Live SHAPE LAB sounds only;
 
 ## v0.24.2 — colourful title
 - The big "Make some noise." title is filled with a rainbow gradient (one rule at the end of the title block in `src/styles/main.css`).
+
+## v0.25.0 — LINK mode in the piano roll
+- New **↗ LINK** button above the piano roll (not on arpeggio tracks). In LINK mode, drag an arrow from one note to a later note: the first note glides smoothly to the pitch of the second one (one long, sliding sound; the second note is not played again). An arrow is drawn between the two notes. Click the glided (second) note to take the link away. Chains work (A → B → C).
+- It uses the existing slide notes: the second note becomes a slide note (its length is the glide time, so stretch it for a slower glide) and the first note is stretched when needed so that it still sounds where the second one starts. Code: `linkNotes` and `linkEdges` in `src/music/melody.ts`, the mode and the arrows in `src/ui/PianoRoll.tsx`.
+- Tests: `src/music/link.test.ts` (4 unit tests) and `tools/e2e-v250.cjs <url>` (drag, arrow, stretch, unlink).

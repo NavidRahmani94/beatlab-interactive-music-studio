@@ -329,5 +329,28 @@ export function slidePath(notes: MelodyNote[], n: MelodyNote): SlidePath | null 
   if (skip.length === 0) return null;
   return { path, endStep: end, skip };
 }
+/**
+ * LINK: joins two notes with an arrow. The first note glides to the pitch of the second one (the second one is not played again).
+ * It uses the slide notes above: the second note becomes a slide note (its length is the time of the glide) and the first note is stretched
+ * when needed so that it is still sounding where the second one starts. The second note must start after the first one.
+ */
+export function linkNotes(notes: MelodyNote[], fromId: string, toId: string): MelodyNote[] {
+  const a = notes.find(n => n.id === fromId), b = notes.find(n => n.id === toId);
+  if (!a || !b || a.id === b.id || b.step <= a.step) return notes;
+  if (noteToMidi(a.pitch) === null || noteToMidi(b.pitch) === null) return notes;
+  const stretched = a.step + a.lengthSteps < b.step ? resizeNote(notes, a.id, b.step - a.step) : notes;
+  return stretched.map(n => n.id === b.id ? { ...n, slide: true } : n);
+}
+/** The arrows to draw: every note that glides, from the note before it (a plain note, or the slide note before it in a chain) to the slide note. */
+export function linkEdges(notes: MelodyNote[]): { from: string; to: string }[] {
+  const out: { from: string; to: string }[] = [];
+  for (const n of notes) {
+    if (n.slide) continue;
+    const sp = slidePath(notes, n); if (!sp) continue;
+    let prev = n.id;
+    for (const id of sp.skip) { out.push({ from: prev, to: id }); prev = id; }
+  }
+  return out;
+}
 /** True for a slide note that bends another note: it is silent itself. A slide note with nothing to bend is played as a normal note. */
 export const isSlideTarget = (notes: MelodyNote[], n: MelodyNote): boolean => n.slide === true && notes.some(o => !o.slide && slidePath(notes, o)?.skip.includes(n.id));

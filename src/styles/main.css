@@ -496,3 +496,13 @@ h1,h2,h3{font-weight:700}
 .mrow.live .mlabel{background:var(--accent,var(--mint));color:var(--onaccent,#fff);font-weight:700;border-radius:4px;box-shadow:0 0 10px color-mix(in srgb,var(--accent,var(--mint)) 70%,transparent)}
 .mrow.live .mcell:not(.on){background:color-mix(in srgb,var(--accent,var(--mint)) 38%,var(--raised));border-color:var(--accent,var(--mint))}
 .mrow.live .mcell.on{filter:brightness(1.18);box-shadow:0 0 8px color-mix(in srgb,var(--accent,var(--mint)) 80%,transparent)}
+
+/* v0.25.0: LINK mode in the piano roll (arrow from one note to the next) */
+.roll{position:relative}
+.roll-tools{display:flex;align-items:center;gap:12px;padding:8px 24px 0}
+.link-btn{height:26px;padding:0 12px;border-radius:6px;border:1px solid var(--accent);background:transparent;color:var(--accent-text);font-family:'DM Mono',monospace;font-size:10px;font-weight:700;letter-spacing:1px}
+.link-btn.on{background:var(--accent);color:var(--onaccent)}
+.link-help{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;color:var(--muted)}
+.link-svg{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:3;color:var(--strong)}
+.link-svg line{stroke:currentColor;stroke-width:2.5;stroke-linecap:round}
+.link-svg line.band{stroke-dasharray:5 4;opacity:.8}
