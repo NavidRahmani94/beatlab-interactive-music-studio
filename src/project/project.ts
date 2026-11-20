@@ -1,6 +1,6 @@
 // FILE: The project file: its type, the default and sample projects, checking a loaded file (validation) and upgrading old file versions.
 import { DrumPattern, INSTRUMENTS, LEGACY_STEPS, STEPS } from '../music/pattern';
-import { MAX_MIDI, MIN_MIDI, MelodyNote, SCALES, ScaleName, makePreset, makeTrackPreset, noteToMidi } from '../music/melody';
+import { MAX_MIDI, MIN_MIDI, MelodyNote, SCALES, ScaleName, isLinkMode, makePreset, makeTrackPreset, noteToMidi } from '../music/melody';
 import { DRUM_CHANNELS, ChannelSettings, Channels, MAX_FEEDBACK, MasterSettings, VOLUME_MAX_DB, VOLUME_MIN_DB, EQ_MAX_DB, EQ_MIN_DB, defaultChannel, defaultChannels, defaultMaster, effectiveMuted, isDelayDivision, isReverbSize } from '../audio/mixer';
 import { DrumKitId, isDrumKit, isMelodyInstrument } from '../audio/instruments';
 import { KIND_DEFAULT_INSTRUMENT, MAX_TRACKS, MAX_TRACK_NAME, TrackDef, defaultTrackDefs, isTrackKind, isValidTrackId, makeTrack } from './tracks';
@@ -331,7 +331,8 @@ function validateNotes(raw: unknown, where: string): MelodyNote[] | string {
     if (!isNum(n.lengthSteps) || !Number.isInteger(n.lengthSteps) || n.lengthSteps < 1 || n.step + n.lengthSteps > STEPS) return `${w}.lengthSteps must be a whole number ≥ 1 that fits inside the bar.`;
     if (!isNum(n.velocity) || n.velocity < 0 || n.velocity > 1) return `${w}.velocity must be between 0 and 1.`;
     if (n.slide !== undefined && typeof n.slide !== 'boolean') return `${w}.slide must be true or false.`;
-    notes.push({ id: n.id, pitch: n.pitch as string, step: n.step, lengthSteps: n.lengthSteps, velocity: n.velocity, ...(n.slide === true ? { slide: true } : {}) });
+    if (n.glide !== undefined && !isLinkMode(n.glide)) return `${w}.glide must be one of smooth, long, snap, tie, late.`;
+    notes.push({ id: n.id, pitch: n.pitch as string, step: n.step, lengthSteps: n.lengthSteps, velocity: n.velocity, ...(n.slide === true ? { slide: true, ...(n.slide === true && isLinkMode(n.glide) ? { glide: n.glide } : {}) } : {}) });
   }
   return notes;
 }

@@ -1,7 +1,7 @@
 // FILE: The piano roll: a grid where you click or drag to add notes. It also has the velocity lane and the slide lane.
 import { Dispatch, KeyboardEvent, PointerEvent, SetStateAction, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
-  MAX_MIDI, MIN_MIDI, MelodyNote, ScaleName, inScale, midiToNote, noteToMidi, noteAt, notesAtStep, resizeNote, scaleRows, setNoteVelocity, setStepVelocity, toggleNote, toggleSlide, isSlideTarget, linkNotes, linkEdges
+  MAX_MIDI, MIN_MIDI, MelodyNote, ScaleName, inScale, midiToNote, noteToMidi, noteAt, notesAtStep, resizeNote, scaleRows, setNoteVelocity, setStepVelocity, toggleNote, toggleSlide, isSlideTarget, linkNotes, linkEdges, LINK_MODES, LinkMode
 } from '../music/melody';
 import { STEPS } from '../music/pattern';
 import { useFollowPlayhead } from './useFollow';
@@ -62,9 +62,11 @@ export default function PianoRoll({ octave = 0, slide = true, notes, onNotes, ad
   const laneDragging = useRef(false);
   // ---- LINK mode: drag an arrow from one note to a later note, the first note glides to the pitch of the second
   const [link, setLink] = useState(false);
+  const [linkMode, setLinkMode] = useState<LinkMode>('smooth');
+  const linkModeRef = useRef(linkMode); linkModeRef.current = linkMode;
   const linkDrag = useRef<{ id: string; moved: boolean } | null>(null);
   const [band, setBand] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
-  const [arrows, setArrows] = useState<{ x1: number; y1: number; x2: number; y2: number }[]>([]);
+  const [arrows, setArrows] = useState<{ x1: number; y1: number; x2: number; y2: number; label: string }[]>([]);
   const rollBox = useRef<HTMLDivElement>(null);
   const rel = (x: number, y: number) => { const r = rollBox.current?.getBoundingClientRect(); return r ? { x: x - r.left, y: y - r.top } : { x: 0, y: 0 }; };
   useFollowPlayhead(rollRef, playingStep);
@@ -88,16 +90,16 @@ export default function PianoRoll({ octave = 0, slide = true, notes, onNotes, ad
 
   useLayoutEffect(() => {
     const box = rollBox.current; if (!box || !slide) { setArrows(a => (a.length ? [] : a)); return; }
-    const br = box.getBoundingClientRect(); const list: { x1: number; y1: number; x2: number; y2: number }[] = [];
+    const br = box.getBoundingClientRect(); const list: { x1: number; y1: number; x2: number; y2: number; label: string }[] = [];
     const cellOf = (n: MelodyNote, step: number) => { const m = noteToMidi(n.pitch); return m === null ? null : box.querySelector(`[data-midi="${m}"][data-step="${step}"]`) as HTMLElement | null; };
     for (const e of linkEdges(notes)) {
       const a = notes.find(n => n.id === e.from), b = notes.find(n => n.id === e.to); if (!a || !b) continue;
       const ca = cellOf(a, Math.min(a.step + a.lengthSteps - 1, b.step - 1)), cb = cellOf(b, b.step); if (!ca || !cb) continue;
       const ra = ca.getBoundingClientRect(), rb = cb.getBoundingClientRect();
-      list.push({ x1: ra.left + ra.width / 2 - br.left, y1: ra.top + ra.height / 2 - br.top, x2: rb.left + rb.width / 2 - br.left, y2: rb.top + rb.height / 2 - br.top });
+      list.push({ x1: ra.left + ra.width / 2 - br.left, y1: ra.top + ra.height / 2 - br.top, x2: rb.left + rb.width / 2 - br.left, y2: rb.top + rb.height / 2 - br.top, label: LINK_MODES.find(m => m.id === b.glide)?.label ?? 'LATE' });
     }
-    const sig = JSON.stringify(list.map(l => [l.x1, l.y1, l.x2, l.y2].map(Math.round)));
-    setArrows(prev => (JSON.stringify(prev.map(l => [l.x1, l.y1, l.x2, l.y2].map(Math.round))) === sig ? prev : list));
+    const key = (a: typeof list) => JSON.stringify(a.map(l => [Math.round(l.x1), Math.round(l.y1), Math.round(l.x2), Math.round(l.y2), l.label]));
+    setArrows(prev => (key(prev) === key(list) ? prev : list));
   }, [notes, rows, advanced, slide]);
 
   // per row: the 32 cells and a short signature of them (so unchanged rows are not redrawn)
@@ -195,7 +197,7 @@ export default function PianoRoll({ octave = 0, slide = true, notes, onNotes, ad
     if (ld) {
       linkDrag.current = null; setBand(null);
       const hit = cellAt(e.clientX, e.clientY); const to = hit ? noteAt(notes, hit.midi, hit.step) : undefined;
-      if (to && to.id !== ld.id) onNotes(prev => linkNotes(prev, ld.id, to.id));
+      if (to && to.id !== ld.id) onNotes(prev => linkNotes(prev, ld.id, to.id, linkModeRef.current));
       else if (!ld.moved || (to && to.id === ld.id)) { const me = notes.find(n => n.id === ld.id); if (me?.slide) onNotes(prev => toggleSlide(prev, ld.id)); }   // a click on a glided note takes the link away
       return;
     }
@@ -241,11 +243,12 @@ export default function PianoRoll({ octave = 0, slide = true, notes, onNotes, ad
 
   return <>
     {slide && <div className="roll-tools"><button className={'link-btn' + (link ? ' on' : '')} aria-pressed={link} aria-label="Link mode" onClick={() => setLink(l => !l)}
-      title="LINK: drag an arrow from one note to a later note. The first note glides to the pitch of the second one (a long, smooth slide). Click a linked note to take the link away.">↗ LINK</button>{link && <span className="link-help">DRAG FROM A NOTE TO A LATER NOTE · CLICK A LINKED NOTE TO UNLINK</span>}</div>}
+      title="LINK: drag an arrow from one note to a later note. The first note glides to the pitch of the second one (a long, smooth slide). Click a linked note to take the link away.">↗ LINK</button>{link && <><div className="seg small" role="group" aria-label="Link style">{LINK_MODES.map(m => <button key={m.id} className={linkMode === m.id ? 'sel' : ''} aria-pressed={linkMode === m.id} title={m.hint} onClick={() => setLinkMode(m.id)}>{m.label}</button>)}</div>
+      <span className="link-help">DRAG FROM A NOTE TO A LATER NOTE · {LINK_MODES.find(m => m.id === linkMode)?.hint.toUpperCase()} · CLICK A LINKED NOTE TO UNLINK</span></>}</div>}
     <div className={'roll-wrap ' + (advanced ? 'advanced' : 'easy') + (enabled ? '' : ' is-muted')} ref={rollRef} style={{ ['--accent' as string]: accent }}>
       <div className={'roll' + (touchDraw ? ' draw' : '')} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={() => { drag.current = null; linkDrag.current = null; setBand(null); }} ref={rollBox}>
         {(arrows.length > 0 || band) && <svg className="link-svg" aria-hidden="true"><defs><marker id="link-head" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor" /></marker></defs>
-          {arrows.map((a, i) => <line key={i} x1={a.x1} y1={a.y1} x2={a.x2} y2={a.y2} markerEnd="url(#link-head)" />)}
+          {arrows.map((a, i) => <g key={i}><line x1={a.x1} y1={a.y1} x2={a.x2} y2={a.y2} markerEnd="url(#link-head)" /><text x={(a.x1 + a.x2) / 2 + 6} y={(a.y1 + a.y2) / 2 - 4}>{a.label}</text></g>)}
           {band && <line className="band" x1={band.x1} y1={band.y1} x2={band.x2} y2={band.y2} markerEnd="url(#link-head)" />}</svg>}
         <div className="mrow mhead"><span />{Array.from({ length: STEPS }, (_, i) => <span key={i} className={(i === 16 ? 'bar2' : '') + (i === cursor ? ' stepcur' : '')}>{i + 1}</span>)}</div>
         {rows.map(midi => {

@@ -19,6 +19,8 @@ const { chromium } = require('playwright');
   // clicking an empty cell in LINK mode does not add a note
   await cell(4, 4).click(); await p.waitForTimeout(150);
   ok('an empty click adds nothing in LINK mode', (await roll.locator('.mcell.on.start').count()) === 2);
+  ok('five link styles to choose from', (await p.locator('.roll-tools .seg button').count()) === 5);
+  await p.locator('.roll-tools .seg button', { hasText: 'LONG' }).click();
   const a = await cell(6, 0).boundingBox(), c = await cell(2, 8).boundingBox();
   await p.mouse.move(a.x + a.width / 2, a.y + a.height / 2); await p.mouse.down(); await p.mouse.move((a.x + c.x) / 2, (a.y + c.y) / 2, { steps: 5 }); await p.mouse.move(c.x + c.width / 2, c.y + c.height / 2, { steps: 5 });
   ok('a dashed arrow follows the pointer while dragging', (await roll.locator('.link-svg line.band').count()) === 1);
@@ -26,6 +28,7 @@ const { chromium } = require('playwright');
   ok('the arrow is drawn between the notes', (await roll.locator('.link-svg line:not(.band)').count()) === 1);
   ok('the second note is a glide (slide) note', (await roll.locator('.mcell.on.slide').count()) > 0);
   ok('the first note was stretched up to the second', (await roll.locator('.mcell.on:not(.slide)').count()) >= 8);
+  ok('the arrow shows its style', (await roll.locator('.link-svg text').first().textContent()) === 'LONG');
   await p.screenshot({ path: process.argv[3] || '/tmp/link.png', clip: (await roll.boundingBox()) });
   // a click on the glided note takes the link away
   await cell(2, 8).click(); await p.waitForTimeout(250);

@@ -4,7 +4,17 @@ import { LEGACY_STEPS, STEPS } from './pattern';
 import { MelodyInstrumentId } from '../audio/instruments';
 
 // One data model for BOTH Easy and Advanced melody views.
-export type MelodyNote = { id: string; pitch: string; step: number; lengthSteps: number; velocity: number; slide?: boolean };
+export type MelodyNote = { id: string; pitch: string; step: number; lengthSteps: number; velocity: number; slide?: boolean; glide?: LinkMode };
+/** How a LINK glides to the note it points at (stored on that second note). No value = the older behaviour ('late'). */
+export type LinkMode = 'smooth' | 'long' | 'snap' | 'tie' | 'late';
+export const LINK_MODES: { id: LinkMode; label: string; hint: string }[] = [
+  { id: 'smooth', label: 'SMOOTH', hint: 'the pitch bends in the end of the first note and a little into the second one' },
+  { id: 'long', label: 'LONG', hint: 'a long glide over the whole first note, ending a little into the second one' },
+  { id: 'snap', label: 'SNAP', hint: 'a quick scoop just at the border of the two notes' },
+  { id: 'tie', label: 'TIE', hint: 'no glide: the second pitch comes without a new attack (legato)' },
+  { id: 'late', label: 'LATE', hint: 'the glide happens inside the second note, over its whole length' },
+];
+export const isLinkMode = (v: unknown): v is LinkMode => typeof v === 'string' && LINK_MODES.some(m => m.id === v);
 
 export const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
 export const MIN_MIDI = 36; // C2
@@ -53,7 +63,7 @@ function make(midi: number, step: number, lengthSteps: number, velocity = DEFAUL
   return { id: `n${midi}_${step}`, pitch: midiToNote(midi), step, lengthSteps, velocity: clampVelocity(velocity) };
 }
 
-const keepSlide = (from: MelodyNote, to: MelodyNote): MelodyNote => from.slide ? { ...to, slide: true } : to;
+const keepSlide = (from: MelodyNote, to: MelodyNote): MelodyNote => from.slide ? { ...to, slide: true, ...(from.glide ? { glide: from.glide } : {}) } : to;
 function midiOf(n: MelodyNote): number { return noteToMidi(n.pitch) ?? -1; }
 
 /** Sorts, clips lengths to the bar, drops invalid notes and overlapping notes of the same pitch. */
@@ -68,7 +78,7 @@ export function normalizeNotes(notes: MelodyNote[]): MelodyNote[] {
     if (n.step < (lastEnd.get(midi) ?? 0)) continue;
     const len = Math.min(Math.round(n.lengthSteps), STEPS - n.step);
     lastEnd.set(midi, n.step + len);
-    out.push(n.slide ? { ...make(midi, n.step, len, n.velocity), slide: true } : make(midi, n.step, len, n.velocity));   // keep the slide flag
+    out.push(n.slide ? { ...make(midi, n.step, len, n.velocity), slide: true, ...(n.glide ? { glide: n.glide } : {}) } : make(midi, n.step, len, n.velocity));   // keep the slide flag and its glide style
   }
   return out;
 }
@@ -281,7 +291,7 @@ export function toggleSlide(notes: MelodyNote[], id: string): MelodyNote[] {
   if (!notes.some(n => n.id === id)) return notes;
   return notes.map(n => {
     if (n.id !== id) return n;
-    if (n.slide) { const { slide: _gone, ...rest } = n; void _gone; return rest; }
+    if (n.slide) { const { slide: _gone, glide: _g, ...rest } = n; void _gone; void _g; return rest; }
     return { ...n, slide: true };
   });
 }
@@ -311,6 +321,18 @@ export function slideCents(notes: MelodyNote[], n: MelodyNote): number {
  * `path` = (step offset from the plain note, cents from its pitch); `endStep` = where the sound stops; `skip` = ids of the (silent) slide notes used.
  */
 export type SlidePath = { path: { at: number; cents: number }[]; endStep: number; skip: string[] };
+/** Where a glide starts and ends (in steps), by its style. `floor` = the earliest step it may start (the note before it is not sounding earlier). */
+function glideSpan(s: MelodyNote, floor: number): [number, number] {
+  const st = s.step, en = s.step + s.lengthSteps;
+  const span = (a: number, b: number): [number, number] => { const g1 = Math.min(en, Math.max(b, floor)); return [Math.max(floor, Math.min(a, g1)), g1]; };
+  switch (s.glide) {
+    case 'smooth': return span(st - 2, st + 1);
+    case 'long': return span(floor, st + 1);
+    case 'snap': return span(st - 0.25, st + 0.25);
+    case 'tie': return [st, st + 0.01];
+    default: return [st, en];                                       // 'late' and old projects: glide over the length of the slide note
+  }
+}
 export function slidePath(notes: MelodyNote[], n: MelodyNote): SlidePath | null {
   if (n.slide) return null;
   const base = noteToMidi(n.pitch); if (base === null) return null;
@@ -322,8 +344,9 @@ export function slidePath(notes: MelodyNote[], n: MelodyNote): SlidePath | null 
     const first = Math.min(...cand.map(s => s.step));
     const s = cand.filter(o => o.step === first).reduce((best, o) => Math.abs((noteToMidi(o.pitch) as number) - base) < Math.abs((noteToMidi(best.pitch) as number) - base) ? o : best);
     const target = Math.max(-MAX_SLIDE_SEMITONES, Math.min(MAX_SLIDE_SEMITONES, (noteToMidi(s.pitch) as number) - base)) * 100;
-    path.push({ at: s.step - n.step, cents });                      // hold the current pitch until the slide note starts …
-    path.push({ at: s.step + s.lengthSteps - n.step, cents: target }); // … glide to its pitch within its length
+    const [g0, g1] = glideSpan(s, n.step + (path.length ? path[path.length - 1].at : 0));
+    path.push({ at: g0 - n.step, cents });                          // hold the current pitch until the glide starts …
+    path.push({ at: g1 - n.step, cents: target });                  // … and reach the pitch of the slide note when it ends
     cents = target; end = Math.max(end, s.step + s.lengthSteps); skip.push(s.id);
   }
   if (skip.length === 0) return null;
@@ -334,12 +357,12 @@ export function slidePath(notes: MelodyNote[], n: MelodyNote): SlidePath | null 
  * It uses the slide notes above: the second note becomes a slide note (its length is the time of the glide) and the first note is stretched
  * when needed so that it is still sounding where the second one starts. The second note must start after the first one.
  */
-export function linkNotes(notes: MelodyNote[], fromId: string, toId: string): MelodyNote[] {
+export function linkNotes(notes: MelodyNote[], fromId: string, toId: string, mode: LinkMode = 'smooth'): MelodyNote[] {
   const a = notes.find(n => n.id === fromId), b = notes.find(n => n.id === toId);
   if (!a || !b || a.id === b.id || b.step <= a.step) return notes;
   if (noteToMidi(a.pitch) === null || noteToMidi(b.pitch) === null) return notes;
   const stretched = a.step + a.lengthSteps < b.step ? resizeNote(notes, a.id, b.step - a.step) : notes;
-  return stretched.map(n => n.id === b.id ? { ...n, slide: true } : n);
+  return stretched.map(n => n.id === b.id ? { ...n, slide: true, glide: mode } : n);
 }
 /** The arrows to draw: every note that glides, from the note before it (a plain note, or the slide note before it in a chain) to the slide note. */
 export function linkEdges(notes: MelodyNote[]): { from: string; to: string }[] {
