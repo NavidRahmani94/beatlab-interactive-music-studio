@@ -227,3 +227,6 @@ Built after the crackle diagnosis and the user's OK. Live SHAPE LAB sounds only;
 
 ## v0.25.2 — play buttons above the piano roll
 - The ▶ PLAY / ■ STOP button and ▶ THIS PATTERN (loops only the open pattern) are now also in the bar right above the piano roll, next to ↗ LINK, so there is no need to scroll up. The buttons in the tab bar stay. Code: `onPlay`, `onPlayPattern` in `src/ui/PianoRoll.tsx` (passed through `TrackPanel`). Test: `tools/e2e-v250.cjs`.
+
+## v0.25.3 — roomier LINK bar
+- The help text next to LINK is short now (the full hint of each style is its tooltip), and the buttons never wrap, so the style names are easy to read.

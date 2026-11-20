@@ -252,7 +252,7 @@ export default function PianoRoll({ onPlay, onPlayPattern, playing = false, patt
         title="LINK: drag an arrow from one note to a later note. The first note glides to the pitch of the second one (a long, smooth slide). Click a linked note to take the link away.">↗ LINK</button>}
       {slide && link && <>
         <div className="seg small" role="group" aria-label="Link style">{LINK_MODES.map(m => <button key={m.id} className={linkMode === m.id ? 'sel' : ''} aria-pressed={linkMode === m.id} title={m.hint} onClick={() => setLinkMode(m.id)}>{m.label}</button>)}</div>
-        <span className="link-help">DRAG FROM A NOTE TO A LATER NOTE · {LINK_MODES.find(m => m.id === linkMode)?.hint.toUpperCase()} · CLICK A LINKED NOTE TO UNLINK</span></>}
+        <span className="link-help" title={LINK_MODES.find(m => m.id === linkMode)?.hint}>DRAG NOTE → NOTE · CLICK LINK = REMOVE</span></>}
     </div>}
     <div className={'roll-wrap ' + (advanced ? 'advanced' : 'easy') + (enabled ? '' : ' is-muted')} ref={rollRef} style={{ ['--accent' as string]: accent }}>
       <div className={'roll' + (touchDraw ? ' draw' : '')} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={() => { drag.current = null; linkDrag.current = null; setBand(null); }} ref={rollBox}>

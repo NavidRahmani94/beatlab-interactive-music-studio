@@ -508,3 +508,7 @@ h1,h2,h3{font-weight:700}
 .link-svg line.band{stroke-dasharray:5 4;opacity:.8}
 .link-svg text{fill:currentColor;stroke:none;font-family:'DM Mono',monospace;font-size:9px;font-weight:700;letter-spacing:1px;paint-order:stroke;stroke:var(--bg);stroke-width:3px}
 .roll-tools{flex-wrap:wrap}.roll-tools .mini-play{height:30px;min-width:38px;padding:0 12px}.roll-tools .mini-play.pat{padding:0 12px}
+.roll-tools .link-btn,.roll-tools .seg button,.roll-tools .mini-play{white-space:nowrap}
+.roll-tools .seg button{padding:0 14px;font-size:11px}
+.roll-tools .link-btn{padding:0 14px;font-size:11px}
+.roll-tools .link-help{font-size:9px}
