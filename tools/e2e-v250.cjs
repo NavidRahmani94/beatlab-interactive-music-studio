@@ -35,6 +35,17 @@ const { chromium } = require('playwright');
   ok('clicking the glided note removes the link', (await roll.locator('.link-svg line').count()) === 0 && (await roll.locator('.mcell.on.slide').count()) === 0);
   await p.locator('.link-btn').first().click(); await p.waitForTimeout(150);
   ok('LINK mode is off again', (await p.locator('.link-help').count()) === 0);
+  // PLAY and THIS PATTERN right above the roll
+  const tools = p.locator('.roll-tools').first();
+  ok('PLAY and THIS PATTERN sit in the bar right above the roll', (await tools.locator('.mini-play').count()) === 2);
+  await tools.locator('.mini-play.pat').click(); await p.waitForTimeout(800);
+  ok('THIS PATTERN above the roll starts playing only this pattern', (await tools.locator('.mini-play.pat.on').count()) === 1);
+  await tools.locator('.mini-play.pat').click(); await p.waitForTimeout(500);
+  ok('and stops again', (await tools.locator('.mini-play.pat.on').count()) === 0);
+  await tools.locator('.mini-play:not(.pat)').click(); await p.waitForTimeout(800);
+  ok('PLAY above the roll starts the song', (await tools.locator('.mini-play.on').count()) >= 1);
+  await tools.locator('.mini-play:not(.pat)').click(); await p.waitForTimeout(500);
+  ok('and stops it', (await tools.locator('.mini-play.on').count()) === 0);
   ok('no page errors', errs.length === 0, errs.join(' | ').slice(0, 300));
   console.log(bad ? bad + ' FAILED' : 'ALL PASS'); await b.close(); process.exit(bad ? 1 : 0);
 })();

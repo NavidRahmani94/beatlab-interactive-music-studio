@@ -224,3 +224,6 @@ Built after the crackle diagnosis and the user's OK. Live SHAPE LAB sounds only;
 - The change now happens in the **first** note (its pitch bends toward the second one) and only a little in the second one. LINK has five styles (buttons next to LINK, the style is also written on the arrow): **SMOOTH** (default: bends in the end of the first note, one step into the second), **LONG** (a long glide over the whole first note), **SNAP** (a quick scoop at the border), **TIE** (no glide, the new pitch comes without a new attack), **LATE** (the older style: the glide is inside the second note). To change the style of a link, drag the arrow again with another style.
 - The style is stored on the second note (`glide`, saved in the project file; projects without it keep the old LATE behaviour). Code: `LINK_MODES`, `glideSpan`, `linkNotes` in `src/music/melody.ts`.
 - Tests: `src/music/link.test.ts` (6 tests) and `tools/e2e-v250.cjs`.
+
+## v0.25.2 — play buttons above the piano roll
+- The ▶ PLAY / ■ STOP button and ▶ THIS PATTERN (loops only the open pattern) are now also in the bar right above the piano roll, next to ↗ LINK, so there is no need to scroll up. The buttons in the tab bar stay. Code: `onPlay`, `onPlayPattern` in `src/ui/PianoRoll.tsx` (passed through `TrackPanel`). Test: `tools/e2e-v250.cjs`.

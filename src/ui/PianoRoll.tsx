@@ -22,6 +22,9 @@ type Props = {
   cursor?: number;          // step-entry position (highlighted column), -1 = none
   octave?: number;          // EASY mode: shifts the shown octave by this many octaves
   slide?: boolean;          // show the SLIDE lane (not for arpeggio tracks, whose notes are chords)
+  onPlay?: () => void;      // the PLAY / STOP button right above the roll
+  onPlayPattern?: () => void; // the THIS PATTERN button right above the roll (loops only the pattern that is open)
+  playing?: boolean; patternOn?: boolean;
   touchDraw: boolean;       // touch screens: true = dragging draws or stretches notes, false = dragging scrolls (a tap still adds or removes a note)
 };
 
@@ -56,7 +59,7 @@ const Row = memo(function Row({ midi, name, inKey, isRoot, live, advanced, curso
  * Piano roll. CLICK an empty cell = new note (default length). DRAG sideways from an empty cell = a note of any length.
  * DRAG sideways from a cell of an existing note = stretch / shrink it. CLICK an existing note = remove it.
  */
-export default function PianoRoll({ octave = 0, slide = true, notes, onNotes, advanced, keyPc, scale, defaultLength, velocity, enabled, playingStep, accent, touchDraw, onPreview, liveNotes, cursor = -1 }: Props) {
+export default function PianoRoll({ onPlay, onPlayPattern, playing = false, patternOn = false, octave = 0, slide = true, notes, onNotes, advanced, keyPc, scale, defaultLength, velocity, enabled, playingStep, accent, touchDraw, onPreview, liveNotes, cursor = -1 }: Props) {
   const rollRef = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);
   const laneDragging = useRef(false);
@@ -242,9 +245,15 @@ export default function PianoRoll({ octave = 0, slide = true, notes, onNotes, ad
   }
 
   return <>
-    {slide && <div className="roll-tools"><button className={'link-btn' + (link ? ' on' : '')} aria-pressed={link} aria-label="Link mode" onClick={() => setLink(l => !l)}
-      title="LINK: drag an arrow from one note to a later note. The first note glides to the pitch of the second one (a long, smooth slide). Click a linked note to take the link away.">↗ LINK</button>{link && <><div className="seg small" role="group" aria-label="Link style">{LINK_MODES.map(m => <button key={m.id} className={linkMode === m.id ? 'sel' : ''} aria-pressed={linkMode === m.id} title={m.hint} onClick={() => setLinkMode(m.id)}>{m.label}</button>)}</div>
-      <span className="link-help">DRAG FROM A NOTE TO A LATER NOTE · {LINK_MODES.find(m => m.id === linkMode)?.hint.toUpperCase()} · CLICK A LINKED NOTE TO UNLINK</span></>}</div>}
+    {(slide || onPlay || onPlayPattern) && <div className="roll-tools">
+      {onPlay && <button className={'mini-play' + (playing ? ' on' : '')} aria-label={playing ? 'Stop (above roll)' : 'Play (above roll)'} title="Play / stop (Space also works)" onClick={onPlay}>{playing ? '■' : '▶'}</button>}
+      {onPlayPattern && <button className={'mini-play pat' + (patternOn ? ' on' : '')} aria-label="Play only this pattern (above roll)" title="Loop only the pattern you are editing" onClick={onPlayPattern}>{patternOn ? '■' : '▶'} THIS PATTERN</button>}
+      {slide && <button className={'link-btn' + (link ? ' on' : '')} aria-pressed={link} aria-label="Link mode" onClick={() => setLink(l => !l)}
+        title="LINK: drag an arrow from one note to a later note. The first note glides to the pitch of the second one (a long, smooth slide). Click a linked note to take the link away.">↗ LINK</button>}
+      {slide && link && <>
+        <div className="seg small" role="group" aria-label="Link style">{LINK_MODES.map(m => <button key={m.id} className={linkMode === m.id ? 'sel' : ''} aria-pressed={linkMode === m.id} title={m.hint} onClick={() => setLinkMode(m.id)}>{m.label}</button>)}</div>
+        <span className="link-help">DRAG FROM A NOTE TO A LATER NOTE · {LINK_MODES.find(m => m.id === linkMode)?.hint.toUpperCase()} · CLICK A LINKED NOTE TO UNLINK</span></>}
+    </div>}
     <div className={'roll-wrap ' + (advanced ? 'advanced' : 'easy') + (enabled ? '' : ' is-muted')} ref={rollRef} style={{ ['--accent' as string]: accent }}>
       <div className={'roll' + (touchDraw ? ' draw' : '')} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={() => { drag.current = null; linkDrag.current = null; setBand(null); }} ref={rollBox}>
         {(arrows.length > 0 || band) && <svg className="link-svg" aria-hidden="true"><defs><marker id="link-head" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor" /></marker></defs>
