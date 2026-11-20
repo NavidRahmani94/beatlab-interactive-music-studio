@@ -4,7 +4,8 @@ A browser music studio with four tracks – **Ambient, Drums, Melody, Arpeggio**
 React + TypeScript + Vite + Tone.js. No backend.
 
 > New to the code? Read **docs/CODE_GUIDE.md** (simple English: what each file does and how the parts fit together).
-
+
+
 
 ## Where to change what
 
@@ -21,10 +22,24 @@ All code lives in `src/`. Each folder has one job, and each test sits next to th
 | Screens and panels: piano roll, mixer, drums, timeline, theme | `src/ui/` | `PianoRoll.tsx`, `MixerPanel.tsx`, `DrumPanel.tsx`, `Timeline.tsx`, `theme.ts` |
 | Colours, fonts, page style | `src/styles/` | `main.css`, `funsized.css` |
 | The main page that connects everything | `src/` | `App.tsx`, `main.tsx` |
+| Finding the code of something you see on the page | the **INSPECT** button in the page header | see below |
 | Benchmarks and browser test scripts | `tools/` | `e2e-*.cjs`, `bench*.cjs` |
 | Documentation | `docs/` | `CODE_GUIDE.md`, `ARCHITECTURE.md`, `TESTING.md` |
 
-Older notes in `docs/` mention files by name only. Look the name up in the table above to find its folder.
+Older notes in `docs/` mention files by name only. Look the name up in the table above to find its folder.
+
+
+### INSPECT: click a part of the page, see its code
+
+Press **🔍 INSPECT** at the top of the page (next to LITE and STATS). While it is on, nothing is played or changed. Move the mouse over the page to see a box with `file:line`, and click to open the panel:
+
+- **Code:** the file and line that made that part (with a copy button), how many lines the file has.
+- **What this file does** and what its **folder** is for.
+- **When you use it, it runs:** the handler of that button or slider (for example `onClick={playing ? stop : play}`). Look up the name in the file shown.
+- **Where it sits:** the elements around it, from inner to outer. Click one to see it.
+- **This file uses / Used by / Tests:** how the file connects to the others. Click a file name to jump to that file.
+
+Press `Esc` or the button again to leave. It works on the live site too. How it is made: `vite-plugins/inspect.mjs` writes the file and line onto every element when the page is built, and builds the map of the files; the panel is `src/inspect/Inspector.tsx` (loaded only when you switch it on). Test: `tools/e2e-v240.cjs <url>`.
 
 ## Start
 ```bash

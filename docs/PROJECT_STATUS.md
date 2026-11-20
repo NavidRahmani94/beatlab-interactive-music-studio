@@ -199,3 +199,9 @@ Built after the crackle diagnosis and the user's OK. Live SHAPE LAB sounds only;
 - Space now starts and stops the song also when a button, slider or menu still has the focus after a mouse click (before, it was ignored there, or it pressed that button again). Only real text fields keep their own Space.
 - Holding Space toggles only once. The header label now says V0.23.1.
 - Test: `tools/e2e-v231.cjs <url>` (focus on a tab button, on a slider, in a text field, held key).
+
+## v0.24.0 — INSPECT mode
+- New **🔍 INSPECT** button in the header. While it is on, a click on any part of the page shows the file and line of its code, what that file does, what the click runs, the elements around it, and which files it uses / is used by / is tested by. Nothing is played or changed while it is on; `Esc` leaves.
+- Made at build time: `vite-plugins/inspect.mjs` (a Babel plugin that writes `data-src="file:line"` and `data-on="onClick={…}"` onto every page element, and a virtual module with the map of the source files). The panel is `src/inspect/Inspector.tsx`, loaded only when switched on (about 28 kB, 7.5 kB zipped). The first download grows by about 37 kB (6.5 kB zipped) for the file and line marks.
+- Tests: `src/inspect/inspect.test.ts` (8 unit tests: marks, source map) and `tools/e2e-v240.cjs` (panel, click blocked, slider not moved, file jump, hover box, Escape).
+- Limits: "what it runs" shows the handler as written in the code, not a live call trace. Elements made by libraries without a mark (for example the 3D canvas content) show the nearest marked parent.

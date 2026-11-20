@@ -1,6 +1,6 @@
 // FILE: The main page. It keeps the whole project in React state (tracks, patterns, playlist, mixer, tempo) and connects every panel to the sound engine.
 // It also handles: play / stop, undo / redo, saving and opening files, MIDI input, the computer-keyboard piano and the hand-gesture controls.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BeatLabEngine } from './audio/engine';
 import { Instrument, clampBpm, toggleStep } from './music/pattern';
 import { DRUMS_TAB, DRUM_IDS, KIND_DEFAULT_INSTRUMENT, MAX_TRACKS, TRACK_KINDS, TRACK_KIND_IDS, TrackDef, TrackKind, addTrack, removeTrack, renameTrackLive, trackAccent, trackById, updateTrack } from './project/tracks';
@@ -41,6 +41,7 @@ import { Tuning, TEMPO_STYLES, TUNING_MAX_CENTS, TUNING_MAX_SEMITONES, clampCent
 import { Autosave, clearAutosave, readAutosave, saveAutosave } from './project/autosave';
 import { ThemeChoice, THEME_LABEL, applyTheme, loadTheme, nextTheme, saveTheme } from './ui/theme';
 import './styles/main.css';
+const Inspector = lazy(() => import('./inspect/Inspector'));   // the INSPECT mode, loaded only when it is switched on
 
 type Status = { kind: 'info' | 'error'; text: string };
 
@@ -77,6 +78,7 @@ export default function App() {
   const [channels, setChannels] = useState<Channels>(initial.channels);
   const [master, setMaster] = useState<MasterSettings>(initial.master);
   const [playing, setPlaying] = useState(false);
+  const [inspect, setInspect] = useState(false);   // INSPECT mode: click a part of the page to see its code
   const [frame, setFrame] = useState<Frame | null>(null);
   const [status, setStatus] = useState<Status>({ kind: 'info', text: 'Press PLAY (or Space) to start. Everything you change is heard live.' });
   const [loops, setLoops] = useState(1);
@@ -600,7 +602,8 @@ export default function App() {
   const bars = mode === 'song' ? playlist.length : 1;
 
   return <main className="shell" style={{ ['--bar-s' as string]: `${(STEPS * 15) / bpm}s` }}>
-    <header><div><div className="eyebrow">INTERACTIVE MUSIC STUDIO</div><h1><span>BEAT</span>LAB<span className="dot">.</span></h1></div><div className="head-right"><button className={'theme-btn' + (lite ? ' on' : '')} aria-pressed={lite} aria-label="Lite mode" title="Lite mode: stops the decorative animation and draws the visualiser less often. Helps slow computers and phones." onClick={() => { setLite(l => { saveLite(!l); return !l; }); }}>{lite ? '🍃 LITE ON' : '🍃 LITE'}</button><button className={'theme-btn' + (sysOpen ? ' on' : '')} aria-pressed={sysOpen} aria-label="System monitor" title="Show CPU / audio load and memory use" onClick={() => setSysOpen(o => !o)}>📊 STATS</button><button className="theme-btn" aria-label="Colour theme" title="Switch between automatic, dark and light" onClick={() => setTheme(nextTheme(theme))}>{THEME_LABEL[theme]}</button><div className="phase">PHASE 01–10 <span>• V0.23.1 TEST BUILD</span></div></div></header>
+    <header><div><div className="eyebrow">INTERACTIVE MUSIC STUDIO</div><h1><span>BEAT</span>LAB<span className="dot">.</span></h1></div><div className="head-right"><button className={'theme-btn' + (lite ? ' on' : '')} aria-pressed={lite} aria-label="Lite mode" title="Lite mode: stops the decorative animation and draws the visualiser less often. Helps slow computers and phones." onClick={() => { setLite(l => { saveLite(!l); return !l; }); }}>{lite ? '🍃 LITE ON' : '🍃 LITE'}</button><button className={'theme-btn insp-toggle' + (inspect ? ' on' : '')} aria-pressed={inspect} aria-label="Inspect mode" title="Inspect: click any part of the page to see which file and line of code it comes from, what it runs and how it connects" onClick={() => setInspect(i => !i)}>🔍 INSPECT</button><button className={'theme-btn' + (sysOpen ? ' on' : '')} aria-pressed={sysOpen} aria-label="System monitor" title="Show CPU / audio load and memory use" onClick={() => setSysOpen(o => !o)}>📊 STATS</button><button className="theme-btn" aria-label="Colour theme" title="Switch between automatic, dark and light" onClick={() => setTheme(nextTheme(theme))}>{THEME_LABEL[theme]}</button><div className="phase">PHASE 01–10 <span>• V0.24.0 TEST BUILD</span></div></div></header>
+    {inspect && <Suspense fallback={null}><Inspector onClose={() => setInspect(false)} /></Suspense>}
     <SystemMonitor open={sysOpen} onClose={() => setSysOpen(false)} playing={playing} getHealth={getHealth} />
     <section className="intro hero"><div className="hero-text"><div className="eyebrow">YOUR FIRST SONG</div><h2>Make some noise.</h2><p>Ambient. Drums. Melody. Arpeggio. Mix. Master. Arrange. Export WAV / MP3.</p></div><HeroArt playing={playing} bpm={bpm} lite={lite} /></section>
     {pendingRestore && <div className="restore-banner" role="alert">

@@ -215,3 +215,5 @@ Audit script (not shipped): every built-in sound rendered offline on 7 notes; be
 - Browser: `tools/e2e-v212.cjs <url>`: SMOOTH is the default; the browser buffer is about 10 ms (FAST), 23 ms (SMOOTH) and 80 ms (SAFE); the delay is shown; a very quick first key tap does not hang (SMOOTH and FAST). The hang was reproduced before the fix. `tools/e2e-v210.cjs` and `tools/e2e-v211.cjs` still pass.
 - Dev tools: `tools/costshape.cjs` (every instrument), `tools/costshape2.cjs` (realistic setups), `tools/clicks.cjs` (clicks and voice steals). They measure on the machine that runs them, so only compare numbers from the same machine.
 - Not tested: a real audio device (crackle cannot be heard in a headless browser).
+
+`src/inspect/inspect.test.ts` (file and line marks from the Babel plugin, the map of the source files, folder names) and `tools/e2e-v240.cjs <url>` (INSPECT mode in the browser: opens, shows file and line, blocks the click, leaves with Esc). Run it on the dev server and on the built site.
