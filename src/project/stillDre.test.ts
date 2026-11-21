@@ -17,15 +17,23 @@ describe('Still D.R.E. style (the song every new project starts with)', () => {
   it('uses only notes of A minor', () => {
     p.patterns.forEach(pt => Object.values(pt.notes).forEach(list => list.forEach(n => expect(A_MINOR.has((noteToMidi(n.pitch) ?? 0) % 12), n.pitch).toBe(true))));
   });
-  it('the piano plays the three chord shapes (C-E-A, B-E-A, B-E-G) and the bass roots are A and E', () => {
-    const groove = p.patterns[1];
-    const at = (track: string, step: number) => groove.notes[track].filter(n => n.step === step).map(n => noteToMidi(n.pitch)).sort();
-    expect(at('melody', 0)).toEqual([60, 64, 69]); expect(at('melody', 6)).toEqual([59, 64, 69]); expect(at('melody', 10)).toEqual([59, 64, 67]);
-    expect(at('ambient', 0)).toEqual([45]); expect(at('ambient', 6)).toEqual([40]);
-  });
-  it('the bass is lower than the piano and the drums have a kick and a backbeat snare', () => {
+  it('the piano loop is the transcription: C5+A5 eighth-note stabs 11 times, then B4+G5 5 times (2 bars)', () => {
     const g = p.patterns[1];
-    expect(Math.max(...g.notes.ambient.map(n => noteToMidi(n.pitch) ?? 0))).toBeLessThan(Math.min(...g.notes.melody.map(n => noteToMidi(n.pitch) ?? 0)));
+    const at = (track: string, step: number) => g.notes[track].filter(n => n.step === step).map(n => noteToMidi(n.pitch)).sort();
+    for (let st = 0; st < 22; st += 2) expect(at('melody', st), `step ${st}`).toEqual([72, 81]);
+    for (let st = 22; st < 32; st += 2) expect(at('melody', st), `step ${st}`).toEqual([71, 79]);
+    expect(g.notes.melody).toHaveLength(32);                         // 16 stabs of two notes, nothing else
+    expect(g.notes.melody.every(n => n.step % 2 === 0 && n.lengthSteps === 2)).toBe(true);
+  });
+  it('the bass line is A, B, E, G (the transcription, one octave up)', () => {
+    const bass = p.patterns[1].notes.ambient.map(n => [n.step, noteToMidi(n.pitch), n.lengthSteps]).sort((x, y) => (x[0] as number) - (y[0] as number));
+    expect(bass).toEqual([[0, 45, 3], [12, 47, 4], [16, 52, 3], [28, 43, 4]]);
+  });
+  it('the intro is the piano alone and the bass comes in with the groove (as in the transcription)', () => {
+    expect(p.patterns[0].notes.ambient ?? []).toHaveLength(0); expect(p.patterns[0].notes.melody.length).toBeGreaterThan(0);
+  });
+  it('the drums have a kick and a backbeat snare', () => {
+    const g = p.patterns[1];
     expect(g.drums.kick[0]).toBe(true); expect(g.drums.snare[4]).toBe(true); expect(g.drums.snare[12]).toBe(true);
   });
   it('the mix (checked by rendering it): the piano leads, the bass sits under it, the snare is clear and the hats are soft', () => {

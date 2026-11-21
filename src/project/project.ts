@@ -152,27 +152,22 @@ export function hipHopDemo(): BeatLabProject {
 }
 
 /**
- * West-coast hip hop in the style of "Still D.R.E.": 93 BPM, A minor, short piano chord stabs (A minor, E sus4, E minor),
- * a deep sub bass under them and a dry boom-bap beat. The rhythm of the stabs is our own writing, it is not a copy of the record.
+ * "Still D.R.E." style: 93 BPM, A minor. The piano loop and the bass line are taken note for note from a public transcription of the
+ * record (a .mid file, 2 bars long): eighth-note stabs of C5+A5 (11 times) and then B4+G5 (5 times), and a bass of A, B, E and G.
+ * The bass is written one octave higher than in that file because the lowest key of the piano roll is C2. The drums are our own writing.
  */
 export function stillDreDemo(): BeatLabProject {
-  type C = [number, number, number];
-  const Am: C = [60, 64, 69], Esus4: C = [59, 64, 69], Em: C = [59, 64, 67];                       // C-E-A, B-E-A, B-E-G
-  const stabs = (chord: C, step: number, len: number, vel: number): N4[] => chord.map(m => [m, step, len, vel] as N4);
-  const riff = (o: number, hard = false): N4[] => [
-    ...stabs(Am, o + 0, 2, hard ? 0.95 : 0.88), ...stabs(Am, o + 3, 1, 0.62), ...stabs(Esus4, o + 6, 2, 0.8), ...stabs(Em, o + 10, 2, 0.8), ...stabs(Am, o + 14, 1, 0.58)
-  ];
-  const piano = (hard = false): N4[] => [...riff(0, hard), ...riff(16, hard)];
-  const bassBar = (o: number): N4[] => [[45, o + 0, 6, 0.95], [40, o + 6, 7, 0.9], [45, o + 14, 2, 0.8]];       // A2, E2, A2 (C2 is the lowest key of the roll)
-  const bass = (): N4[] => [...bassBar(0), ...bassBar(16)];
+  const stabs = (a: number, b: number, from: number, to: number, vel: number): N4[] => every(2, from, to).flatMap(st => [[a, st, 2, vel], [b, st, 2, vel]] as N4[]);
+  const riff = (vel = 0.9): N4[] => [...stabs(72, 81, 0, 22, vel), ...stabs(71, 79, 22, 32, vel)];                       // C5+A5 x11, B4+G5 x5
+  const bass = (): N4[] => [[45, 0, 3, 0.95], [47, 12, 4, 0.95], [52, 16, 3, 0.95], [43, 28, 4, 0.95]];                    // A, B, E, G (one octave up)
   const hats = every(2).filter(i => i % 4 !== 3), hatsBusy = [...every(2), 7, 15, 23, 31];
   const beat = drums32([0, 10, 16, 26], [4, 12, 20, 28], hats, []);
   const beatHard = drums32([0, 7, 10, 16, 23, 26], [4, 12, 20, 28], hatsBusy, [28]);
   const patterns = [
-    mk('Intro', drums32([0, 16], [], every(4, 2), []), piano(), [], []),
-    mk('Groove', beat, piano(), bass(), []),
-    mk('Hook', beatHard, piano(true), bass(), []),
-    mk('Break', drums32([0], [], [], []), riff(0), [[45, 0, 14, 0.9]], [])
+    mk('Intro', drums32([0, 16], [], every(4, 2), []), riff(), [], []),
+    mk('Groove', beat, riff(), bass(), []),
+    mk('Hook', beatHard, riff(1), bass(), []),
+    mk('Break', drums32([0], [], [], []), riff(0.8), [], [])
   ];
   const base = defaultProject();
   return {
@@ -183,8 +178,8 @@ export function stillDreDemo(): BeatLabProject {
     channels: {
       ...base.channels,
       kick: { ...base.channels.kick, volumeDb: 1 }, snare: { ...base.channels.snare, volumeDb: 6, reverbSend: 0.1 }, hat: { ...base.channels.hat, volumeDb: -13 },
-      melody: { ...base.channels.melody, volumeDb: 2, pan: 0.05, reverbSend: 0.1, delaySend: 0 },
-      ambient: { ...base.channels.ambient, volumeDb: -5, pan: 0, reverbSend: 0, delaySend: 0 },
+      melody: { ...base.channels.melody, volumeDb: -1, pan: 0.05, reverbSend: 0.1, delaySend: 0 },
+      ambient: { ...base.channels.ambient, volumeDb: -3, pan: 0, reverbSend: 0, delaySend: 0 },
       arp: { ...base.channels.arp, volumeDb: -8 }
     },
     master: { ...defaultMaster(), reverbMix: 0.1, delayFeedback: 0.25, eqLow: 1, compAmount: 0.4 }
