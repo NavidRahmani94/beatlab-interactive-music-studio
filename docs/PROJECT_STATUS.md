@@ -237,3 +237,9 @@ Built after the crackle diagnosis and the user's OK. Live SHAPE LAB sounds only;
 
 ## v0.25.5 — SONG / PATTERN in the TRANSPORT panel
 - The SONG / PATTERN switch is now also in the TRANSPORT panel next to PLAY (it is the same switch as in the playlist panel). On narrow screens the row wraps. Test: `tools/e2e-v254.cjs`.
+
+## v0.26.0 — the starting song is "Still D.R.E. style"
+- A new project (and the first start of the app) now opens with **Still D.R.E. style**: 93 BPM, A minor, piano chord stabs (A minor, E sus4, E minor), a sub bass under them (A and E) and a dry "Tight" boom-bap beat. Patterns: Intro, Groove, Hook, Break, 14 slots. The chord shapes and the key and tempo follow the style of that record; the rhythm of the stabs, the bass and the drums are our own writing, not a copy. The old Hip Hop Demo is still in the sample list.
+- Checked by rendering the song offline (`renderProjectToWav`): peak -2.6 dB (no clipping), average level -20.9 dB like the other demos (Hip Hop Demo -21.1 dB). Balance: piano -22.8 dB, bass -27 dB (under the piano, dry), snare peak -9.3 dB (clear), kick -10.1 dB, hats -15.9 dB (soft). The mix values are in `stillDreDemo` in `src/project/project.ts`.
+- The lowest key of the piano roll is C2, so the bass uses A2 and E2.
+- Tests: `src/project/stillDre.test.ts` (key, tempo, instruments, notes only in A minor, the three chord shapes, bass roots, kit, mix order); the demo is also in `src/audio/demos.test.ts`.

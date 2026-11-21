@@ -4,7 +4,7 @@ import { MAX_MIDI, MIN_MIDI, noteToMidi } from '../music/melody';
 import { isDrumKit, isMelodyInstrument } from './instruments';
 import { STEPS } from '../music/pattern';
 
-const DEMOS = ['Hip Hop Demo', 'Lo-Fi Chill', 'House 124', 'Trap 140', 'Persian Mood', 'Synthwave 108', 'Chiptune 150'];
+const DEMOS = ['Still D.R.E. style', 'Hip Hop Demo', 'Lo-Fi Chill', 'House 124', 'Trap 140', 'Persian Mood', 'Synthwave 108', 'Chiptune 150'];
 
 describe('demo songs in several styles', () => {
   it('are all listed as samples', () => { DEMOS.forEach(n => expect(Object.keys(SAMPLE_PROJECTS)).toContain(n)); });

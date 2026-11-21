@@ -151,6 +151,46 @@ export function hipHopDemo(): BeatLabProject {
   };
 }
 
+/**
+ * West-coast hip hop in the style of "Still D.R.E.": 93 BPM, A minor, short piano chord stabs (A minor, E sus4, E minor),
+ * a deep sub bass under them and a dry boom-bap beat. The rhythm of the stabs is our own writing, it is not a copy of the record.
+ */
+export function stillDreDemo(): BeatLabProject {
+  type C = [number, number, number];
+  const Am: C = [60, 64, 69], Esus4: C = [59, 64, 69], Em: C = [59, 64, 67];                       // C-E-A, B-E-A, B-E-G
+  const stabs = (chord: C, step: number, len: number, vel: number): N4[] => chord.map(m => [m, step, len, vel] as N4);
+  const riff = (o: number, hard = false): N4[] => [
+    ...stabs(Am, o + 0, 2, hard ? 0.95 : 0.88), ...stabs(Am, o + 3, 1, 0.62), ...stabs(Esus4, o + 6, 2, 0.8), ...stabs(Em, o + 10, 2, 0.8), ...stabs(Am, o + 14, 1, 0.58)
+  ];
+  const piano = (hard = false): N4[] => [...riff(0, hard), ...riff(16, hard)];
+  const bassBar = (o: number): N4[] => [[45, o + 0, 6, 0.95], [40, o + 6, 7, 0.9], [45, o + 14, 2, 0.8]];       // A2, E2, A2 (C2 is the lowest key of the roll)
+  const bass = (): N4[] => [...bassBar(0), ...bassBar(16)];
+  const hats = every(2).filter(i => i % 4 !== 3), hatsBusy = [...every(2), 7, 15, 23, 31];
+  const beat = drums32([0, 10, 16, 26], [4, 12, 20, 28], hats, []);
+  const beatHard = drums32([0, 7, 10, 16, 23, 26], [4, 12, 20, 28], hatsBusy, [28]);
+  const patterns = [
+    mk('Intro', drums32([0, 16], [], every(4, 2), []), piano(), [], []),
+    mk('Groove', beat, piano(), bass(), []),
+    mk('Hook', beatHard, piano(true), bass(), []),
+    mk('Break', drums32([0], [], [], []), riff(0), [[45, 0, 14, 0.9]], [])
+  ];
+  const base = defaultProject();
+  return {
+    ...base, name: 'Still D.R.E. style', bpm: 93, drumKit: 'tight',
+    patterns, playlist: [0, 0, 1, 1, 1, 1, 2, 2, 3, 1, 1, 2, 2, 3],
+    tracks: trackSet({ melody: 'piano', ambient: 'subBass', arp: 'rhodes' }),
+    melodyView: { key: 9, scale: 'minor' },
+    channels: {
+      ...base.channels,
+      kick: { ...base.channels.kick, volumeDb: 1 }, snare: { ...base.channels.snare, volumeDb: 6, reverbSend: 0.1 }, hat: { ...base.channels.hat, volumeDb: -13 },
+      melody: { ...base.channels.melody, volumeDb: 2, pan: 0.05, reverbSend: 0.1, delaySend: 0 },
+      ambient: { ...base.channels.ambient, volumeDb: -5, pan: 0, reverbSend: 0, delaySend: 0 },
+      arp: { ...base.channels.arp, volumeDb: -8 }
+    },
+    master: { ...defaultMaster(), reverbMix: 0.1, delayFeedback: 0.25, eqLow: 1, compAmount: 0.4 }
+  };
+}
+
 // ---------- demo songs in other styles (each one uses the newer instruments and kits) ----------
 type N4 = [number, number, number, number];
 /** Two whole-bar chords: `a` on steps 0–15 and `b` on steps 16–31. */
@@ -278,15 +318,16 @@ export function chiptuneDemo(): BeatLabProject {
 }
 
 /** The song that is loaded when the app starts (NEW still gives a simple project). */
-export function startupProject(): BeatLabProject { const p = hipHopDemo(); return { ...p, sections: autoSections(p.patterns, p.playlist) }; }
+export function startupProject(): BeatLabProject { const p = SAMPLE_PROJECTS['Still D.R.E. style'](); return { ...p, sections: autoSections(p.patterns, p.playlist) }; }
 
 export const SAMPLE_PROJECTS_EXTRA: Record<string, () => BeatLabProject> = {
-  'Hip Hop Demo': hipHopDemo, 'Lo-Fi Chill': lofiDemo, 'House 124': houseDemo, 'Trap 140': trapDemo, 'Persian Mood': persianDemo, 'Synthwave 108': synthwaveDemo, 'Chiptune 150': chiptuneDemo
+  'Still D.R.E. style': stillDreDemo, 'Hip Hop Demo': hipHopDemo, 'Lo-Fi Chill': lofiDemo, 'House 124': houseDemo, 'Trap 140': trapDemo, 'Persian Mood': persianDemo, 'Synthwave 108': synthwaveDemo, 'Chiptune 150': chiptuneDemo
 };
 
 Object.assign(SAMPLE_PROJECTS, SAMPLE_PROJECTS_EXTRA);
 // the genre demos get a fitting groove (the plain samples above stay straight)
 const DEMO_GROOVE: Record<string, Groove> = {
+  'Still D.R.E. style': { swing: 0.18, humanize: 0.25, ghost: 0.2, fill: 0.25 },
   'Hip Hop Demo': { swing: 0.35, humanize: 0.4, ghost: 0.4, fill: 0.3 }, 'Lo-Fi Chill': GROOVE_PRESETS['Lo-Fi loose'], 'House 124': { swing: 0.12, humanize: 0.15, ghost: 0, fill: 0.2 },
   'Trap 140': { swing: 0, humanize: 0.15, ghost: 0, fill: 0.3 }, 'Persian Mood': { swing: 0.15, humanize: 0.3, ghost: 0.15, fill: 0.2 }, 'Synthwave 108': { swing: 0.05, humanize: 0.1, ghost: 0, fill: 0.3 }, 'Chiptune 150': defaultGroove()
 };
