@@ -238,8 +238,8 @@ Built after the crackle diagnosis and the user's OK. Live SHAPE LAB sounds only;
 ## v0.25.5 — SONG / PATTERN in the TRANSPORT panel
 - The SONG / PATTERN switch is now also in the TRANSPORT panel next to PLAY (it is the same switch as in the playlist panel). On narrow screens the row wraps. Test: `tools/e2e-v254.cjs`.
 
-## v0.26.1 — the starting song is "Still D.R.E. style"
-- A new project (and the first start of the app) now opens with **Still D.R.E. style**: 93 BPM, A minor, a piano loop, a sub bass and a dry "Tight" boom-bap beat. Patterns: Intro (piano alone), Groove, Hook, Break, 14 slots. The old Hip Hop Demo is still in the sample list.
+## v0.26.2 — "Still D.R.E. style" is a sample, the start song is the Hip Hop Demo again
+- **Still D.R.E. style** is in the sample list (the app starts with the Hip Hop Demo, as before): 93 BPM, A minor, a piano loop, a sub bass and a dry "Tight" boom-bap beat. Patterns: Intro (piano alone), Groove, Hook, Break, 14 slots. 
 - The piano loop and the bass line are taken note for note from a public transcription (a `.mid` file, 2 bars long, supplied by the author): eighth-note stabs of C5+A5 (11 times) and then B4+G5 (5 times); a bass of A, B, E, G. The bass is one octave higher than in that file because the lowest key of the piano roll is C2. The drums, the sounds and the mix are our own.
 - Mix checked by rendering the song offline (`renderProjectToWav`): peak -3.8 dB (no clipping), average level -19.8 dB (Hip Hop Demo is about -21 dB). Piano -20.6 dB average, bass -27.9 dB (dry, under the piano), snare clear, hats soft. The mix values are in `stillDreDemo` in `src/project/project.ts`.
 - Tests: `src/project/stillDre.test.ts` (key, tempo, instruments, every note of the loop and the bass line, intro without bass, kit, mix order); the demo is also in `src/audio/demos.test.ts`.

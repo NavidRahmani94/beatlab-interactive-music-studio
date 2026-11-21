@@ -4,9 +4,9 @@ import { SCALES, noteToMidi } from '../music/melody';
 
 const A_MINOR = new Set(SCALES.minor.intervals.map(i => (9 + i) % 12));   // A B C D E F G
 
-describe('Still D.R.E. style (the song every new project starts with)', () => {
+describe('Still D.R.E. style (a sample song)', () => {
   const p = SAMPLE_PROJECTS['Still D.R.E. style']();
-  it('is what the app starts with', () => { expect(startupProject().name).toBe('Still D.R.E. style'); });
+  it('is in the sample list, the app still starts with the Hip Hop Demo', () => { expect(Object.keys(SAMPLE_PROJECTS)).toContain('Still D.R.E. style'); expect(startupProject().name).toBe('Hip Hop Demo'); });
   it('is 93 BPM in A minor with a piano, a sub bass and a dry kit', () => {
     expect(p.bpm).toBe(93);
     expect(p.melodyView).toEqual({ key: 9, scale: 'minor' });
