@@ -25,7 +25,7 @@ const { chromium } = require('playwright');
   ok('a click on a slider does not move it', (await range.inputValue()) === v0);
   txt = await panel.innerText(); ok('and shows where that slider is made', /src\/[\w/]+\.tsx:\d+/.test(txt), txt.slice(0, 120));
   // 3. click through the folders: a panel from the UI folder
-  await p.locator('[role=tab]:has-text("MELODY")').first().click({ force: true }).catch(() => {}); await p.waitForTimeout(300);
+  await p.locator('[role=tab]:has-text("LEAD")').first().click({ force: true }).catch(() => {}); await p.waitForTimeout(300);
   // 4. clicking a file name in the lists jumps to that file
   const chip = panel.locator('.insp-chip[title^="src/audio/"]').first();
   if (await chip.count()) { const name = (await chip.innerText()); await chip.click(); await p.waitForTimeout(200); const t2 = await panel.innerText(); ok('a file name in the list opens that file', t2.includes('src/' + name), t2.slice(0, 150)); ok('a test file is listed where one exists', /TESTS/.test(t2)); }

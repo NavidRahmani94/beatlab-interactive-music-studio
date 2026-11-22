@@ -23,7 +23,7 @@ const { chromium } = require('playwright');
   // independence: play the shapes, then go to the DRUMS tab: the shape sound continues, no melody track needed
   await panel.getByRole('switch', { name: /PLAY THE SHAPES/ }).click(); const a1 = await peak(2200); ok('the shape is heard with its own sound', a1 > 0.03, 'peak ' + a1);
   await p.locator('[role=tab]:has-text("DRUMS")').first().click(); await panel.scrollIntoViewIfNeeded(); const a2 = await peak(2200); ok('still heard when the DRUMS tab is open (not tied to the open track)', a2 > 0.03, 'peak ' + a2);
-  await p.locator('[role=tab]:has-text("MELODY")').first().click(); await panel.scrollIntoViewIfNeeded();
+  await p.locator('[role=tab]:has-text("LEAD")').first().click(); await panel.scrollIntoViewIfNeeded();
   // volume
   await vol.fill('-30'); await vol.dispatchEvent('input'); await p.waitForTimeout(300); const quiet = await peak(2200);
   await vol.fill('0'); await vol.dispatchEvent('input'); await p.waitForTimeout(300); const loud = await peak(2200);

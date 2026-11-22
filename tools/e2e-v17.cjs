@@ -9,7 +9,7 @@ const ok = (n, c, d = '') => { results.push(c); console.log((c ? 'PASS ' : 'FAIL
   p.on('pageerror', e => errs.push(String(e))); p.on('dialog', d => d.accept());
   await p.goto(URL); await p.waitForTimeout(1000);
   await p.click('[aria-label="Play mode"] >> text="PATTERN"');
-  await p.click('button:text-is("MELODY")'); await p.waitForTimeout(300);
+  await p.click('button:text-is("LEAD")'); await p.waitForTimeout(300);
   const sec = 'section[aria-label="Melody track"]';
   const onCells = () => p.$$eval(`${sec} button[aria-pressed="true"][data-step]`, e => e.map(x => x.getAttribute('aria-label')));
   // 1. click a note name -> a sound starts

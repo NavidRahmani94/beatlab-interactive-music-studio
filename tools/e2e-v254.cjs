@@ -7,7 +7,7 @@ const { chromium } = require('playwright');
   await p.goto(process.argv[2]); await p.waitForTimeout(1200);
   const modeSel = async () => (await p.locator('.seg button.sel', { hasText: /^(PATTERN|SONG)$/ }).first().textContent());
   ok('starts in SONG mode', (await modeSel()) === 'SONG');
-  await p.locator('[role=tab]:has-text("MELODY")').first().click(); await p.waitForTimeout(300);
+  await p.locator('[role=tab]:has-text("LEAD")').first().click(); await p.waitForTimeout(300);
   const tools = p.locator('.roll-tools').first();
   await tools.locator('.mini-play.pat').click(); await p.waitForTimeout(700);
   ok('THIS PATTERN switches to PATTERN mode while it plays', (await modeSel()) === 'PATTERN');

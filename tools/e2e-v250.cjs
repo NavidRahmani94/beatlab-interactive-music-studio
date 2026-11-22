@@ -5,7 +5,7 @@ const { chromium } = require('playwright');
   p.on('pageerror', e => errs.push(String(e)));
   let bad = 0; const ok = (n, c, d) => { console.log((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : ' ' + (d || ''))); if (!c) bad++; };
   await p.goto(process.argv[2]); await p.waitForTimeout(1200);
-  await p.locator('[role=tab]:has-text("MELODY")').first().click(); await p.waitForTimeout(400);
+  await p.locator('[role=tab]:has-text("LEAD")').first().click(); await p.waitForTimeout(400);
   const roll = p.locator('.roll').first();
   // start from an empty roll
   for (let i = 0; i < 40; i++) { const on = roll.locator('.mcell.on.start').first(); if (!(await on.count())) break; await on.click(); await p.waitForTimeout(30); }

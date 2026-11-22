@@ -4,12 +4,12 @@ import { channelGroups, channelLabel, defaultChannels, syncChannels } from '../a
 
 describe('track list', () => {
   it('a new project has Melody, Ambient, Arpeggio and Synth', () => {
-    expect(defaultTrackDefs().map(t => [t.id, t.kind, t.name])).toEqual([['melody', 'melody', 'Melody'], ['ambient', 'ambient', 'Ambient'], ['arp', 'arp', 'Arpeggio'], ['synth', 'synth', 'Synth']]);
+    expect(defaultTrackDefs().map(t => [t.id, t.kind, t.name])).toEqual([['melody', 'melody', 'Lead'], ['ambient', 'ambient', 'Ambient'], ['arp', 'arp', 'Arpeggio'], ['synth', 'synth', 'Synth']]);
   });
   it('addTrack gives unique ids and names, and stops at the limit', () => {
     let t = defaultTrackDefs();
     t = addTrack(t, 'melody');
-    expect(t[4]).toMatchObject({ kind: 'melody', name: 'Melody 2' });
+    expect(t[4]).toMatchObject({ kind: 'melody', name: 'Lead 2' });
     t = addTrack(t, 'synth');
     expect(new Set(t.map(x => x.id)).size).toBe(t.length);
     while (t.length < MAX_TRACKS) t = addTrack(t, 'arp');
@@ -30,7 +30,7 @@ describe('track list', () => {
   it('rename trims, limits the length and never leaves a track nameless', () => {
     const t = defaultTrackDefs();
     expect(updateTrack(t, 'melody', { name: '  Lead   guitar ' })[0].name).toBe('Lead guitar');
-    expect(updateTrack(t, 'melody', { name: '   ' })[0].name).toBe('Melody');
+    expect(updateTrack(t, 'melody', { name: '   ' })[0].name).toBe('Lead');
     expect(cleanTrackName('x'.repeat(50), 'a')).toHaveLength(MAX_TRACK_NAME);
     expect(renameTrackLive(t, 'ambient', '')[1].name).toBe('');   // while typing
     expect(nextTrackName(t, 'ambient')).toBe('Ambient 2');

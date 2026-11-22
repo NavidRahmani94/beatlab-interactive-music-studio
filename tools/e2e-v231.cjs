@@ -12,7 +12,7 @@ const { chromium } = require('playwright');
   await space(); ok('Space starts playback', await playing());
   await space(); ok('Space stops playback', !(await playing()));
   // focus stays on a button after a mouse click: Space must still toggle once (and not press that button)
-  const tab = p.locator('[role=tab]:has-text("MELODY")').first(); await tab.click(); await p.waitForTimeout(300);
+  const tab = p.locator('[role=tab]:has-text("LEAD")').first(); await tab.click(); await p.waitForTimeout(300);
   await tab.focus(); await space(); ok('Space plays while a tab button has the focus', await playing());
   await tab.focus(); await space(); ok('Space stops again from the same button', !(await playing()));
   ok('the focused button was not clicked twice (MELODY tab still selected)', (await tab.getAttribute('aria-selected')) === 'true');

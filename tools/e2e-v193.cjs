@@ -9,7 +9,7 @@ const { chromium } = require('playwright');
       await ctx.addAudioWorkletModule(URL.createObjectURL(new Blob([src], { type: 'application/javascript' })), 'rec-w'); const node = ctx.createAudioWorkletNode('rec-w', { numberOfInputs: 1, numberOfOutputs: 0 }); node.port.onmessage = e => { window.__rec.chunks.push(e.data); }; this.safety.connect(node); }; });
   const peak = async (ms) => { await p.evaluate(() => { window.__rec.chunks = []; }); await p.waitForTimeout(ms); return p.evaluate(() => { let m = 0; window.__rec.chunks.forEach(c => c.forEach(v => { m = Math.max(m, Math.abs(v)); })); return +m.toFixed(3); }); };
   const press = async (key, code) => { await p.evaluate(([k, c]) => window.dispatchEvent(new KeyboardEvent('keydown', { key: k, code: c, bubbles: true })), [key, code]); const pk = await peak(500); await p.evaluate(([k, c]) => window.dispatchEvent(new KeyboardEvent('keyup', { key: k, code: c, bubbles: true })), [key, code]); await p.waitForTimeout(150); return pk; };
-  await p.locator('[role=tab]:has-text("MELODY")').first().click(); await p.waitForTimeout(300);
+  await p.locator('[role=tab]:has-text("LEAD")').first().click(); await p.waitForTimeout(300);
   ok('Persian layout (key ش, code KeyA) plays a note', (await press('ش', 'KeyA')) > 0.03);
   ok('Persian layout, W key (ص) plays a note', (await press('ص', 'KeyW')) > 0.03);
   ok('US layout still plays', (await press('a', 'KeyA')) > 0.03);

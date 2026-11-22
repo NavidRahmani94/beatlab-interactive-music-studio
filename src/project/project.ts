@@ -55,7 +55,7 @@ const drumsOf = (kick: number[], snare: number[], hat: number[], clap: number[])
 const drums32 = (kick: number[], snare: number[], hat: number[], clap: number[]): DrumPattern => ({ kick: on(kick), snare: on(snare), hat: on(hat), clap: on(clap) });
 /** The three classic tracks with chosen instruments (and arpeggio settings). */
 const trackSet = (instr: { melody?: string; ambient?: string; arp?: string } = {}, arp: ArpSettings = defaultArp()): TrackDef[] => [
-  makeTrack('melody', 'Melody', 'melody', instr.melody ?? KIND_DEFAULT_INSTRUMENT.melody),
+  makeTrack('melody', 'Lead', 'melody', instr.melody ?? KIND_DEFAULT_INSTRUMENT.melody),
   makeTrack('ambient', 'Ambient', 'ambient', instr.ambient ?? KIND_DEFAULT_INSTRUMENT.ambient),
   makeTrack('arp', 'Arpeggio', 'arp', instr.arp ?? KIND_DEFAULT_INSTRUMENT.arp, arp),
   makeTrack('synth', 'Synth', 'synth')
@@ -109,7 +109,7 @@ export const SAMPLE_PROJECTS: Record<string, () => BeatLabProject> = {
 
 /**
  * "Hip Hop Demo" – boom-bap at 90 BPM in A minor, 16 playlist slots (about 85 s):
- * 808 drums, a bass line (MELODY track), Rhodes chords played as an arpeggio (ARPEGGIO track), strings pad (AMBIENT track).
+ * 808 drums, a bass line (LEAD track), Rhodes chords played as an arpeggio (ARPEGGIO track), strings pad (AMBIENT track).
  */
 export function hipHopDemo(): BeatLabProject {
   const Am = [57, 60, 64], F = [53, 57, 60], C = [60, 64, 67], G = [55, 59, 62];
@@ -410,7 +410,7 @@ function widenV2(data: Record<string, unknown>): Record<string, unknown> {
 function toV5(data: Record<string, unknown>): Record<string, unknown> {
   const t = isObj(data.tracks) ? data.tracks : {};
   const tracks = [
-    { id: 'melody', name: 'Melody', kind: 'melody', instrument: t.melody ?? KIND_DEFAULT_INSTRUMENT.melody },
+    { id: 'melody', name: 'Lead', kind: 'melody', instrument: t.melody ?? KIND_DEFAULT_INSTRUMENT.melody },
     { id: 'ambient', name: 'Ambient', kind: 'ambient', instrument: t.ambient ?? KIND_DEFAULT_INSTRUMENT.ambient },
     { id: 'arp', name: 'Arpeggio', kind: 'arp', instrument: t.arp ?? KIND_DEFAULT_INSTRUMENT.arp, arp: data.arp },
     { id: 'synth', name: 'Synth', kind: 'synth', instrument: KIND_DEFAULT_INSTRUMENT.synth }

@@ -4,7 +4,7 @@
 import { ArpSettings, defaultArp } from '../music/arp';
 
 export const TRACK_KINDS = {
-  melody: { label: 'Melody', hint: 'the tune' },
+  melody: { label: 'Lead', hint: 'the lead line (the tune)' },
   ambient: { label: 'Ambient', hint: 'long, slow atmosphere (pads, drones)' },
   arp: { label: 'Arpeggio', hint: 'a held chord is played note by note' },
   synth: { label: 'Synth', hint: 'notes played by your own Synth Lab sound' }
@@ -42,7 +42,7 @@ export function makeTrack(id: string, name: string, kind: TrackKind, instrument:
 /** The tracks every new project starts with (all can be renamed or deleted; more can be added). */
 export function defaultTrackDefs(): TrackDef[] {
   return [
-    makeTrack('melody', 'Melody', 'melody'),
+    makeTrack('melody', 'Lead', 'melody'),
     makeTrack('ambient', 'Ambient', 'ambient'),
     makeTrack('arp', 'Arpeggio', 'arp'),
     makeTrack('synth', 'Synth', 'synth')
@@ -54,7 +54,7 @@ export function nextTrackId(tracks: TrackDef[]): string {
   while (tracks.some(t => t.id === `t${n}`)) n++;
   return `t${n}`;
 }
-/** "Melody", then "Melody 2", "Melody 3" ... (first name not used yet). */
+/** "Lead", then "Lead 2", "Lead 3" ... (first name not used yet). */
 export function nextTrackName(tracks: TrackDef[], kind: TrackKind): string {
   const base = TRACK_KINDS[kind].label;
   if (!tracks.some(t => t.name === base)) return base;

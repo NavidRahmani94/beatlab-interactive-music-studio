@@ -243,3 +243,6 @@ Built after the crackle diagnosis and the user's OK. Live SHAPE LAB sounds only;
 - The piano loop and the bass line are taken note for note from a public transcription (a `.mid` file, 2 bars long, supplied by the author): eighth-note stabs of C5+A5 (11 times) and then B4+G5 (5 times); a bass of A, B, E, G. The bass is one octave higher than in that file because the lowest key of the piano roll is C2. The drums, the sounds and the mix are our own.
 - Mix checked by rendering the song offline (`renderProjectToWav`): peak -3.8 dB (no clipping), average level -19.8 dB (Hip Hop Demo is about -21 dB). Piano -20.6 dB average, bass -27.9 dB (dry, under the piano), snare clear, hats soft. The mix values are in `stillDreDemo` in `src/project/project.ts`.
 - Tests: `src/project/stillDre.test.ts` (key, tempo, instruments, every note of the loop and the bass line, intro without bass, kit, mix order); the demo is also in `src/audio/demos.test.ts`.
+
+## v0.26.3 — the first track is called LEAD
+- The first track of a new project (and the name used for new tracks of that kind) is **Lead** instead of Melody. Projects that were saved before keep the name they have. The e2e scripts in `tools/` use the LEAD tab.

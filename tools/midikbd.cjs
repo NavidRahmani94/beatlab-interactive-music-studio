@@ -28,13 +28,13 @@ const { chromium } = require('playwright');
   console.log('requestMIDIAccess calls:', await p.evaluate(() => window.__midiAsked), '| status text:', (await p.locator('section.midi').innerText()).replace(/\n+/g, ' | ').slice(0, 400));
   console.log('handler attached:', await p.evaluate(() => typeof window.__midiIn.onmidimessage));
   // play a key on the open tab (melody first)
-  await p.locator('[role=tab]:has-text("MELODY")').first().click(); await p.waitForTimeout(300);
+  await p.locator('[role=tab]:has-text("LEAD")').first().click(); await p.waitForTimeout(300);
   console.log('open tab:', await p.locator('[role=tab][aria-selected=true]').first().innerText());
   await send([0x90, 60, 100]); console.log('melody note-on  -> peak', await peak(800)); await send([0x80, 60, 0]); await p.waitForTimeout(600);
   await p.locator('[role=tab]:has-text("DRUMS")').first().click(); await p.waitForTimeout(300);
   await send([0x90, 36, 110]); console.log('drums kick (36) -> peak', await peak(600));
 
-  await p.locator('[role=tab]:has-text("MELODY")').first().click(); await p.waitForTimeout(300);
+  await p.locator('[role=tab]:has-text("LEAD")').first().click(); await p.waitForTimeout(300);
   const notes = [21, 36, 48, 55, 60, 64, 72, 84, 96, 108];
   for (const n of notes) { await send([0x90, n, 90]); const pk = await peak(500); await send([0x80, n, 0]); await p.waitForTimeout(150); console.log('note', n, '-> peak', pk); }
   await send([0x90, 60, 90]); await send([0x90, 64, 90]); await send([0x90, 67, 90]); console.log('chord C-E-G -> peak', await peak(600)); await send([0x80, 60, 0]); await send([0x80, 64, 0]); await send([0x80, 67, 0]); await p.waitForTimeout(300);
